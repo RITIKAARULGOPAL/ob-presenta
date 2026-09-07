@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createProject, listProjects } from '@/lib/data';
+import { createProject, deleteProject, listProjects } from '@/lib/data';
 import type { ProjectSummary } from '@/types/slide';
 
 export default function HomePage() {
@@ -14,6 +14,7 @@ export default function HomePage() {
   const [preparedBy, setPreparedBy] = useState('Officebanao');
   const [date] = useState(() => new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }));
   const [error, setError] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     listProjects().then(setProjects);
@@ -27,6 +28,12 @@ export default function HomePage() {
     }
     const project = await createProject({ name: name.trim(), client: client.trim(), preparedBy: preparedBy.trim(), date });
     router.push(`/p/${project.id}/edit`);
+  }
+
+  async function handleDelete(id: string) {
+    setProjects((prev) => prev.filter((p) => p.id !== id));
+    setConfirmDeleteId(null);
+    await deleteProject(id);
   }
 
   return (
@@ -66,20 +73,43 @@ export default function HomePage() {
             <div className="flex flex-col gap-3">
               {projects.length === 0 && <div className="text-sm text-white/50">No saved presentations yet — start a new one above.</div>}
               {projects.map((p) => (
-                <button
+                <div
                   key={p.id}
-                  onClick={() => router.push(`/p/${p.id}/edit`)}
-                  className="flex items-center gap-4 rounded-xl border border-white/15 bg-white/[0.07] px-6 py-5 text-left transition hover:bg-white/[0.12]"
+                  className="flex items-center gap-4 rounded-xl border border-white/15 bg-white/[0.07] px-6 py-5 transition hover:bg-white/[0.12]"
                 >
-                  <span className="h-2 w-2 flex-shrink-0 rounded-full bg-[#5fa8e8]" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-display text-sm font-semibold text-white">{p.name}</span>
-                    <span className="block text-xs text-white/65">
-                      {p.client} · {p.date}
+                  <button onClick={() => router.push(`/p/${p.id}/edit`)} className="flex min-w-0 flex-1 items-center gap-4 text-left">
+                    <span className="h-2 w-2 flex-shrink-0 rounded-full bg-[#5fa8e8]" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-display text-sm font-semibold text-white">{p.name}</span>
+                      <span className="block text-xs text-white/65">
+                        {p.client} · {p.date}
+                      </span>
                     </span>
-                  </span>
-                  <span className="flex-shrink-0 text-xs font-semibold text-white/60">Open →</span>
-                </button>
+                  </button>
+                  {confirmDeleteId === p.id ? (
+                    <span className="flex flex-shrink-0 items-center gap-2 text-xs font-semibold">
+                      <button onClick={() => handleDelete(p.id)} className="text-red-400 hover:text-red-300">
+                        Delete
+                      </button>
+                      <button onClick={() => setConfirmDeleteId(null)} className="text-white/50 hover:text-white/80">
+                        Cancel
+                      </button>
+                    </span>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => setConfirmDeleteId(p.id)}
+                        className="flex-shrink-0 text-xs font-semibold text-white/40 hover:text-red-400"
+                        aria-label={`Delete ${p.name}`}
+                      >
+                        Delete
+                      </button>
+                      <button onClick={() => router.push(`/p/${p.id}/edit`)} className="flex-shrink-0 text-xs font-semibold text-white/60 hover:text-white">
+                        Open →
+                      </button>
+                    </>
+                  )}
+                </div>
               ))}
             </div>
           </>

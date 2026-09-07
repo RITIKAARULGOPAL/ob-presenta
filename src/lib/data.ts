@@ -1,41 +1,64 @@
 import { makeId } from './id';
 import { createSlide } from './slideDefaults';
+import { supabase } from './supabaseClient';
 import type { Project, ProjectSummary } from '@/types/slide';
 
 // ---------------------------------------------------------------------------
-// Data layer. Backed by localStorage today; this is the ONLY file that should
-// need to change when it's swapped for real Supabase calls (see the build
-// proposal: projects/slides live in Postgres as jsonb, same shape as below).
-// Every function here is async on purpose, even though localStorage is sync
-// — callers already treat this as I/O, so the Supabase swap is a body-only
-// change, not a call-site change.
+// Data layer — backed by Supabase Postgres. This is the only file that talks
+// to storage; every caller (the editor store, pages) goes through these five
+// functions, so the earlier localStorage version could be swapped out for
+// this one without touching anything else in the app.
 // ---------------------------------------------------------------------------
 
-const STORAGE_KEY = 'presenta_projects_v1';
-
-function readAll(): Project[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Project[]) : [];
-  } catch {
-    return [];
-  }
+interface ProjectRow {
+  id: string;
+  name: string;
+  client: string;
+  prepared_by: string;
+  date: string;
+  slides: Project['slides'];
+  created_at: number;
+  updated_at: number;
 }
 
-function writeAll(projects: Project[]) {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+function fromRow(row: ProjectRow): Project {
+  return {
+    id: row.id,
+    name: row.name,
+    client: row.client,
+    preparedBy: row.prepared_by,
+    date: row.date,
+    slides: row.slides,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 export async function listProjects(): Promise<ProjectSummary[]> {
-  return readAll()
-    .map(({ id, name, client, date, updatedAt }) => ({ id, name, client, date, updatedAt }))
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+  const { data, error } = await supabase
+    .from('projects')
+    .select('id, name, client, date, updated_at')
+    .order('updated_at', { ascending: false });
+  if (error) {
+    console.error('listProjects failed:', error.message);
+    return [];
+  }
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    client: r.client,
+    date: r.date,
+    updatedAt: r.updated_at,
+  }));
 }
 
 export async function getProject(id: string): Promise<Project | null> {
-  return readAll().find((p) => p.id === id) ?? null;
+  const { data, error } = await supabase.from('projects').select('*').eq('id', id).maybeSingle();
+  if (error) {
+    console.error('getProject failed:', error.message);
+    return null;
+  }
+  return data ? fromRow(data as ProjectRow) : null;
 }
 
 export async function createProject(input: {
@@ -55,21 +78,37 @@ export async function createProject(input: {
     createdAt: now,
     updatedAt: now,
   };
-  const all = readAll();
-  all.unshift(project);
-  writeAll(all);
+  const { error } = await supabase.from('projects').insert({
+    id: project.id,
+    name: project.name,
+    client: project.client,
+    prepared_by: project.preparedBy,
+    date: project.date,
+    slides: project.slides,
+    created_at: project.createdAt,
+    updated_at: project.updatedAt,
+  });
+  if (error) console.error('createProject failed:', error.message);
   return project;
 }
 
 export async function saveProject(project: Project): Promise<void> {
-  const all = readAll();
-  const idx = all.findIndex((p) => p.id === project.id);
-  const updated = { ...project, updatedAt: Date.now() };
-  if (idx === -1) all.unshift(updated);
-  else all[idx] = updated;
-  writeAll(all);
+  const updatedAt = Date.now();
+  const { error } = await supabase
+    .from('projects')
+    .update({
+      name: project.name,
+      client: project.client,
+      prepared_by: project.preparedBy,
+      date: project.date,
+      slides: project.slides,
+      updated_at: updatedAt,
+    })
+    .eq('id', project.id);
+  if (error) console.error('saveProject failed:', error.message);
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  writeAll(readAll().filter((p) => p.id !== id));
+  const { error } = await supabase.from('projects').delete().eq('id', id);
+  if (error) console.error('deleteProject failed:', error.message);
 }

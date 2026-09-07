@@ -1,5 +1,5 @@
 import { makeId } from './id';
-import type { Slide, SlideLayout, SlideStyleKind, StatItem, MergeItem } from '@/types/slide';
+import type { Slide, SlideLayout, SlideStyleKind, StatItem, MergeItem, LinkedView } from '@/types/slide';
 
 const defaultAnimation = () => ({ entry: 'none' as const, duration: 600, delay: 0 });
 
@@ -8,6 +8,14 @@ function makeStat(label: string, value = '0'): StatItem {
 }
 function makeItem(label: string): MergeItem {
   return { id: makeId('item'), label };
+}
+function makeLinkedViews(): LinkedView[] {
+  return [
+    { id: makeId('view'), kind: 'layout', label: 'Layout', url: '' },
+    { id: makeId('view'), kind: 'render', label: 'Render', url: '' },
+    { id: makeId('view'), kind: 'walkthrough', label: 'Walkthrough', url: '' },
+    { id: makeId('view'), kind: 'axo', label: 'Axo', url: '' },
+  ];
 }
 
 /** One factory per layout — the fields a fresh slide of that layout starts with.
@@ -59,6 +67,13 @@ export function defaultFieldsForLayout(layout: SlideLayout) {
         statValue: '123',
         statLabel: 'Stat description',
         caption: 'Supporting caption text.',
+      };
+    case 'linked-views':
+      return {
+        kickerEyebrow: 'New Section',
+        kickerLabel: 'Untitled',
+        title: 'Slide title',
+        views: makeLinkedViews(),
       };
     default:
       return {};
@@ -118,6 +133,7 @@ export const LAYOUT_LABELS: Record<SlideLayout, string> = {
   'title-slide': 'Title Slide',
   'merge-diagram': 'Merge Diagram',
   'stat-hero': 'Stat Hero',
+  'linked-views': 'Linked Views',
 };
 
 export const STYLE_LABELS: Record<SlideStyleKind, string> = {

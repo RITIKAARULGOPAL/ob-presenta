@@ -12,7 +12,8 @@ export type SlideLayout =
   | 'two-content'
   | 'title-slide'
   | 'merge-diagram'
-  | 'stat-hero';
+  | 'stat-hero'
+  | 'linked-views';
 
 export type SlideStyleKind = 'standard' | 'section-starter' | 'company' | 'design';
 
@@ -25,6 +26,15 @@ export interface StatItem {
 export interface MergeItem {
   id: string;
   label: string;
+}
+
+export type LinkedViewKind = 'layout' | 'render' | 'walkthrough' | 'axo';
+
+export interface LinkedView {
+  id: string;
+  kind: LinkedViewKind;
+  label: string;
+  url: string;
 }
 
 export interface SlideFields {
@@ -43,6 +53,7 @@ export interface SlideFields {
   imageUrl?: string;
   subtitle?: string;
   numeral?: string;
+  views?: LinkedView[];
 }
 
 export type AnimationEntry = 'none' | 'fadeUp' | 'fadeIn' | 'scaleIn' | 'slideLeft';

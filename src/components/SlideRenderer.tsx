@@ -1,8 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { EditableText } from './EditableText';
 import { useEditorStore } from '@/lib/editorStore';
-import type { Slide } from '@/types/slide';
+import type { LinkedView, Slide } from '@/types/slide';
 
 interface SlideRendererProps {
   slide: Slide;
@@ -10,6 +11,86 @@ interface SlideRendererProps {
 }
 
 const ARROW = '→';
+
+/** Image or video box with an inline "paste a URL" affordance when editable —
+ * used for Design-style slides and each Linked-Views tab. No upload/storage
+ * involved on purpose; pasting a hosted URL is the whole workaround. */
+function MediaBox({
+  url,
+  kind,
+  editable,
+  onChangeUrl,
+  className,
+}: {
+  url: string;
+  kind: 'image' | 'video';
+  editable: boolean;
+  onChangeUrl: (url: string) => void;
+  className?: string;
+}) {
+  return (
+    <div className={`relative overflow-hidden rounded-lg bg-black/30 ${className ?? ''}`}>
+      {url ? (
+        kind === 'video' ? (
+          <video src={url} controls className="h-full w-full object-cover" />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={url} alt="" className="h-full w-full object-cover" />
+        )
+      ) : (
+        <div className="flex h-full items-center justify-center text-sm text-white/40">No {kind} yet</div>
+      )}
+      {editable && (
+        <input
+          value={url}
+          onChange={(e) => onChangeUrl(e.target.value)}
+          placeholder={`Paste ${kind} URL…`}
+          className="absolute inset-x-2 bottom-2 rounded-md border border-white/20 bg-black/60 px-2 py-1 text-xs text-white outline-none placeholder:text-white/40"
+        />
+      )}
+    </div>
+  );
+}
+
+function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
+  const updateField = useEditorStore((s) => s.updateField);
+  const views = slide.fields.views ?? [];
+  const [activeId, setActiveId] = useState<string | undefined>(views[0]?.id);
+  const active = views.find((v) => v.id === activeId) ?? views[0];
+
+  function setView(id: string, patch: Partial<LinkedView>) {
+    updateField('views', views.map((v) => (v.id === id ? { ...v, ...patch } : v)));
+  }
+
+  if (!active) return null;
+
+  return (
+    <div className="mt-6 flex flex-col">
+      <div className="mb-3 flex flex-wrap gap-2">
+        {views.map((v) => (
+          <button
+            key={v.id}
+            onClick={() => setActiveId(v.id)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+              v.id === active.id
+                ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                : 'border-[var(--line)] text-[var(--ink-2)] hover:border-[var(--ink-3)]'
+            }`}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
+      <MediaBox
+        url={active.url}
+        kind={active.kind === 'walkthrough' ? 'video' : 'image'}
+        editable={editable}
+        onChangeUrl={(url) => setView(active.id, { url })}
+        className="aspect-video w-full"
+      />
+    </div>
+  );
+}
 
 function Kicker({ slide, editable }: SlideRendererProps) {
   const updateField = useEditorStore((s) => s.updateField);
@@ -300,15 +381,15 @@ export function SlideRenderer({ slide, editable }: SlideRendererProps) {
           {slide.layout === 'two-content' && <TwoContent slide={slide} editable={editable} />}
           {slide.layout === 'merge-diagram' && <MergeDiagram slide={slide} editable={editable} />}
           {slide.layout === 'stat-hero' && <StatHero slide={slide} editable={editable} />}
+          {slide.layout === 'linked-views' && <LinkedViewsExplorer slide={slide} editable={editable} />}
           {slide.style === 'design' && (
-            <div className="mt-6 aspect-video w-full max-w-xl overflow-hidden rounded-lg bg-black/30">
-              {slide.fields.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={slide.fields.imageUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full items-center justify-center text-sm text-white/40">No image yet</div>
-              )}
-            </div>
+            <MediaBox
+              url={slide.fields.imageUrl ?? ''}
+              kind="image"
+              editable={editable}
+              onChangeUrl={(url) => updateField('imageUrl', url)}
+              className="mt-6 aspect-video w-full max-w-xl"
+            />
           )}
         </>
       )}

@@ -107,6 +107,15 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 >
                   Stat Hero
                 </button>
+                <button
+                  onClick={() => {
+                    addSlide('linked-views');
+                    setShowAddMenu(false);
+                  }}
+                  className="block w-full rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Linked Views
+                </button>
               </div>
             )}
           </div>

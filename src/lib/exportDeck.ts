@@ -8,7 +8,9 @@ import type { Project } from '@/types/slide';
 // Export renders each slide off-screen at a fixed 16:9 pixel size, rasterizes
 // it with html-to-image, then assembles the images into a PDF or PPTX. This
 // reuses SlideRenderer directly so exported output always matches what the
-// editor/presenter show — no second layout engine to keep in sync.
+// editor/presenter show — no second layout engine to keep in sync. PDF/PPTX
+// are frozen-frame formats, so each slide is captured in its settled (post-
+// animation) state; entrance animations don't carry over by design.
 
 const SLIDE_W = 1280;
 const SLIDE_H = 720;
@@ -60,10 +62,13 @@ async function captureSlides(project: Project, onProgress?: ExportProgress): Pro
 
 export async function exportToPdf(project: Project, onProgress?: ExportProgress): Promise<void> {
   const images = await captureSlides(project, onProgress);
-  const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [SLIDE_W, SLIDE_H] });
+  // Passing both `orientation` and a custom pixel `format` array makes jsPDF
+  // swap the dimensions a second time, silently producing a portrait canvas
+  // the wrong size for our image draws — the format array alone is enough.
+  const pdf = new jsPDF({ unit: 'px', format: [SLIDE_W, SLIDE_H] });
 
   images.forEach((dataUrl, i) => {
-    if (i > 0) pdf.addPage([SLIDE_W, SLIDE_H], 'landscape');
+    if (i > 0) pdf.addPage([SLIDE_W, SLIDE_H]);
     pdf.addImage(dataUrl, 'PNG', 0, 0, SLIDE_W, SLIDE_H);
   });
 

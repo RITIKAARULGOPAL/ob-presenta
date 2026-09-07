@@ -1,69 +1,141 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createProject, listProjects } from '@/lib/data';
+import type { ProjectSummary } from '@/types/slide';
+
+export default function HomePage() {
+  const router = useRouter();
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [name, setName] = useState('');
+  const [client, setClient] = useState('');
+  const [preparedBy, setPreparedBy] = useState('Officebanao');
+  const [date] = useState(() => new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }));
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    listProjects().then(setProjects);
+  }, []);
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) {
+      setError('Project name is required.');
+      return;
+    }
+    const project = await createProject({ name: name.trim(), client: client.trim(), preparedBy: preparedBy.trim(), date });
+    router.push(`/p/${project.id}/edit`);
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0c1420] px-6 py-16 text-white">
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(1100px 700px at 85% 8%, rgba(11,114,194,.16), transparent 60%), radial-gradient(900px 600px at 90% 95%, rgba(255,255,255,.05), transparent 55%)',
+        }}
+      />
+      <div className="relative w-full max-w-3xl">
+        {!showForm ? (
+          <>
+            <div className="mb-2 font-display text-4xl font-light tracking-[0.3em]">
+              Presenta<span className="tracking-normal">.</span>
+            </div>
+            <p className="mb-1 text-lg font-medium text-white/90">An Interactive Presentation Platform</p>
+            <p className="mb-14 text-sm text-white/60">Powered by Officebanao</p>
+
+            <button
+              onClick={() => setShowForm(true)}
+              className="mb-10 flex w-full items-center gap-5 rounded-2xl border border-dashed border-white/25 bg-white/5 p-7 text-left transition hover:bg-white/10"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+              <span className="flex h-13 w-13 flex-shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 p-3">
+                <svg viewBox="0 0 24 24" className="h-5 w-5 stroke-white" fill="none" strokeWidth={2} strokeLinecap="round">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </span>
+              <span>
+                <span className="block font-display text-lg font-bold">New presentation</span>
+                <span className="block text-sm text-white/60">Start from a blank project — set the name, client and date</span>
+              </span>
+            </button>
+
+            <div className="mb-4 text-xs font-bold uppercase tracking-widest text-white/65">Recent</div>
+            <div className="flex flex-col gap-3">
+              {projects.length === 0 && <div className="text-sm text-white/50">No saved presentations yet — start a new one above.</div>}
+              {projects.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => router.push(`/p/${p.id}/edit`)}
+                  className="flex items-center gap-4 rounded-xl border border-white/15 bg-white/[0.07] px-6 py-5 text-left transition hover:bg-white/[0.12]"
+                >
+                  <span className="h-2 w-2 flex-shrink-0 rounded-full bg-[#5fa8e8]" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-display text-sm font-semibold text-white">{p.name}</span>
+                    <span className="block text-xs text-white/65">
+                      {p.client} · {p.date}
+                    </span>
+                  </span>
+                  <span className="flex-shrink-0 text-xs font-semibold text-white/60">Open →</span>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="mx-auto w-full max-w-md rounded-2xl bg-white p-10 text-[#141a2b] shadow-2xl">
+            <button onClick={() => setShowForm(false)} className="mb-6 flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600">
+              ← Back to Presenta
+            </button>
+            <div className="text-xs font-bold uppercase tracking-wider text-[#0b72c2]">Presenta · New Presentation</div>
+            <h1 className="mt-2 font-display text-2xl font-bold">Set up this presentation</h1>
+            <p className="mt-2 text-sm text-slate-500">These details personalise the deck — fill them in, then create the file. Opens straight into the Editor.</p>
+            <form onSubmit={handleCreate} className="mt-6 flex flex-col gap-4">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Project name</span>
+                <input
+                  autoFocus
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setError('');
+                  }}
+                  placeholder="e.g. Acme Corp — HQ Workplace Design"
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm outline-none focus:border-[#0b72c2] focus:bg-white"
+                />
+                {error && <span className="mt-1 block text-xs text-red-600">{error}</span>}
+              </label>
+              <div className="flex gap-4">
+                <label className="block flex-1">
+                  <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Client</span>
+                  <input
+                    value={client}
+                    onChange={(e) => setClient(e.target.value)}
+                    placeholder="Client name"
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm outline-none focus:border-[#0b72c2] focus:bg-white"
+                  />
+                </label>
+                <label className="block flex-1">
+                  <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Prepared by</span>
+                  <input
+                    value={preparedBy}
+                    onChange={(e) => setPreparedBy(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm outline-none focus:border-[#0b72c2] focus:bg-white"
+                  />
+                </label>
+              </div>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Presentation date</span>
+                <input readOnly value={date} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-500" />
+              </label>
+              <button type="submit" className="mt-2 w-full rounded-lg bg-[#0b72c2] py-3 text-sm font-bold text-white transition hover:bg-[#095f9f]">
+                + Create New File
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
+    </main>
   );
 }

@@ -56,22 +56,26 @@ export default function PresenterPage({ params }: { params: Promise<{ id: string
         </div>
       )}
 
+      {/* A translucent dark pill (not the slide-relative white/black tokens SlideRenderer
+          uses) so these controls stay visible over both light and dark slide styles. */}
       <button
         onClick={goPrev}
         disabled={currentIndex <= 0}
-        className="absolute left-6 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white transition hover:bg-white/15 disabled:opacity-20"
+        className="absolute left-6 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-lg text-white shadow-lg backdrop-blur-sm transition hover:bg-black/60 disabled:opacity-20"
       >
         ‹
       </button>
       <button
         onClick={goNext}
         disabled={!project || currentIndex >= project.slides.length - 1}
-        className="absolute right-6 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white transition hover:bg-white/15 disabled:opacity-20"
+        className="absolute right-6 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-lg text-white shadow-lg backdrop-blur-sm transition hover:bg-black/60 disabled:opacity-20"
       >
         ›
       </button>
 
-      <div className="absolute bottom-6 right-6 text-xs text-white/35">Press Esc to exit Presenter mode</div>
+      <div className="absolute bottom-6 right-6 rounded-full bg-black/40 px-3 py-1.5 text-xs text-white shadow-lg backdrop-blur-sm">
+        Press Esc to exit Presenter mode
+      </div>
     </div>
   );
 }

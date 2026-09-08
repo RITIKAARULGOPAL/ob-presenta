@@ -14,10 +14,21 @@ export function SlideRail() {
   return (
     <div className="flex w-48 flex-shrink-0 flex-col gap-3 overflow-y-auto border-r border-slate-200 bg-slate-50 p-3">
       {project.slides.map((slide, i) => (
-        <button
+        // A div rather than a button: the rendered slide inside can itself contain
+        // buttons (the Linked Views tabs), and a button can't nest a button.
+        <div
           key={slide.id}
+          role="button"
+          tabIndex={0}
+          aria-current={slide.id === currentSlideId}
           onClick={() => selectSlide(slide.id)}
-          className={`group relative aspect-video overflow-hidden rounded-md border-2 text-left transition ${
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              selectSlide(slide.id);
+            }
+          }}
+          className={`group relative aspect-video cursor-pointer overflow-hidden rounded-md border-2 text-left transition ${
             slide.id === currentSlideId ? 'border-[#0b72c2]' : 'border-transparent hover:border-slate-300'
           }`}
         >
@@ -26,17 +37,18 @@ export function SlideRail() {
           </div>
           <span className="absolute bottom-1 left-1.5 rounded bg-black/50 px-1.5 py-0.5 text-[10px] font-semibold text-white">{i + 1}</span>
           {project.slides.length > 1 && (
-            <span
+            <button
               onClick={(e) => {
                 e.stopPropagation();
                 removeSlide(slide.id);
               }}
+              aria-label={`Delete slide ${i + 1}`}
               className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded bg-black/50 text-xs text-white group-hover:flex hover:bg-red-600"
             >
               ✕
-            </span>
+            </button>
           )}
-        </button>
+        </div>
       ))}
     </div>
   );

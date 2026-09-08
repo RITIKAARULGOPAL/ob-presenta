@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createSlide, createStyledSlide, defaultFieldsForLayout, defaultFieldsForStyle } from './slideDefaults';
-import { saveProject } from './data';
+import { optionalColumnsMissing, saveProject } from './data';
 import { makeId } from './id';
 import type { Brand, Project, Slide, SlideFields, SlideLayout, SlideStyleKind } from '@/types/slide';
 
@@ -11,6 +11,8 @@ interface EditorState {
   currentSlideId: string | null;
   mode: Mode;
   saving: boolean;
+  saveError?: string;
+  logoSaveUnavailable: boolean;
 
   loadProject: (project: Project) => void;
   setMode: (mode: Mode) => void;
@@ -38,9 +40,15 @@ interface EditorState {
 }
 
 function persist(project: Project) {
-  // fire-and-forget; the data layer is the single place this becomes a real
-  // network call once Supabase is wired in.
-  void saveProject(project);
+  // Fire-and-forget, but not silent: a save that fails has to reach the user,
+  // or they keep editing a deck that isn't being written anywhere.
+  void saveProject(project)
+    .then(() => useEditorStore.setState({ saveError: undefined, logoSaveUnavailable: optionalColumnsMissing() }))
+    .catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('saveProject failed:', message);
+      useEditorStore.setState({ saveError: message });
+    });
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -48,6 +56,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   currentSlideId: null,
   mode: 'editor',
   saving: false,
+  saveError: undefined,
+  logoSaveUnavailable: false,
 
   loadProject: (project) => set({ project, currentSlideId: project.slides[0]?.id ?? null, mode: 'editor' }),
 

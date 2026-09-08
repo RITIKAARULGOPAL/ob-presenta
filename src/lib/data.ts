@@ -58,13 +58,58 @@ export async function listProjects(): Promise<ProjectSummary[]> {
   }));
 }
 
+/** Columns added by migration 0003. When that migration hasn't been applied to
+ * the target database, Postgres rejects the entire write with 42703 rather than
+ * ignoring the unknown columns — which silently broke every create and every
+ * save. We retry once without them, so the deck still works and only the logo
+ * and accent colour fail to stick. */
+const OPTIONAL_COLUMNS = ['client_logo', 'accent_color'] as const;
+
+/** An unknown column surfaces under two different codes depending on who
+ * catches it: PostgREST rejects writes against its own schema cache before
+ * Postgres ever sees them (PGRST204), while reads reach Postgres and come back
+ * as 42703. Matching only one of the two silently misses the write path. */
+const UNKNOWN_COLUMN_CODES = new Set(['PGRST204', '42703']);
+
+function isUnknownColumn(error: { code?: string } | null): boolean {
+  return !!error?.code && UNKNOWN_COLUMN_CODES.has(error.code);
+}
+
+let missingOptionalColumns = false;
+
+/** True once a write has proven migration 0003 is absent, so the UI can explain
+ * why a logo or accent colour didn't stick instead of just losing it. */
+export function optionalColumnsMissing(): boolean {
+  return missingOptionalColumns;
+}
+
+function warnOnce() {
+  if (missingOptionalColumns) return;
+  missingOptionalColumns = true;
+  console.warn(
+    'Presenta: migration 0003_add_client_logo.sql has not been applied, so the ' +
+      'client logo and accent colour cannot be saved. Everything else works.',
+  );
+}
+
+function withoutOptionalColumns<T extends Record<string, unknown>>(row: T): Partial<T> {
+  const copy: Record<string, unknown> = { ...row };
+  for (const column of OPTIONAL_COLUMNS) delete copy[column];
+  return copy as Partial<T>;
+}
+
 export async function getProject(id: string): Promise<Project | null> {
   const { data, error } = await supabase.from('projects').select('*').eq('id', id).maybeSingle();
   if (error) {
     console.error('getProject failed:', error.message);
     return null;
   }
-  return data ? fromRow(data as ProjectRow) : null;
+  if (!data) return null;
+  // select('*') returns only the columns that exist, so a row missing these
+  // keys tells us migration 0003 is absent without spending another request —
+  // and lets the editor warn on load rather than after the first failed save.
+  if (!(OPTIONAL_COLUMNS[0] in (data as Record<string, unknown>))) warnOnce();
+  return fromRow(data as ProjectRow);
 }
 
 export async function createProject(input: {
@@ -90,7 +135,7 @@ export async function createProject(input: {
     createdAt: now,
     updatedAt: now,
   };
-  const { error } = await supabase.from('projects').insert({
+  const row = {
     id: project.id,
     name: project.name,
     client: project.client,
@@ -102,28 +147,39 @@ export async function createProject(input: {
     slides: project.slides,
     created_at: project.createdAt,
     updated_at: project.updatedAt,
-  });
-  if (error) console.error('createProject failed:', error.message);
+  };
+
+  let { error } = await supabase.from('projects').insert(row);
+  if (isUnknownColumn(error)) {
+    warnOnce();
+    ({ error } = await supabase.from('projects').insert(withoutOptionalColumns(row)));
+  }
+  // Returning the project regardless used to send the editor to a row that was
+  // never written, which surfaced as "Couldn't find that project."
+  if (error) throw new Error(error.message);
   return project;
 }
 
 export async function saveProject(project: Project): Promise<void> {
   const updatedAt = Date.now();
-  const { error } = await supabase
-    .from('projects')
-    .update({
-      name: project.name,
-      client: project.client,
-      prepared_by: project.preparedBy,
-      date: project.date,
-      brand: project.brand,
-      client_logo: project.clientLogo ?? null,
+  const row = {
+    name: project.name,
+    client: project.client,
+    prepared_by: project.preparedBy,
+    date: project.date,
+    brand: project.brand,
+    client_logo: project.clientLogo ?? null,
     accent_color: project.accentColor ?? null,
-      slides: project.slides,
-      updated_at: updatedAt,
-    })
-    .eq('id', project.id);
-  if (error) console.error('saveProject failed:', error.message);
+    slides: project.slides,
+    updated_at: updatedAt,
+  };
+
+  let { error } = await supabase.from('projects').update(row).eq('id', project.id);
+  if (isUnknownColumn(error)) {
+    warnOnce();
+    ({ error } = await supabase.from('projects').update(withoutOptionalColumns(row)).eq('id', project.id));
+  }
+  if (error) throw new Error(error.message);
 }
 
 export async function deleteProject(id: string): Promise<void> {

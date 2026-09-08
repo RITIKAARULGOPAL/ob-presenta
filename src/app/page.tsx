@@ -38,8 +38,15 @@ export default function HomePage() {
       setError('Project name is required.');
       return;
     }
-    const project = await createProject({ name: name.trim(), client: client.trim(), preparedBy: preparedBy.trim(), date, brand, clientLogo, accentColor });
-    router.push(`/p/${project.id}/edit`);
+    setError('');
+    try {
+      const project = await createProject({ name: name.trim(), client: client.trim(), preparedBy: preparedBy.trim(), date, brand, clientLogo, accentColor });
+      router.push(`/p/${project.id}/edit`);
+    } catch (err) {
+      // Navigating on a failed insert is what produced the dead
+      // "Couldn't find that project." page — stay put and say what broke.
+      setError(err instanceof Error ? `Couldn't create the presentation: ${err.message}` : "Couldn't create the presentation.");
+    }
   }
 
   async function handleClientLogoPick(e: React.ChangeEvent<HTMLInputElement>) {

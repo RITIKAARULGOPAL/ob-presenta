@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getProject } from '@/lib/data';
+import { getProject, optionalColumnsMissing } from '@/lib/data';
 import { useEditorStore } from '@/lib/editorStore';
 import { SlideRail } from '@/components/SlideRail';
 import { SlideRenderer } from '@/components/SlideRenderer';
@@ -22,11 +22,15 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const loadProject = useEditorStore((s) => s.loadProject);
   const currentSlide = useEditorStore((s) => s.currentSlide());
   const addSlide = useEditorStore((s) => s.addSlide);
+  const saveError = useEditorStore((s) => s.saveError);
+  const logoSaveUnavailable = useEditorStore((s) => s.logoSaveUnavailable);
 
   useEffect(() => {
     getProject(id).then((p) => {
-      if (p) loadProject(p);
-      else setNotFound(true);
+      if (p) {
+        loadProject(p);
+        useEditorStore.setState({ logoSaveUnavailable: optionalColumnsMissing() });
+      } else setNotFound(true);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -59,8 +63,20 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     return <div className="flex h-screen items-center justify-center text-slate-400">Loading…</div>;
   }
 
+  const saveBanner = saveError ? (
+    <div className="shrink-0 bg-red-50 px-4 py-2 text-[12px] text-red-700">
+      <strong className="font-semibold">Changes aren&apos;t being saved.</strong> {saveError}
+    </div>
+  ) : logoSaveUnavailable ? (
+    <div className="shrink-0 bg-amber-50 px-4 py-2 text-[12px] text-amber-800">
+      <strong className="font-semibold">Slides are saving, but the client logo and accent colour aren&apos;t.</strong>{' '}
+      The database is missing those two columns — run migration 0003_add_client_logo.sql to enable them.
+    </div>
+  ) : null;
+
   return (
     <div className="flex h-screen flex-col bg-slate-100">
+      {saveBanner}
       <header className="flex flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-2.5">
         <div className="flex items-center gap-2 rounded-full bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-white">
           <span className="h-1.5 w-1.5 rounded-full bg-[#5fa8e8]" />

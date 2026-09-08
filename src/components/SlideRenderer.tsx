@@ -71,6 +71,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   const updateField = useEditorStore((s) => s.updateField);
   const views = slide.fields.views ?? [];
   const [activeId, setActiveId] = useState<string | undefined>(views[0]?.id);
+  const [drawMode, setDrawMode] = useState(false);
   const [drawingPoints, setDrawingPoints] = useState<Point[] | null>(null);
   const [pickingTarget, setPickingTarget] = useState(false);
   const [pendingTarget, setPendingTarget] = useState('');
@@ -93,7 +94,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   const targetView = otherViews.find((v) => v.id === pendingTarget);
 
   function handleMediaClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (!editable || !active.url || active.kind === 'walkthrough' || pickingTarget) return;
+    if (!drawMode || !editable || !active.url || active.kind === 'walkthrough' || pickingTarget) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const point = { x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height };
     setDrawingPoints((prev) => (prev ? [...prev, point] : [point]));
@@ -106,6 +107,12 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   function cancelDrawing() {
     setDrawingPoints(null);
     setPickingTarget(false);
+    setDrawMode(false);
+  }
+
+  function selectView(id: string) {
+    setActiveId(id);
+    cancelDrawing();
   }
 
   function startPickingTarget() {
@@ -158,11 +165,11 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
 
   return (
     <div className="mt-6 flex flex-col">
-      <div className="mb-3 flex flex-wrap gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         {views.map((v) => (
           <button
             key={v.id}
-            onClick={() => setActiveId(v.id)}
+            onClick={() => selectView(v.id)}
             className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
               v.id === active.id
                 ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
@@ -172,8 +179,16 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
             {v.label}
           </button>
         ))}
+        {editable && active.url && active.kind !== 'walkthrough' && !drawMode && (
+          <button
+            onClick={() => setDrawMode(true)}
+            className="ml-auto rounded-full border border-dashed border-[var(--line)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-2)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          >
+            + Draw region
+          </button>
+        )}
       </div>
-      <div className="relative aspect-video w-full" onClick={handleMediaClick}>
+      <div className={`relative aspect-video w-full ${drawMode ? 'cursor-crosshair' : ''}`} onClick={handleMediaClick}>
         <MediaBox
           url={active.url}
           kind={active.kind === 'walkthrough' ? 'video' : 'image'}
@@ -193,7 +208,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               fillOpacity={h.fillOpacity ?? DEFAULT_FILL_OPACITY}
               stroke={h.strokeColor ?? DEFAULT_STROKE}
               strokeWidth={h.strokeWidth ?? DEFAULT_STROKE_WIDTH}
-              className={drawingPoints ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer'}
+              className={drawMode ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer'}
               onClick={(e) => {
                 e.stopPropagation();
                 if (editable) removeHotspot(h.id);
@@ -219,21 +234,27 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           )}
         </svg>
 
-        {drawingPoints && !pickingTarget && (
+        {drawMode && !pickingTarget && (
           <div onClick={(e) => e.stopPropagation()} className="absolute left-2 top-2 z-20 flex items-center gap-2 rounded-md bg-black/75 px-2.5 py-1.5 text-[11px] font-medium text-white">
-            <span>
-              {drawingPoints.length} point{drawingPoints.length === 1 ? '' : 's'}
-            </span>
-            <button onClick={undoPoint} className="underline decoration-white/50 hover:decoration-white">
-              Undo
-            </button>
-            <button
-              onClick={startPickingTarget}
-              disabled={drawingPoints.length < 3}
-              className="rounded bg-[var(--accent)] px-2 py-0.5 font-semibold disabled:opacity-40"
-            >
-              {drawingPoints.length < 3 ? `Finish (${3 - drawingPoints.length} more)` : 'Finish'}
-            </button>
+            {drawingPoints ? (
+              <>
+                <span>
+                  {drawingPoints.length} point{drawingPoints.length === 1 ? '' : 's'}
+                </span>
+                <button onClick={undoPoint} className="underline decoration-white/50 hover:decoration-white">
+                  Undo
+                </button>
+                <button
+                  onClick={startPickingTarget}
+                  disabled={drawingPoints.length < 3}
+                  className="rounded bg-[var(--accent)] px-2 py-0.5 font-semibold disabled:opacity-40"
+                >
+                  {drawingPoints.length < 3 ? `Finish (${3 - drawingPoints.length} more)` : 'Finish'}
+                </button>
+              </>
+            ) : (
+              <span>Click the image to place your first point</span>
+            )}
             <button onClick={cancelDrawing} className="underline decoration-white/50 hover:decoration-white">
               Cancel
             </button>
@@ -329,9 +350,6 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           </div>
         )}
       </div>
-      {editable && active.url && active.kind !== 'walkthrough' && !drawingPoints && (
-        <p className="mt-2 text-[11px] text-[var(--ink-3)]">Click to place points around a region, then Finish to link it to another view.</p>
-      )}
     </div>
   );
 }

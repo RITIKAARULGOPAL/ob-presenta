@@ -32,9 +32,8 @@ export type LinkedViewKind = 'layout' | 'render' | 'walkthrough' | 'axo';
 
 export interface ViewHotspot {
   id: string;
-  /** Relative position within the source image, both 0–1. */
-  x: number;
-  y: number;
+  /** Polygon outlining the linked region — each vertex relative to the image, 0–1. At least 3 points. */
+  points: { x: number; y: number }[];
   targetViewId: string;
   /** Seconds — only meaningful when the target view is a walkthrough video. */
   targetTime?: number;

@@ -56,15 +56,18 @@ function MediaBox({
   );
 }
 
-/** A pin placed at a relative (x, y) on a source image. Editable mode: click empty
- * space to drop a new pin and pick its target view (+ optional video timestamp);
- * click an existing pin to remove it. Non-editable (Presenter): click a pin to jump
- * to its target, seeking the target video to the given timestamp if there is one. */
+type Point = { x: number; y: number };
+
+/** A region drawn as a polygon on a source image. Editable mode: click to place
+ * vertices, Finish once there are 3+, then pick the target view (+ optional video
+ * timestamp); click a finished region to delete it. Non-editable (Presenter): click
+ * a region to jump to its target, seeking the target video if a timestamp was set. */
 function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   const updateField = useEditorStore((s) => s.updateField);
   const views = slide.fields.views ?? [];
   const [activeId, setActiveId] = useState<string | undefined>(views[0]?.id);
-  const [pending, setPending] = useState<{ x: number; y: number } | null>(null);
+  const [drawingPoints, setDrawingPoints] = useState<Point[] | null>(null);
+  const [pickingTarget, setPickingTarget] = useState(false);
   const [pendingTarget, setPendingTarget] = useState('');
   const [pendingTime, setPendingTime] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -78,21 +81,37 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
 
   const otherViews = views.filter((v) => v.id !== active.id);
   const hotspots = active.hotspots ?? [];
+  const targetView = otherViews.find((v) => v.id === pendingTarget);
 
   function handleMediaClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (!editable || !active.url || active.kind === 'walkthrough') return;
+    if (!editable || !active.url || active.kind === 'walkthrough' || pickingTarget) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    setPending({ x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height });
-    setPendingTarget(otherViews[0]?.id ?? '');
-    setPendingTime('');
+    const point = { x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height };
+    setDrawingPoints((prev) => (prev ? [...prev, point] : [point]));
   }
 
-  function confirmHotspot() {
-    if (!pending || !pendingTarget) return;
+  function undoPoint() {
+    setDrawingPoints((prev) => (prev && prev.length > 1 ? prev.slice(0, -1) : null));
+  }
+
+  function cancelDrawing() {
+    setDrawingPoints(null);
+    setPickingTarget(false);
+  }
+
+  function startPickingTarget() {
+    if (!drawingPoints || drawingPoints.length < 3) return;
+    setPendingTarget(otherViews[0]?.id ?? '');
+    setPendingTime('');
+    setPickingTarget(true);
+  }
+
+  function confirmRegion() {
+    if (!drawingPoints || drawingPoints.length < 3 || !pendingTarget) return;
     const time = pendingTime.trim() ? Number(pendingTime) : undefined;
-    const hotspot: ViewHotspot = { id: makeId('hotspot'), x: pending.x, y: pending.y, targetViewId: pendingTarget, targetTime: time };
+    const hotspot: ViewHotspot = { id: makeId('hotspot'), points: drawingPoints, targetViewId: pendingTarget, targetTime: time };
     setView(active.id, { hotspots: [...hotspots, hotspot] });
-    setPending(null);
+    cancelDrawing();
   }
 
   function removeHotspot(id: string) {
@@ -108,7 +127,12 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     }
   }
 
-  const targetView = otherViews.find((v) => v.id === pendingTarget);
+  const centroid: Point | null = drawingPoints
+    ? {
+        x: drawingPoints.reduce((s, p) => s + p.x, 0) / drawingPoints.length,
+        y: drawingPoints.reduce((s, p) => s + p.y, 0) / drawingPoints.length,
+      }
+    : null;
 
   return (
     <div className="mt-6 flex flex-col">
@@ -137,27 +161,65 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           mediaRef={active.kind === 'walkthrough' ? videoRef : undefined}
         />
 
-        {hotspots.map((h) => (
-          <button
-            key={h.id}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (editable) removeHotspot(h.id);
-              else jumpTo(h);
-            }}
-            title={editable ? 'Click to remove' : views.find((v) => v.id === h.targetViewId)?.label}
-            style={{ left: `${h.x * 100}%`, top: `${h.y * 100}%` }}
-            className="absolute z-10 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-[var(--accent)] text-[10px] font-bold text-white shadow-lg transition hover:scale-110"
-          >
-            {editable ? '×' : '●'}
-          </button>
-        ))}
+        <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+          {hotspots.filter((h) => h.points && h.points.length >= 3).map((h) => (
+            <polygon
+              key={h.id}
+              points={h.points.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
+              vectorEffect="non-scaling-stroke"
+              className={`fill-[var(--accent)]/25 stroke-[var(--accent)] ${drawingPoints ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer hover:fill-[var(--accent)]/40'}`}
+              strokeWidth={1.5}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (editable) removeHotspot(h.id);
+                else jumpTo(h);
+              }}
+            >
+              <title>{editable ? 'Click to remove' : views.find((v) => v.id === h.targetViewId)?.label}</title>
+            </polygon>
+          ))}
+          {drawingPoints && (
+            <>
+              <polyline
+                points={drawingPoints.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
+                vectorEffect="non-scaling-stroke"
+                className="fill-none stroke-[var(--accent)]"
+                strokeWidth={1.5}
+                strokeDasharray="4,3"
+              />
+              {drawingPoints.map((p, i) => (
+                <circle key={i} cx={p.x * 100} cy={p.y * 100} r={0.9} vectorEffect="non-scaling-stroke" className="fill-white stroke-[var(--accent)]" strokeWidth={1.5} />
+              ))}
+            </>
+          )}
+        </svg>
 
-        {pending && editable && (
+        {drawingPoints && !pickingTarget && (
+          <div onClick={(e) => e.stopPropagation()} className="absolute left-2 top-2 z-20 flex items-center gap-2 rounded-md bg-black/75 px-2.5 py-1.5 text-[11px] font-medium text-white">
+            <span>
+              {drawingPoints.length} point{drawingPoints.length === 1 ? '' : 's'}
+            </span>
+            <button onClick={undoPoint} className="underline decoration-white/50 hover:decoration-white">
+              Undo
+            </button>
+            <button
+              onClick={startPickingTarget}
+              disabled={drawingPoints.length < 3}
+              className="rounded bg-[var(--accent)] px-2 py-0.5 font-semibold disabled:opacity-40"
+            >
+              {drawingPoints.length < 3 ? `Finish (${3 - drawingPoints.length} more)` : 'Finish'}
+            </button>
+            <button onClick={cancelDrawing} className="underline decoration-white/50 hover:decoration-white">
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {pickingTarget && centroid && (
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ left: `${pending.x * 100}%`, top: `${pending.y * 100}%` }}
-            className="absolute z-20 w-52 -translate-x-1/2 rounded-lg border border-[var(--line)] bg-white p-3 shadow-xl"
+            style={{ left: `${centroid.x * 100}%`, top: `${centroid.y * 100}%` }}
+            className="absolute z-20 w-52 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--line)] bg-white p-3 shadow-xl"
           >
             <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--ink-3)]">Jump to</div>
             <select
@@ -181,24 +243,18 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               />
             )}
             <div className="flex gap-2">
-              <button
-                onClick={confirmHotspot}
-                className="flex-1 rounded-md bg-[var(--accent)] px-2 py-1.5 text-xs font-semibold text-white"
-              >
-                Add pin
+              <button onClick={confirmRegion} className="flex-1 rounded-md bg-[var(--accent)] px-2 py-1.5 text-xs font-semibold text-white">
+                Add region
               </button>
-              <button
-                onClick={() => setPending(null)}
-                className="rounded-md border border-[var(--line)] px-2 py-1.5 text-xs font-medium text-[var(--ink-2)]"
-              >
+              <button onClick={cancelDrawing} className="rounded-md border border-[var(--line)] px-2 py-1.5 text-xs font-medium text-[var(--ink-2)]">
                 Cancel
               </button>
             </div>
           </div>
         )}
       </div>
-      {editable && active.url && active.kind !== 'walkthrough' && (
-        <p className="mt-2 text-[11px] text-[var(--ink-3)]">Click anywhere on the image to drop a pin linking to another view.</p>
+      {editable && active.url && active.kind !== 'walkthrough' && !drawingPoints && (
+        <p className="mt-2 text-[11px] text-[var(--ink-3)]">Click to place points around a region, then Finish to link it to another view.</p>
       )}
     </div>
   );

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { EditableText } from './EditableText';
 import { useEditorStore } from '@/lib/editorStore';
-import type { LinkedView, Slide } from '@/types/slide';
+import { makeId } from '@/lib/id';
+import type { LinkedView, Slide, ViewHotspot } from '@/types/slide';
 
 interface SlideRendererProps {
   slide: Slide;
@@ -21,18 +22,20 @@ function MediaBox({
   editable,
   onChangeUrl,
   className,
+  mediaRef,
 }: {
   url: string;
   kind: 'image' | 'video';
   editable: boolean;
   onChangeUrl: (url: string) => void;
   className?: string;
+  mediaRef?: React.Ref<HTMLVideoElement>;
 }) {
   return (
     <div className={`relative overflow-hidden rounded-lg bg-black/30 ${className ?? ''}`}>
       {url ? (
         kind === 'video' ? (
-          <video src={url} controls className="h-full w-full object-cover" />
+          <video ref={mediaRef} src={url} controls className="h-full w-full object-cover" />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={url} alt="" className="h-full w-full object-cover" />
@@ -44,6 +47,7 @@ function MediaBox({
         <input
           value={url}
           onChange={(e) => onChangeUrl(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
           placeholder={`Paste ${kind} URL…`}
           className="absolute inset-x-2 bottom-2 rounded-md border border-white/20 bg-black/60 px-2 py-1 text-xs text-white outline-none placeholder:text-white/40"
         />
@@ -52,10 +56,18 @@ function MediaBox({
   );
 }
 
+/** A pin placed at a relative (x, y) on a source image. Editable mode: click empty
+ * space to drop a new pin and pick its target view (+ optional video timestamp);
+ * click an existing pin to remove it. Non-editable (Presenter): click a pin to jump
+ * to its target, seeking the target video to the given timestamp if there is one. */
 function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   const updateField = useEditorStore((s) => s.updateField);
   const views = slide.fields.views ?? [];
   const [activeId, setActiveId] = useState<string | undefined>(views[0]?.id);
+  const [pending, setPending] = useState<{ x: number; y: number } | null>(null);
+  const [pendingTarget, setPendingTarget] = useState('');
+  const [pendingTime, setPendingTime] = useState('');
+  const videoRef = useRef<HTMLVideoElement>(null);
   const active = views.find((v) => v.id === activeId) ?? views[0];
 
   function setView(id: string, patch: Partial<LinkedView>) {
@@ -63,6 +75,40 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   }
 
   if (!active) return null;
+
+  const otherViews = views.filter((v) => v.id !== active.id);
+  const hotspots = active.hotspots ?? [];
+
+  function handleMediaClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (!editable || !active.url || active.kind === 'walkthrough') return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    setPending({ x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height });
+    setPendingTarget(otherViews[0]?.id ?? '');
+    setPendingTime('');
+  }
+
+  function confirmHotspot() {
+    if (!pending || !pendingTarget) return;
+    const time = pendingTime.trim() ? Number(pendingTime) : undefined;
+    const hotspot: ViewHotspot = { id: makeId('hotspot'), x: pending.x, y: pending.y, targetViewId: pendingTarget, targetTime: time };
+    setView(active.id, { hotspots: [...hotspots, hotspot] });
+    setPending(null);
+  }
+
+  function removeHotspot(id: string) {
+    setView(active.id, { hotspots: hotspots.filter((h) => h.id !== id) });
+  }
+
+  function jumpTo(hotspot: ViewHotspot) {
+    setActiveId(hotspot.targetViewId);
+    if (hotspot.targetTime != null) {
+      requestAnimationFrame(() => {
+        if (videoRef.current) videoRef.current.currentTime = hotspot.targetTime!;
+      });
+    }
+  }
+
+  const targetView = otherViews.find((v) => v.id === pendingTarget);
 
   return (
     <div className="mt-6 flex flex-col">
@@ -81,13 +127,79 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           </button>
         ))}
       </div>
-      <MediaBox
-        url={active.url}
-        kind={active.kind === 'walkthrough' ? 'video' : 'image'}
-        editable={editable}
-        onChangeUrl={(url) => setView(active.id, { url })}
-        className="aspect-video w-full"
-      />
+      <div className="relative aspect-video w-full" onClick={handleMediaClick}>
+        <MediaBox
+          url={active.url}
+          kind={active.kind === 'walkthrough' ? 'video' : 'image'}
+          editable={editable}
+          onChangeUrl={(url) => setView(active.id, { url })}
+          className="h-full w-full"
+          mediaRef={active.kind === 'walkthrough' ? videoRef : undefined}
+        />
+
+        {hotspots.map((h) => (
+          <button
+            key={h.id}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (editable) removeHotspot(h.id);
+              else jumpTo(h);
+            }}
+            title={editable ? 'Click to remove' : views.find((v) => v.id === h.targetViewId)?.label}
+            style={{ left: `${h.x * 100}%`, top: `${h.y * 100}%` }}
+            className="absolute z-10 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-[var(--accent)] text-[10px] font-bold text-white shadow-lg transition hover:scale-110"
+          >
+            {editable ? '×' : '●'}
+          </button>
+        ))}
+
+        {pending && editable && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ left: `${pending.x * 100}%`, top: `${pending.y * 100}%` }}
+            className="absolute z-20 w-52 -translate-x-1/2 rounded-lg border border-[var(--line)] bg-white p-3 shadow-xl"
+          >
+            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--ink-3)]">Jump to</div>
+            <select
+              value={pendingTarget}
+              onChange={(e) => setPendingTarget(e.target.value)}
+              className="mb-2 w-full rounded-md border border-[var(--line)] px-2 py-1.5 text-xs outline-none"
+            >
+              {otherViews.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.label}
+                </option>
+              ))}
+            </select>
+            {targetView?.kind === 'walkthrough' && (
+              <input
+                value={pendingTime}
+                onChange={(e) => setPendingTime(e.target.value)}
+                placeholder="Start at (seconds, optional)"
+                type="number"
+                className="mb-2 w-full rounded-md border border-[var(--line)] px-2 py-1.5 text-xs outline-none"
+              />
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={confirmHotspot}
+                className="flex-1 rounded-md bg-[var(--accent)] px-2 py-1.5 text-xs font-semibold text-white"
+              >
+                Add pin
+              </button>
+              <button
+                onClick={() => setPending(null)}
+                className="rounded-md border border-[var(--line)] px-2 py-1.5 text-xs font-medium text-[var(--ink-2)]"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      {editable && active.url && active.kind !== 'walkthrough' && (
+        <p className="mt-2 text-[11px] text-[var(--ink-3)]">Click anywhere on the image to drop a pin linking to another view.</p>
+      )}
     </div>
   );
 }

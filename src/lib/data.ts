@@ -17,6 +17,8 @@ interface ProjectRow {
   prepared_by: string;
   date: string;
   brand: Brand;
+  client_logo: string | null;
+  accent_color: string | null;
   slides: Project['slides'];
   created_at: number;
   updated_at: number;
@@ -30,6 +32,8 @@ function fromRow(row: ProjectRow): Project {
     preparedBy: row.prepared_by,
     date: row.date,
     brand: row.brand ?? 'ob',
+    clientLogo: row.client_logo ?? undefined,
+    accentColor: row.accent_color ?? undefined,
     slides: row.slides,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -69,6 +73,8 @@ export async function createProject(input: {
   preparedBy: string;
   date: string;
   brand: Brand;
+  clientLogo?: string;
+  accentColor?: string;
 }): Promise<Project> {
   const now = Date.now();
   const project: Project = {
@@ -78,6 +84,8 @@ export async function createProject(input: {
     preparedBy: input.preparedBy,
     date: input.date,
     brand: input.brand,
+    clientLogo: input.clientLogo,
+    accentColor: input.accentColor,
     slides: [createSlide('title-slide')],
     createdAt: now,
     updatedAt: now,
@@ -89,6 +97,8 @@ export async function createProject(input: {
     prepared_by: project.preparedBy,
     date: project.date,
     brand: project.brand,
+    client_logo: project.clientLogo ?? null,
+    accent_color: project.accentColor ?? null,
     slides: project.slides,
     created_at: project.createdAt,
     updated_at: project.updatedAt,
@@ -107,6 +117,8 @@ export async function saveProject(project: Project): Promise<void> {
       prepared_by: project.preparedBy,
       date: project.date,
       brand: project.brand,
+      client_logo: project.clientLogo ?? null,
+    accent_color: project.accentColor ?? null,
       slides: project.slides,
       updated_at: updatedAt,
     })

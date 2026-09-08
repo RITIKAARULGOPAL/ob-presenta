@@ -3,6 +3,8 @@
 import { useRef, useState } from 'react';
 import { EditableText } from './EditableText';
 import { useEditorStore } from '@/lib/editorStore';
+import { tintWithWhite } from '@/lib/color';
+import { fileToDataUrl } from '@/lib/imageFile';
 import { makeId } from '@/lib/id';
 import type { Brand, LinkedView, Slide, ViewHotspot } from '@/types/slide';
 
@@ -58,6 +60,8 @@ function MediaBox({
 
 type Point = { x: number; y: number };
 
+export const DEFAULT_ACCENT = '#0b72c2';
+
 const DEFAULT_FILL = '#0b72c2';
 const DEFAULT_FILL_OPACITY = 0.25;
 const DEFAULT_STROKE = '#0b72c2';
@@ -97,6 +101,54 @@ function BrandMark({ brand, dark }: { brand: 'skv' | 'ob'; dark: boolean }) {
   );
 }
 
+/** The client's logo on the title slide. In the editor it doubles as its own
+ * upload control — click to pick a file, matching how every other bit of media
+ * in this app is set inline rather than through a settings screen. */
+function ClientLogo({ editable, dark }: { editable: boolean; dark: boolean }) {
+  const project = useEditorStore((s) => s.project);
+  const setClientLogo = useEditorStore((s) => s.setClientLogo);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const logo = project?.clientLogo;
+
+  async function handlePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setBusy(true);
+    try {
+      setClientLogo(await fileToDataUrl(file));
+    } catch (err) {
+      console.error('Could not read that logo file:', err);
+    }
+    setBusy(false);
+  }
+
+  if (!logo && !editable) return null;
+
+  return (
+    <div className="mt-10 flex flex-col items-center gap-2">
+      {logo ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={logo} alt={project?.client ? `${project.client} logo` : 'Client logo'} className="h-10 w-auto object-contain" />
+      ) : null}
+      {editable && (
+        <>
+          <input ref={inputRef} type="file" accept="image/*" onChange={handlePick} className="hidden" />
+          <button
+            onClick={() => inputRef.current?.click()}
+            className={`rounded-md border border-dashed px-2.5 py-1 text-[10px] font-semibold transition ${
+              dark ? 'border-white/30 text-white/60 hover:border-white/60' : 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+            }`}
+          >
+            {busy ? 'Reading…' : logo ? 'Replace client logo' : '+ Add client logo'}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function BrandFooter({ slide, dark }: { slide: Slide; dark: boolean }) {
   const project = useEditorStore((s) => s.project);
   const brand: Brand = slide.brandOverride ?? project?.brand ?? 'ob';
@@ -110,8 +162,18 @@ function BrandFooter({ slide, dark }: { slide: Slide; dark: boolean }) {
           <BrandMark key={m} brand={m} dark={dark} />
         ))}
       </span>
-      <span className={`text-[9px] leading-tight ${dark ? 'text-white/50' : 'text-[var(--ink-3)]'}`}>
-        © Copyright {year}, {LEGAL_NAMES[brand]}. All rights reserved.
+      <span className="flex items-center gap-3">
+        <span className={`text-[9px] leading-tight ${dark ? 'text-white/50' : 'text-[var(--ink-3)]'}`}>
+          © Copyright {year}, {LEGAL_NAMES[brand]}. All rights reserved.
+        </span>
+        {project?.clientLogo && (
+          // The client's mark travels on every slide, not just the cover — a
+          // white chip on dark styles for the same reason SKV needs one.
+          <span className={`inline-flex items-center rounded ${dark ? 'bg-white/90 px-1.5 py-1' : ''}`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={project.clientLogo} alt={project.client ? `${project.client} logo` : 'Client logo'} className="h-4 w-auto object-contain" />
+          </span>
+        )}
       </span>
     </div>
   );
@@ -623,6 +685,7 @@ function TwoContent({ slide, editable }: SlideRendererProps) {
 
 export function SlideRenderer({ slide, editable }: SlideRendererProps) {
   const updateField = useEditorStore((s) => s.updateField);
+  const accentColor = useEditorStore((s) => s.project?.accentColor) ?? DEFAULT_ACCENT;
   const dark = slide.style === 'section-starter' || slide.style === 'design';
 
   const base = (
@@ -630,9 +693,11 @@ export function SlideRenderer({ slide, editable }: SlideRendererProps) {
       className={`relative flex min-h-full w-full flex-col justify-center px-16 pb-14 pt-10 ${dark ? 'bg-[var(--ink)]' : 'bg-white'}`}
       style={
         {
-          '--accent': '#0b72c2',
-          '--accent-soft': '#e8f2fb',
-          '--accent-soft-line': '#c9e2f6',
+          // Every accent-coloured thing on a slide reads from these, so a
+          // project-level accent flows through without touching each component.
+          '--accent': accentColor,
+          '--accent-soft': tintWithWhite(accentColor, 0.9),
+          '--accent-soft-line': tintWithWhite(accentColor, 0.78),
           '--ink': '#141a2b',
           '--ink-2': '#525a72',
           '--ink-3': '#848da6',
@@ -682,6 +747,7 @@ export function SlideRenderer({ slide, editable }: SlideRendererProps) {
             as="p"
             className="mx-auto mt-4 max-w-lg text-[var(--ink-2)] outline-none"
           />
+          <ClientLogo editable={editable} dark={dark} />
         </div>
       ) : slide.layout === 'blank' ? null : (
         <>

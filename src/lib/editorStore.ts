@@ -25,6 +25,8 @@ interface EditorState {
   changeLayout: (layout: SlideLayout) => void;
   changeStyle: (style: SlideStyleKind) => void;
   setBrandOverride: (brand: Brand | undefined) => void;
+  setClientLogo: (dataUrl: string | undefined) => void;
+  setAccentColor: (hex: string | undefined) => void;
 
   addStatItem: () => void;
   removeStatItem: (statId: string) => void;
@@ -149,6 +151,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!project || !currentSlideId) return;
     const slides = project.slides.map((s) => (s.id === currentSlideId ? { ...s, brandOverride: brand } : s));
     const next = { ...project, slides };
+    set({ project: next });
+    persist(next);
+  },
+
+  setClientLogo: (dataUrl) => {
+    const { project } = get();
+    if (!project) return;
+    const next = { ...project, clientLogo: dataUrl };
+    set({ project: next });
+    persist(next);
+  },
+
+  setAccentColor: (hex) => {
+    const { project } = get();
+    if (!project) return;
+    const next = { ...project, accentColor: hex };
     set({ project: next });
     persist(next);
   },

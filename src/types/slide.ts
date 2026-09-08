@@ -101,6 +101,10 @@ export interface Project {
   preparedBy: string;
   date: string;
   brand: Brand;
+  /** The client's own logo — a downscaled data URL, or any image URL. */
+  clientLogo?: string;
+  /** Hex accent for the whole deck, usually pulled from the client logo. */
+  accentColor?: string;
   slides: Slide[];
   createdAt: number;
   updatedAt: number;

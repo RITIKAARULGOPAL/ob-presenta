@@ -1,6 +1,7 @@
 'use client';
 
 import { useEditorStore } from '@/lib/editorStore';
+import { AccentPicker } from './AccentPicker';
 import { LAYOUT_LABELS, STYLE_LABELS } from '@/lib/slideDefaults';
 import type { Brand, SlideLayout, SlideStyleKind } from '@/types/slide';
 
@@ -20,6 +21,7 @@ export function PropertiesPanel() {
   const changeLayout = useEditorStore((s) => s.changeLayout);
   const changeStyle = useEditorStore((s) => s.changeStyle);
   const setBrandOverride = useEditorStore((s) => s.setBrandOverride);
+  const setAccentColor = useEditorStore((s) => s.setAccentColor);
 
   if (!slide) return null;
 
@@ -87,6 +89,12 @@ export function PropertiesPanel() {
         <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
           This project defaults to <span className="font-semibold text-slate-500">{project?.brand === 'both' ? 'Both' : project?.brand?.toUpperCase() ?? 'OB'}</span> — override it for just this slide if needed.
         </p>
+      </div>
+
+      <div className="mb-2 border-t border-slate-100 pt-6">
+        <h4 className="mb-2.5 text-xs font-bold uppercase tracking-wide text-slate-400">Accent Colour</h4>
+        <AccentPicker logo={project?.clientLogo} value={project?.accentColor} onChange={setAccentColor} tone="panel" />
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">Applies to the whole deck, not just this slide.</p>
       </div>
     </aside>
   );

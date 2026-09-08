@@ -59,10 +59,41 @@ export async function extractAccentColors(src: string, count = 5): Promise<strin
     }
   }
 
-  return [...families.values()]
+  const hues = [...families.values()]
     .sort((a, b) => b.n - a.n) // most of the image first
     .slice(0, count)
     .map((f) => rgbToHex(f.best.r, f.best.g, f.best.b));
+
+  return padWithTones(hues, count);
+}
+
+/** Tops a palette up to `count` with tonal variants of the colours found.
+ *
+ * A single-hue logo (SKV is just yellow) otherwise offers exactly one choice,
+ * and the one vivid swatch isn't always the right accent — bright yellow as
+ * title text on white is barely legible, so a deeper shade of the same hue is
+ * often the usable option. Shades come before tints for that reason. */
+function padWithTones(base: string[], count: number): string[] {
+  if (base.length === 0 || base.length >= count) return base.slice(0, count);
+
+  const out = [...base];
+  // Deeper first, then lighter — widening each round rather than exhausting
+  // one colour's variants before moving on.
+  const steps = [
+    (hex: string) => shadeWithBlack(hex, 0.25),
+    (hex: string) => tintWithWhite(hex, 0.3),
+    (hex: string) => shadeWithBlack(hex, 0.5),
+    (hex: string) => tintWithWhite(hex, 0.55),
+  ];
+
+  for (const step of steps) {
+    for (const hex of base) {
+      if (out.length >= count) return out;
+      const variant = step(hex);
+      if (!out.some((existing) => existing.toLowerCase() === variant.toLowerCase())) out.push(variant);
+    }
+  }
+  return out.slice(0, count);
 }
 
 /** Hue in degrees, 0–360. */
@@ -110,4 +141,31 @@ export function tintWithWhite(hex: string, amount: number): string {
   if (!rgb) return hex;
   const mix = (v: number) => Math.round(v + (255 - v) * amount);
   return rgbToHex(mix(rgb.r), mix(rgb.g), mix(rgb.b));
+}
+
+/** Mixes a colour toward black, for deeper variants of the same hue. */
+export function shadeWithBlack(hex: string, amount: number): string {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return hex;
+  const mix = (v: number) => Math.round(v * (1 - amount));
+  return rgbToHex(mix(rgb.r), mix(rgb.g), mix(rgb.b));
+}
+
+/** Relative luminance per WCAG, 0 (black) to 1 (white). */
+function luminance(hex: string): number {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return 0;
+  const channel = (v: number) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * channel(rgb.r) + 0.7152 * channel(rgb.g) + 0.0722 * channel(rgb.b);
+}
+
+/** WCAG contrast ratio between two colours, 1–21. */
+export function contrastRatio(a: string, b: string): number {
+  const la = luminance(a);
+  const lb = luminance(b);
+  const [hi, lo] = la > lb ? [la, lb] : [lb, la];
+  return (hi + 0.05) / (lo + 0.05);
 }

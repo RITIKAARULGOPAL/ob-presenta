@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { extractAccentColors } from '@/lib/color';
+import { contrastRatio, extractAccentColors, shadeWithBlack } from '@/lib/color';
 
 const DEFAULT_ACCENT = '#0b72c2';
 
@@ -90,6 +90,17 @@ export function AccentPicker({
           </button>
         )}
       </div>
+
+      {/* Titles render in the accent on white slides, so a light accent can be
+          effectively unreadable. Say so, and offer the fix in one click. */}
+      {contrastRatio(active, '#ffffff') < 3 && (
+        <p className="mt-2 text-[11px] leading-relaxed text-amber-600">
+          This is very light for headline text on white slides.{' '}
+          <button type="button" onClick={() => onChange(shadeWithBlack(active, 0.45))} className="font-semibold underline">
+            Use a deeper shade
+          </button>
+        </p>
+      )}
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { createSlide, createStyledSlide, defaultFieldsForLayout, defaultFieldsForStyle } from './slideDefaults';
 import { saveProject } from './data';
 import { makeId } from './id';
-import type { Project, Slide, SlideFields, SlideLayout, SlideStyleKind } from '@/types/slide';
+import type { Brand, Project, Slide, SlideFields, SlideLayout, SlideStyleKind } from '@/types/slide';
 
 type Mode = 'editor' | 'presenter';
 
@@ -24,6 +24,7 @@ interface EditorState {
   removeSlide: (id: string) => void;
   changeLayout: (layout: SlideLayout) => void;
   changeStyle: (style: SlideStyleKind) => void;
+  setBrandOverride: (brand: Brand | undefined) => void;
 
   addStatItem: () => void;
   removeStatItem: (statId: string) => void;
@@ -138,6 +139,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           }
         : s
     );
+    const next = { ...project, slides };
+    set({ project: next });
+    persist(next);
+  },
+
+  setBrandOverride: (brand) => {
+    const { project, currentSlideId } = get();
+    if (!project || !currentSlideId) return;
+    const slides = project.slides.map((s) => (s.id === currentSlideId ? { ...s, brandOverride: brand } : s));
     const next = { ...project, slides };
     set({ project: next });
     persist(next);

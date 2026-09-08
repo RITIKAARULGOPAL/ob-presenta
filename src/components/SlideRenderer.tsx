@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { EditableText } from './EditableText';
 import { useEditorStore } from '@/lib/editorStore';
 import { makeId } from '@/lib/id';
-import type { LinkedView, Slide, ViewHotspot } from '@/types/slide';
+import type { Brand, LinkedView, Slide, ViewHotspot } from '@/types/slide';
 
 interface SlideRendererProps {
   slide: Slide;
@@ -62,6 +62,60 @@ const DEFAULT_FILL = '#0b72c2';
 const DEFAULT_FILL_OPACITY = 0.25;
 const DEFAULT_STROKE = '#0b72c2';
 const DEFAULT_STROKE_WIDTH = 1.5;
+
+const LEGAL_NAMES: Record<Brand, string> = {
+  skv: 'Studiokon Ventures Private Limited',
+  ob: 'Officebanao',
+  both: 'Studiokon Ventures Private Limited & Officebanao',
+};
+
+/** Renders a company logo from /public/logos, falling back to a text wordmark
+ * if the file isn't there yet — so the footer works before the real assets land.
+ *
+ * Officebanao ships black and white versions, so dark slides get the reversed
+ * one directly. SKV is a single black-and-yellow mark, so on dark slides it sits
+ * on a small white chip instead — swap in a reversed skv-white.png the same way
+ * as OB if one ever exists. */
+function BrandMark({ brand, dark }: { brand: 'skv' | 'ob'; dark: boolean }) {
+  const [failed, setFailed] = useState(false);
+  const label = brand === 'skv' ? 'SKV' : 'Officebanao';
+  const src = brand === 'ob' && dark ? '/logos/ob-white.png' : `/logos/${brand}.png`;
+  const needsChip = brand === 'skv' && dark;
+
+  if (failed) {
+    return (
+      <span className={`font-display text-[10px] font-bold uppercase tracking-wider ${dark ? 'text-white/70' : 'text-[var(--ink-3)]'}`}>
+        {label}
+      </span>
+    );
+  }
+  return (
+    <span className={`inline-flex items-center rounded ${needsChip ? 'bg-white/90 px-1.5 py-1' : ''}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={label} onError={() => setFailed(true)} className="h-4 w-auto object-contain" />
+    </span>
+  );
+}
+
+function BrandFooter({ slide, dark }: { slide: Slide; dark: boolean }) {
+  const project = useEditorStore((s) => s.project);
+  const brand: Brand = slide.brandOverride ?? project?.brand ?? 'ob';
+  const year = project ? new Date(project.createdAt).getFullYear() : new Date().getFullYear();
+  const marks: ('skv' | 'ob')[] = brand === 'both' ? ['skv', 'ob'] : [brand];
+
+  return (
+    <div className="pointer-events-none absolute inset-x-6 bottom-3 flex items-end justify-between gap-4">
+      <span className="flex items-center gap-2">
+        {marks.map((m) => (
+          <BrandMark key={m} brand={m} dark={dark} />
+        ))}
+      </span>
+      <span className={`text-[9px] leading-tight ${dark ? 'text-white/50' : 'text-[var(--ink-3)]'}`}>
+        © Copyright {year}, {LEGAL_NAMES[brand]}. All rights reserved.
+      </span>
+    </div>
+  );
+}
 
 /** A region drawn as a polygon on a source image. Editable mode: click to place
  * vertices, Finish once there are 3+, then pick the target view (+ optional video
@@ -573,7 +627,7 @@ export function SlideRenderer({ slide, editable }: SlideRendererProps) {
 
   const base = (
     <div
-      className={`flex min-h-full w-full flex-col justify-center px-16 py-10 ${dark ? 'bg-[var(--ink)]' : 'bg-white'}`}
+      className={`relative flex min-h-full w-full flex-col justify-center px-16 pb-14 pt-10 ${dark ? 'bg-[var(--ink)]' : 'bg-white'}`}
       style={
         {
           '--accent': '#0b72c2',
@@ -655,6 +709,8 @@ export function SlideRenderer({ slide, editable }: SlideRendererProps) {
           )}
         </>
       )}
+
+      <BrandFooter slide={slide} dark={dark} />
     </div>
   );
 

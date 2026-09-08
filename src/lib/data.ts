@@ -1,7 +1,7 @@
 import { makeId } from './id';
 import { createSlide } from './slideDefaults';
 import { supabase } from './supabaseClient';
-import type { Project, ProjectSummary } from '@/types/slide';
+import type { Brand, Project, ProjectSummary } from '@/types/slide';
 
 // ---------------------------------------------------------------------------
 // Data layer — backed by Supabase Postgres. This is the only file that talks
@@ -16,6 +16,7 @@ interface ProjectRow {
   client: string;
   prepared_by: string;
   date: string;
+  brand: Brand;
   slides: Project['slides'];
   created_at: number;
   updated_at: number;
@@ -28,6 +29,7 @@ function fromRow(row: ProjectRow): Project {
     client: row.client,
     preparedBy: row.prepared_by,
     date: row.date,
+    brand: row.brand ?? 'ob',
     slides: row.slides,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -66,6 +68,7 @@ export async function createProject(input: {
   client: string;
   preparedBy: string;
   date: string;
+  brand: Brand;
 }): Promise<Project> {
   const now = Date.now();
   const project: Project = {
@@ -74,6 +77,7 @@ export async function createProject(input: {
     client: input.client,
     preparedBy: input.preparedBy,
     date: input.date,
+    brand: input.brand,
     slides: [createSlide('title-slide')],
     createdAt: now,
     updatedAt: now,
@@ -84,6 +88,7 @@ export async function createProject(input: {
     client: project.client,
     prepared_by: project.preparedBy,
     date: project.date,
+    brand: project.brand,
     slides: project.slides,
     created_at: project.createdAt,
     updated_at: project.updatedAt,
@@ -101,6 +106,7 @@ export async function saveProject(project: Project): Promise<void> {
       client: project.client,
       prepared_by: project.preparedBy,
       date: project.date,
+      brand: project.brand,
       slides: project.slides,
       updated_at: updatedAt,
     })

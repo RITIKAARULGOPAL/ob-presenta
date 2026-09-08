@@ -3,7 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createProject, deleteProject, listProjects } from '@/lib/data';
-import type { ProjectSummary } from '@/types/slide';
+import type { Brand, ProjectSummary } from '@/types/slide';
+
+const BRAND_CHOICES: { key: Brand; label: string; hint: string }[] = [
+  { key: 'skv', label: 'SKV', hint: 'Studiokon Ventures' },
+  { key: 'ob', label: 'OB', hint: 'Officebanao' },
+  { key: 'both', label: 'Both', hint: 'Joint project' },
+];
 
 export default function HomePage() {
   const router = useRouter();
@@ -12,6 +18,7 @@ export default function HomePage() {
   const [name, setName] = useState('');
   const [client, setClient] = useState('');
   const [preparedBy, setPreparedBy] = useState('Officebanao');
+  const [brand, setBrand] = useState<Brand>('ob');
   const [date] = useState(() => new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }));
   const [error, setError] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -26,7 +33,7 @@ export default function HomePage() {
       setError('Project name is required.');
       return;
     }
-    const project = await createProject({ name: name.trim(), client: client.trim(), preparedBy: preparedBy.trim(), date });
+    const project = await createProject({ name: name.trim(), client: client.trim(), preparedBy: preparedBy.trim(), date, brand });
     router.push(`/p/${project.id}/edit`);
   }
 
@@ -159,6 +166,27 @@ export default function HomePage() {
                 <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Presentation date</span>
                 <input readOnly value={date} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-500" />
               </label>
+              <div className="block">
+                <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Whose project is this?</span>
+                <div className="flex gap-2">
+                  {BRAND_CHOICES.map((c) => (
+                    <button
+                      key={c.key}
+                      type="button"
+                      onClick={() => setBrand(c.key)}
+                      className={`flex-1 rounded-lg border px-2 py-2 text-center transition ${
+                        brand === c.key
+                          ? 'border-[#0b72c2] bg-[#e8f2fb] text-[#0b72c2]'
+                          : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      <span className="block text-sm font-bold">{c.label}</span>
+                      <span className="block text-[10px] opacity-70">{c.hint}</span>
+                    </button>
+                  ))}
+                </div>
+                <span className="mt-1.5 block text-[11px] text-slate-400">Sets the logo and copyright line on every slide — changeable per slide later.</span>
+              </div>
               <button type="submit" className="mt-2 w-full rounded-lg bg-[#0b72c2] py-3 text-sm font-bold text-white transition hover:bg-[#095f9f]">
                 + Create New File
               </button>

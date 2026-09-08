@@ -80,12 +80,18 @@ export interface SlideAnimation {
   delay: number;
 }
 
+/** SKV (Studiokon Ventures Private Limited) is the parent company, OB
+ * (Officebanao) the child — 'both' covers projects the two do jointly. */
+export type Brand = 'skv' | 'ob' | 'both';
+
 export interface Slide {
   id: string;
   layout: SlideLayout;
   style: SlideStyleKind;
   fields: SlideFields;
   animation: SlideAnimation;
+  /** Overrides the project's brand for just this slide; unset = inherit. */
+  brandOverride?: Brand;
 }
 
 export interface Project {
@@ -94,6 +100,7 @@ export interface Project {
   client: string;
   preparedBy: string;
   date: string;
+  brand: Brand;
   slides: Slide[];
   createdAt: number;
   updatedAt: number;

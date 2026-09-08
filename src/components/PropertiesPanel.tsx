@@ -2,15 +2,24 @@
 
 import { useEditorStore } from '@/lib/editorStore';
 import { LAYOUT_LABELS, STYLE_LABELS } from '@/lib/slideDefaults';
-import type { SlideLayout, SlideStyleKind } from '@/types/slide';
+import type { Brand, SlideLayout, SlideStyleKind } from '@/types/slide';
 
 const LAYOUTS = Object.keys(LAYOUT_LABELS) as SlideLayout[];
 const STYLES = Object.keys(STYLE_LABELS) as SlideStyleKind[];
 
+const BRAND_OPTIONS: { key: Brand | 'default'; label: string }[] = [
+  { key: 'default', label: 'Project default' },
+  { key: 'skv', label: 'SKV' },
+  { key: 'ob', label: 'OB' },
+  { key: 'both', label: 'Both' },
+];
+
 export function PropertiesPanel() {
   const slide = useEditorStore((s) => s.currentSlide());
+  const project = useEditorStore((s) => s.project);
   const changeLayout = useEditorStore((s) => s.changeLayout);
   const changeStyle = useEditorStore((s) => s.changeStyle);
+  const setBrandOverride = useEditorStore((s) => s.setBrandOverride);
 
   if (!slide) return null;
 
@@ -55,6 +64,29 @@ export function PropertiesPanel() {
           ))}
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-slate-400">A generic structure — replaces this slide&apos;s content with that layout&apos;s placeholders.</p>
+      </div>
+
+      <div className="mb-2 border-t border-slate-100 pt-6">
+        <h4 className="mb-2.5 text-xs font-bold uppercase tracking-wide text-slate-400">Logo &amp; Copyright</h4>
+        <div className="flex flex-wrap gap-2">
+          {BRAND_OPTIONS.map((o) => {
+            const selected = o.key === 'default' ? slide.brandOverride === undefined : slide.brandOverride === o.key;
+            return (
+              <button
+                key={o.key}
+                onClick={() => setBrandOverride(o.key === 'default' ? undefined : o.key)}
+                className={`rounded-md border px-2.5 py-1.5 text-xs font-medium transition ${
+                  selected ? 'border-[#0b72c2] bg-[#e8f2fb] text-[#0b72c2]' : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+          This project defaults to <span className="font-semibold text-slate-500">{project?.brand === 'both' ? 'Both' : project?.brand?.toUpperCase() ?? 'OB'}</span> — override it for just this slide if needed.
+        </p>
       </div>
     </aside>
   );

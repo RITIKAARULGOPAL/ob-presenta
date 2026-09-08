@@ -37,6 +37,12 @@ export interface ViewHotspot {
   targetViewId: string;
   /** Seconds — only meaningful when the target view is a walkthrough video. */
   targetTime?: number;
+  /** All optional — fall back to a default accent look when unset. */
+  fillColor?: string;
+  /** 0–1 */
+  fillOpacity?: number;
+  strokeColor?: string;
+  strokeWidth?: number;
 }
 
 export interface LinkedView {

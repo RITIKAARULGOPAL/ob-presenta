@@ -58,6 +58,11 @@ function MediaBox({
 
 type Point = { x: number; y: number };
 
+const DEFAULT_FILL = '#0b72c2';
+const DEFAULT_FILL_OPACITY = 0.25;
+const DEFAULT_STROKE = '#0b72c2';
+const DEFAULT_STROKE_WIDTH = 1.5;
+
 /** A region drawn as a polygon on a source image. Editable mode: click to place
  * vertices, Finish once there are 3+, then pick the target view (+ optional video
  * timestamp); click a finished region to delete it. Non-editable (Presenter): click
@@ -70,6 +75,10 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   const [pickingTarget, setPickingTarget] = useState(false);
   const [pendingTarget, setPendingTarget] = useState('');
   const [pendingTime, setPendingTime] = useState('');
+  const [pendingFill, setPendingFill] = useState(DEFAULT_FILL);
+  const [pendingFillOpacity, setPendingFillOpacity] = useState(DEFAULT_FILL_OPACITY);
+  const [pendingStroke, setPendingStroke] = useState(DEFAULT_STROKE);
+  const [pendingStrokeWidth, setPendingStrokeWidth] = useState(DEFAULT_STROKE_WIDTH);
   const videoRef = useRef<HTMLVideoElement>(null);
   const active = views.find((v) => v.id === activeId) ?? views[0];
 
@@ -103,13 +112,26 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     if (!drawingPoints || drawingPoints.length < 3) return;
     setPendingTarget(otherViews[0]?.id ?? '');
     setPendingTime('');
+    setPendingFill(DEFAULT_FILL);
+    setPendingFillOpacity(DEFAULT_FILL_OPACITY);
+    setPendingStroke(DEFAULT_STROKE);
+    setPendingStrokeWidth(DEFAULT_STROKE_WIDTH);
     setPickingTarget(true);
   }
 
   function confirmRegion() {
     if (!drawingPoints || drawingPoints.length < 3 || !pendingTarget) return;
     const time = pendingTime.trim() ? Number(pendingTime) : undefined;
-    const hotspot: ViewHotspot = { id: makeId('hotspot'), points: drawingPoints, targetViewId: pendingTarget, targetTime: time };
+    const hotspot: ViewHotspot = {
+      id: makeId('hotspot'),
+      points: drawingPoints,
+      targetViewId: pendingTarget,
+      targetTime: time,
+      fillColor: pendingFill,
+      fillOpacity: pendingFillOpacity,
+      strokeColor: pendingStroke,
+      strokeWidth: pendingStrokeWidth,
+    };
     setView(active.id, { hotspots: [...hotspots, hotspot] });
     cancelDrawing();
   }
@@ -167,8 +189,11 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               key={h.id}
               points={h.points.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
               vectorEffect="non-scaling-stroke"
-              className={`fill-[var(--accent)]/25 stroke-[var(--accent)] ${drawingPoints ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer hover:fill-[var(--accent)]/40'}`}
-              strokeWidth={1.5}
+              fill={h.fillColor ?? DEFAULT_FILL}
+              fillOpacity={h.fillOpacity ?? DEFAULT_FILL_OPACITY}
+              stroke={h.strokeColor ?? DEFAULT_STROKE}
+              strokeWidth={h.strokeWidth ?? DEFAULT_STROKE_WIDTH}
+              className={drawingPoints ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer'}
               onClick={(e) => {
                 e.stopPropagation();
                 if (editable) removeHotspot(h.id);
@@ -242,6 +267,57 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
                 className="mb-2 w-full rounded-md border border-[var(--line)] px-2 py-1.5 text-xs outline-none"
               />
             )}
+
+            <div className="mb-2 grid grid-cols-2 gap-2">
+              <label className="block">
+                <span className="mb-1 block text-[10px] font-semibold text-[var(--ink-3)]">Fill</span>
+                <input
+                  type="color"
+                  value={pendingFill}
+                  onChange={(e) => setPendingFill(e.target.value)}
+                  className="h-7 w-full cursor-pointer rounded border border-[var(--line)] p-0.5"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[10px] font-semibold text-[var(--ink-3)]">Stroke</span>
+                <input
+                  type="color"
+                  value={pendingStroke}
+                  onChange={(e) => setPendingStroke(e.target.value)}
+                  className="h-7 w-full cursor-pointer rounded border border-[var(--line)] p-0.5"
+                />
+              </label>
+            </div>
+            <label className="mb-1.5 block">
+              <span className="mb-1 flex items-center justify-between text-[10px] font-semibold text-[var(--ink-3)]">
+                <span>Fill opacity</span>
+                <span>{Math.round(pendingFillOpacity * 100)}%</span>
+              </span>
+              <input
+                type="range"
+                min={5}
+                max={90}
+                value={Math.round(pendingFillOpacity * 100)}
+                onChange={(e) => setPendingFillOpacity(Number(e.target.value) / 100)}
+                className="w-full"
+              />
+            </label>
+            <label className="mb-2 block">
+              <span className="mb-1 flex items-center justify-between text-[10px] font-semibold text-[var(--ink-3)]">
+                <span>Stroke width</span>
+                <span>{pendingStrokeWidth}px</span>
+              </span>
+              <input
+                type="range"
+                min={0.5}
+                max={4}
+                step={0.5}
+                value={pendingStrokeWidth}
+                onChange={(e) => setPendingStrokeWidth(Number(e.target.value))}
+                className="w-full"
+              />
+            </label>
+
             <div className="flex gap-2">
               <button onClick={confirmRegion} className="flex-1 rounded-md bg-[var(--accent)] px-2 py-1.5 text-xs font-semibold text-white">
                 Add region

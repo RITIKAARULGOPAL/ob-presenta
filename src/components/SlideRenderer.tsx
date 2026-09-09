@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { EditableText } from './EditableText';
 import { useEditorStore } from '@/lib/editorStore';
 import { tintWithWhite } from '@/lib/color';
-import { fileToDataUrl } from '@/lib/imageFile';
+import { dataUrlBytes, fileToDataUrl, fileToSlideImage } from '@/lib/imageFile';
 import { ConceptDiagram } from './ConceptDiagram';
 import { makeId } from '@/lib/id';
 import type { Brand, LinkedView, Slide, ViewHotspot } from '@/types/slide';
@@ -21,9 +21,10 @@ interface SlideRendererProps {
 
 const ARROW = '→';
 
-/** Image or video box with an inline "paste a URL" affordance when editable —
- * used for Design-style slides and each Linked-Views tab. No upload/storage
- * involved on purpose; pasting a hosted URL is the whole workaround. */
+/** Image or video box. Images can be picked from disk or dropped on the box;
+ * pasting a URL still works, and is the only option for video — a walkthrough
+ * clip as base64 would be tens of megabytes in the row, re-fetched on every
+ * deck load. Used for Design slides, Linked-Views tabs and the concept slot. */
 function MediaBox({
   url,
   kind,
@@ -39,8 +40,50 @@ function MediaBox({
   className?: string;
   mediaRef?: React.Ref<HTMLVideoElement>;
 }) {
+  const [busy, setBusy] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [note, setNote] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+  const canUpload = editable && kind === 'image';
+
+  async function accept(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setNote('That file is not an image.');
+      return;
+    }
+    setBusy(true);
+    setNote('');
+    try {
+      const dataUrl = await fileToSlideImage(file);
+      onChangeUrl(dataUrl);
+      const kb = Math.round(dataUrlBytes(dataUrl) / 1024);
+      // Worth saying out loud: this lands in the project row, not a bucket.
+      setNote(kb > 700 ? `Added — ${kb}KB, which is heavy for one slide.` : `Added — ${kb}KB.`);
+    } catch (err) {
+      console.error('Could not read that image:', err);
+      setNote('Could not read that image.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <div className={`relative overflow-hidden rounded-lg bg-black/30 ${className ?? ''}`}>
+    <div
+      className={`relative overflow-hidden rounded-lg bg-black/30 ${dragging ? 'ring-2 ring-[var(--accent)]' : ''} ${className ?? ''}`}
+      onDragOver={canUpload ? (e) => { e.preventDefault(); setDragging(true); } : undefined}
+      onDragLeave={canUpload ? () => setDragging(false) : undefined}
+      onDrop={
+        canUpload
+          ? (e) => {
+              // Without preventDefault the browser navigates away to the file.
+              e.preventDefault();
+              setDragging(false);
+              void accept(e.dataTransfer.files?.[0]);
+            }
+          : undefined
+      }
+    >
       {url ? (
         kind === 'video' ? (
           <video ref={mediaRef} src={url} controls className="h-full w-full object-cover" />
@@ -49,16 +92,68 @@ function MediaBox({
           <img src={url} alt="" className="h-full w-full object-cover" />
         )
       ) : (
-        <div className="flex h-full items-center justify-center text-sm text-white/40">No {kind} yet</div>
+        <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-white/40">
+          {canUpload ? (
+            <>
+              <span>{dragging ? 'Drop to add' : busy ? 'Reading image…' : 'Drag an image here'}</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); fileRef.current?.click(); }}
+                className="rounded-md border border-dashed border-white/30 px-2.5 py-1 text-xs font-semibold text-white/70 hover:border-white/60 hover:text-white"
+              >
+                Choose a file
+              </button>
+            </>
+          ) : (
+            <span>No {kind} yet</span>
+          )}
+        </div>
       )}
-      {editable && (
+
+      {canUpload && (
         <input
-          value={url}
-          onChange={(e) => onChangeUrl(e.target.value)}
-          onClick={(e) => e.stopPropagation()}
-          placeholder={`Paste ${kind} URL…`}
-          className="absolute inset-x-2 bottom-2 rounded-md border border-white/20 bg-black/60 px-2 py-1 text-xs text-white outline-none placeholder:text-white/40"
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = '';
+            void accept(file);
+          }}
         />
+      )}
+
+      {editable && (
+        <div className="absolute inset-x-2 bottom-2 flex flex-col gap-1">
+          {note && <span className="rounded bg-black/70 px-2 py-0.5 text-[10px] text-white/80">{note}</span>}
+          <div className="flex gap-1">
+            <input
+              value={url.startsWith('data:') ? '' : url}
+              onChange={(e) => onChangeUrl(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              placeholder={url.startsWith('data:') ? 'Uploaded image' : `Paste ${kind} URL…`}
+              className="min-w-0 flex-1 rounded-md border border-white/20 bg-black/60 px-2 py-1 text-xs text-white outline-none placeholder:text-white/40"
+            />
+            {canUpload && (
+              <button
+                onClick={(e) => { e.stopPropagation(); fileRef.current?.click(); }}
+                disabled={busy}
+                className="shrink-0 rounded-md border border-white/20 bg-black/60 px-2 py-1 text-xs font-semibold text-white/80 hover:border-white/50 hover:text-white disabled:opacity-50"
+              >
+                {busy ? '…' : 'Upload'}
+              </button>
+            )}
+            {url && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onChangeUrl(''); setNote(''); }}
+                aria-label={`Remove ${kind}`}
+                className="shrink-0 rounded-md border border-white/20 bg-black/60 px-2 py-1 text-xs text-white/70 hover:border-red-400 hover:text-red-300"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

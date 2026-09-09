@@ -12,6 +12,11 @@ import type { Brand, LinkedView, Slide, ViewHotspot } from '@/types/slide';
 interface SlideRendererProps {
   slide: Slide;
   editable: boolean;
+  /** Play entry motion. Off for rail thumbnails, which re-mount constantly and
+   *  would otherwise re-animate every time the deck changes; on for the live
+   *  canvas and for Presenter — editable is the wrong signal, since Presenter
+   *  is not editable but is exactly where the motion matters. */
+  animate?: boolean;
 }
 
 const ARROW = '→';
@@ -731,7 +736,7 @@ function StatHero({ slide, editable }: SlideRendererProps) {
   );
 }
 
-function ConceptBody({ slide, editable }: SlideRendererProps) {
+function ConceptBody({ slide, editable, animate, dark }: SlideRendererProps & { dark?: boolean }) {
   const updateField = useEditorStore((s) => s.updateField);
   const addPoint = useEditorStore((s) => s.addPoint);
   const removePoint = useEditorStore((s) => s.removePoint);
@@ -742,14 +747,16 @@ function ConceptBody({ slide, editable }: SlideRendererProps) {
   }
 
   return (
-    <div className="mt-5 flex flex-1 items-start gap-10">
+    <div className="mt-6 flex items-center gap-10">
       <div className="flex min-w-0 flex-1 flex-col">
+        <Kicker slide={slide} editable={editable} />
+        <Title slide={slide} editable={editable} dark={dark} />
         <EditableText
           editable={editable}
           value={slide.fields.lead ?? ''}
           onChange={(v) => updateField('lead', v)}
           as="p"
-          className="max-w-md text-lg leading-snug text-[var(--ink-2)] outline-none"
+          className="mt-4 max-w-md text-lg leading-snug text-[var(--ink-2)] outline-none"
         />
 
         <div className="mt-6 flex flex-wrap gap-2">
@@ -814,6 +821,7 @@ function ConceptBody({ slide, editable }: SlideRendererProps) {
             conceptId={slide.conceptOrigin?.conceptId}
             labels={points.map((pt) => pt.label)}
             seedKey={slide.id}
+            animate={animate}
             className="aspect-[4/3] w-full"
           />
           {editable && (
@@ -852,15 +860,13 @@ function TwoContent({ slide, editable }: SlideRendererProps) {
   );
 }
 
-export function SlideRenderer({ slide, editable }: SlideRendererProps) {
+export function SlideRenderer({ slide, editable, animate = false }: SlideRendererProps) {
   const updateField = useEditorStore((s) => s.updateField);
   const accentColor = useEditorStore((s) => s.project?.accentColor) ?? DEFAULT_ACCENT;
   const dark = slide.style === 'section-starter' || slide.style === 'design';
 
   const entry = slide.animation?.entry ?? 'none';
-  // Only animate the live canvas — rail thumbnails re-mount constantly and
-  // would flicker, and an export needs the settled frame.
-  const animClass = editable && entry !== 'none' ? `slide-anim-${entry}` : '';
+  const animClass = animate && entry !== 'none' ? `slide-anim-${entry}` : '';
 
   const base = (
     <div
@@ -925,7 +931,9 @@ export function SlideRenderer({ slide, editable }: SlideRendererProps) {
           />
           <ClientLogo editable={editable} dark={dark} />
         </div>
-      ) : slide.layout === 'blank' ? null : (
+      ) : slide.layout === 'blank' ? null : slide.layout === 'concept' ? (
+        <ConceptBody slide={slide} editable={editable} animate={animate} dark={dark} />
+      ) : (
         <>
           <Kicker slide={slide} editable={editable} />
           <Title slide={slide} editable={editable} dark={dark} />
@@ -939,7 +947,6 @@ export function SlideRenderer({ slide, editable }: SlideRendererProps) {
           {slide.layout === 'two-content' && <TwoContent slide={slide} editable={editable} />}
           {slide.layout === 'merge-diagram' && <MergeDiagram slide={slide} editable={editable} />}
           {slide.layout === 'stat-hero' && <StatHero slide={slide} editable={editable} />}
-          {slide.layout === 'concept' && <ConceptBody slide={slide} editable={editable} />}
           {slide.layout === 'linked-views' && <LinkedViewsExplorer slide={slide} editable={editable} />}
           {slide.style === 'design' && (
             <MediaBox

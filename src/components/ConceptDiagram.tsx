@@ -13,7 +13,25 @@ function delay(i: number): React.CSSProperties {
   return { animationDelay: `${i * 90}ms` };
 }
 
-function Zones({ labels, rand }: { labels: string[]; rand: () => number }) {
+/** Delay plus the shape's resting opacity, handed to the keyframes as --o.
+ *  Without it, `to { opacity: 1 }` under fill-mode: both permanently overrides
+ *  each shape's own opacity attribute and flattens the depth hierarchy. Shapes
+ *  wrapped in an animated <g> don't need this — group opacity multiplies. */
+function anim(i: number, o: number): React.CSSProperties {
+  return { animationDelay: `${i * 90}ms`, '--o': o } as React.CSSProperties;
+}
+
+/** Passed down per render so a still thumbnail and an animating canvas can
+ *  coexist — module-level state would leak between instances. */
+type Cls = (name: string) => string;
+
+interface DrawProps {
+  labels: string[];
+  rand: () => number;
+  cls: Cls;
+}
+
+function Zones({ labels, rand, cls }: DrawProps) {
   // Slice the plate into a coarse mosaic — proportions vary per slide but stay
   // stable for the same slide.
   const rows = labels.length <= 3 ? 1 : 2;
@@ -30,7 +48,7 @@ function Zones({ labels, rand }: { labels: string[]; rand: () => number }) {
         const colW = (W - gap * (inRow - 1)) / inRow;
         const jitter = 0.82 + rand() * 0.18;
         return (
-          <g key={label} className="cd-in" style={delay(i)}>
+          <g key={label} className={cls("cd-in")} style={delay(i)}>
             <rect
               x={c * (colW + gap)}
               y={r * (rowH + gap)}
@@ -47,7 +65,7 @@ function Zones({ labels, rand }: { labels: string[]; rand: () => number }) {
   );
 }
 
-function Nodes({ labels, rand }: { labels: string[]; rand: () => number }) {
+function Nodes({ labels, rand, cls }: DrawProps) {
   const pts = labels.map((_, i) => {
     const a = (i / labels.length) * Math.PI * 2 - Math.PI / 2;
     const rr = 88 + rand() * 26;
@@ -67,8 +85,8 @@ function Nodes({ labels, rand }: { labels: string[]; rand: () => number }) {
             stroke="var(--accent)"
             strokeWidth={j === 0 ? 1.6 : 0.6}
             opacity={j === 0 ? 0.4 : 0.16}
-            className="cd-draw"
-            style={delay(i)}
+            className={cls("cd-draw")}
+            style={anim(i, j === 0 ? 0.4 : 0.16)}
           />
         )),
       )}
@@ -80,15 +98,15 @@ function Nodes({ labels, rand }: { labels: string[]; rand: () => number }) {
           r={i === 0 ? 13 : 9}
           fill="var(--accent)"
           opacity={i === 0 ? 0.95 : 0.5}
-          className="cd-pop"
-          style={delay(i)}
+          className={cls("cd-pop")}
+          style={anim(i, i === 0 ? 0.95 : 0.5)}
         />
       ))}
     </>
   );
 }
 
-function Paths({ labels, rand }: { labels: string[]; rand: () => number }) {
+function Paths({ labels, rand, cls }: DrawProps) {
   return (
     <>
       <rect x={0} y={0} width={W} height={H} rx={4} fill="var(--accent)" opacity={0.06} />
@@ -105,8 +123,8 @@ function Paths({ labels, rand }: { labels: string[]; rand: () => number }) {
             strokeWidth={i === 0 ? 2.6 : 1.4}
             strokeLinecap="round"
             opacity={i === 0 ? 0.9 : 0.4}
-            className="cd-draw"
-            style={delay(i)}
+            className={cls("cd-draw")}
+            style={anim(i, i === 0 ? 0.9 : 0.4)}
           />
         );
       })}
@@ -114,7 +132,7 @@ function Paths({ labels, rand }: { labels: string[]; rand: () => number }) {
   );
 }
 
-function Layers({ labels }: { labels: string[] }) {
+function Layers({ labels, cls }: DrawProps) {
   return (
     <>
       {labels.map((label, i) => {
@@ -131,8 +149,8 @@ function Layers({ labels }: { labels: string[] }) {
             stroke="var(--accent)"
             strokeWidth={2}
             opacity={0.85 - i * 0.16}
-            className="cd-pop"
-            style={delay(i)}
+            className={cls("cd-pop")}
+            style={anim(i, 0.85 - i * 0.16)}
           />
         );
       })}
@@ -140,7 +158,7 @@ function Layers({ labels }: { labels: string[] }) {
   );
 }
 
-function Grid({ labels, rand }: { labels: string[]; rand: () => number }) {
+function Grid({ labels, rand, cls }: DrawProps) {
   const cols = 10;
   const rows = 7;
   const cell = Math.min(W / cols, H / rows);
@@ -161,8 +179,8 @@ function Grid({ labels, rand }: { labels: string[]; rand: () => number }) {
             rx={2}
             fill="var(--accent)"
             opacity={on ? 0.55 : 0.1}
-            className="cd-in"
-            style={{ animationDelay: `${(i % cols) * 22 + Math.floor(i / cols) * 40}ms` }}
+            className={cls("cd-in")}
+            style={{ animationDelay: `${(i % cols) * 22 + Math.floor(i / cols) * 40}ms`, '--o': on ? 0.55 : 0.1 } as React.CSSProperties}
           />
         );
       })}
@@ -170,7 +188,7 @@ function Grid({ labels, rand }: { labels: string[]; rand: () => number }) {
   );
 }
 
-function Section({ labels }: { labels: string[] }) {
+function Section({ labels, cls }: DrawProps) {
   return (
     <>
       {/* Floor plate and a facade to the left, with light entering it. */}
@@ -190,17 +208,17 @@ function Section({ labels }: { labels: string[] }) {
             strokeWidth={2}
             strokeLinecap="round"
             opacity={0.7 - i * 0.1}
-            className="cd-draw"
-            style={delay(i)}
+            className={cls("cd-draw")}
+            style={anim(i, 0.7 - i * 0.1)}
           />
         );
       })}
-      <circle cx={26} cy={34} r={13} fill="var(--accent)" opacity={0.9} className="cd-pop" />
+      <circle cx={26} cy={34} r={13} fill="var(--accent)" opacity={0.9} className={cls("cd-pop")} style={anim(0, 0.9)} />
     </>
   );
 }
 
-function Radial({ labels }: { labels: string[] }) {
+function Radial({ labels, cls }: DrawProps) {
   const cx = W / 2;
   const cy = H / 2;
   return (
@@ -210,18 +228,18 @@ function Radial({ labels }: { labels: string[] }) {
         const x = cx + Math.cos(a) * 105;
         const y = cy + Math.sin(a) * 88;
         return (
-          <g key={label} className="cd-pop" style={delay(i)}>
+          <g key={label} className={cls("cd-pop")} style={delay(i)}>
             <line x1={cx} y1={cy} x2={x} y2={y} stroke="var(--accent)" strokeWidth={1.3} opacity={0.3} />
             <circle cx={x} cy={y} r={13} fill="var(--accent)" opacity={0.28 + (i % 3) * 0.18} />
           </g>
         );
       })}
-      <circle cx={cx} cy={cy} r={26} fill="var(--accent)" opacity={0.95} className="cd-pop" />
+      <circle cx={cx} cy={cy} r={26} fill="var(--accent)" opacity={0.95} className={cls("cd-pop")} style={anim(0, 0.95)} />
     </>
   );
 }
 
-function Bars({ labels, rand }: { labels: string[]; rand: () => number }) {
+function Bars({ labels, rand, cls }: DrawProps) {
   const gap = 14;
   const bw = (W - gap * (labels.length - 1)) / labels.length;
   return (
@@ -239,8 +257,8 @@ function Bars({ labels, rand }: { labels: string[]; rand: () => number }) {
             rx={3}
             fill="var(--accent)"
             opacity={0.25 + (i % 3) * 0.22}
-            className="cd-rise"
-            style={{ ...delay(i), transformOrigin: `50% ${H - 30}px` }}
+            className={cls("cd-rise")}
+            style={anim(i, 0.25 + (i % 3) * 0.22)}
           />
         );
       })}
@@ -248,7 +266,7 @@ function Bars({ labels, rand }: { labels: string[]; rand: () => number }) {
   );
 }
 
-function Sequence({ labels }: { labels: string[] }) {
+function Sequence({ labels, cls }: DrawProps) {
   const n = labels.length;
   const step = W / Math.max(1, n);
   return (
@@ -261,12 +279,13 @@ function Sequence({ labels }: { labels: string[] }) {
         stroke="var(--accent)"
         strokeWidth={2}
         opacity={0.25}
-        className="cd-draw"
+        className={cls("cd-draw")}
+        style={anim(0, 0.25)}
       />
       {labels.map((label, i) => {
         const x = step / 2 + i * step;
         return (
-          <g key={label} className="cd-pop" style={delay(i)}>
+          <g key={label} className={cls("cd-pop")} style={delay(i)}>
             <circle cx={x} cy={H / 2} r={19} fill="var(--accent)" opacity={0.18 + i * 0.13} />
             <text
               x={x}
@@ -286,7 +305,7 @@ function Sequence({ labels }: { labels: string[] }) {
   );
 }
 
-function Organic({ labels, rand }: { labels: string[]; rand: () => number }) {
+function Organic({ labels, rand, cls }: DrawProps) {
   return (
     <>
       {labels.map((label, i) => {
@@ -301,8 +320,8 @@ function Organic({ labels, rand }: { labels: string[]; rand: () => number }) {
             r={r}
             fill="var(--accent)"
             opacity={0.13 + (i % 3) * 0.1}
-            className="cd-pop"
-            style={delay(i)}
+            className={cls("cd-pop")}
+            style={anim(i, 0.13 + (i % 3) * 0.1)}
           />
         );
       })}
@@ -317,8 +336,8 @@ function Organic({ labels, rand }: { labels: string[]; rand: () => number }) {
             strokeWidth={2}
             strokeLinecap="round"
             opacity={0.6}
-            className="cd-draw"
-            style={delay(i)}
+            className={cls("cd-draw")}
+            style={anim(i, 0.6)}
           />
         );
       })}
@@ -326,7 +345,7 @@ function Organic({ labels, rand }: { labels: string[]; rand: () => number }) {
   );
 }
 
-function Stack({ labels }: { labels: string[] }) {
+function Stack({ labels, cls }: DrawProps) {
   const gap = 7;
   const h = (H - gap * (labels.length - 1)) / labels.length;
   return (
@@ -341,26 +360,26 @@ function Stack({ labels }: { labels: string[] }) {
           rx={3}
           fill="var(--accent)"
           opacity={0.18 + i * 0.15}
-          className="cd-slide"
-          style={delay(i)}
+          className={cls("cd-slide")}
+          style={anim(i, 0.18 + i * 0.15)}
         />
       ))}
     </>
   );
 }
 
-const RENDERERS: Record<DiagramKind, (p: { labels: string[]; rand: () => number }) => React.ReactNode> = {
+const RENDERERS: Record<DiagramKind, (p: DrawProps) => React.ReactNode> = {
   zones: Zones,
   nodes: Nodes,
   paths: Paths,
-  layers: ({ labels }) => <Layers labels={labels} />,
+  layers: ({ labels, cls }) => <Layers labels={labels} cls={cls} rand={() => 0} />,
   grid: Grid,
-  section: ({ labels }) => <Section labels={labels} />,
-  radial: ({ labels }) => <Radial labels={labels} />,
+  section: ({ labels, cls }) => <Section labels={labels} cls={cls} rand={() => 0} />,
+  radial: ({ labels, cls }) => <Radial labels={labels} cls={cls} rand={() => 0} />,
   bars: Bars,
-  sequence: ({ labels }) => <Sequence labels={labels} />,
+  sequence: ({ labels, cls }) => <Sequence labels={labels} cls={cls} rand={() => 0} />,
   organic: Organic,
-  stack: ({ labels }) => <Stack labels={labels} />,
+  stack: ({ labels, cls }) => <Stack labels={labels} cls={cls} rand={() => 0} />,
 };
 
 /** A generated diagram for a concept slide, drawn from the slide's own points
@@ -371,6 +390,7 @@ export function ConceptDiagram({
   conceptId,
   labels,
   seedKey,
+  animate = false,
   className,
 }: {
   pillarId?: string;
@@ -378,6 +398,7 @@ export function ConceptDiagram({
   labels: string[];
   /** Keeps a given slide's layout stable across renders. */
   seedKey: string;
+  animate?: boolean;
   className?: string;
 }) {
   const kind = diagramFor(pillarId, conceptId);
@@ -389,9 +410,10 @@ export function ConceptDiagram({
   const { drawn, safeLabels } = useMemo(() => {
     const list = labelKey.split('|');
     const rand = seedFrom(seedKey + kind + labelKey);
+    const cls: Cls = (name) => (animate ? name : '');
     const Renderer = RENDERERS[kind];
-    return { drawn: <Renderer labels={list} rand={rand} />, safeLabels: list };
-  }, [kind, seedKey, labelKey]);
+    return { drawn: <Renderer labels={list} rand={rand} cls={cls} />, safeLabels: list };
+  }, [kind, seedKey, labelKey, animate]);
 
   return (
     <svg

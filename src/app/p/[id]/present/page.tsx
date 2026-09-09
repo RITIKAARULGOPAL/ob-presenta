@@ -52,7 +52,7 @@ export default function PresenterPage({ params }: { params: Promise<{ id: string
     <div className="relative h-screen w-screen bg-black">
       {currentSlide && (
         <div className="absolute inset-0">
-          <SlideRenderer slide={currentSlide} editable={false} />
+          <SlideRenderer slide={currentSlide} editable={false} animate />
         </div>
       )}
 

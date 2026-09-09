@@ -34,24 +34,33 @@ body {
 
 @keyframes cd-in {
   from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: none; }
+  to   { opacity: var(--o, 1); transform: none; }
 }
 @keyframes cd-pop {
   from { opacity: 0; transform: scale(0.6); }
-  to   { opacity: 1; transform: scale(1); }
+  to   { opacity: var(--o, 1); transform: scale(1); }
 }
 @keyframes cd-rise {
   from { opacity: 0; transform: scaleY(0); }
-  to   { opacity: 1; transform: scaleY(1); }
+  to   { opacity: var(--o, 1); transform: scaleY(1); }
 }
 @keyframes cd-slide {
   from { opacity: 0; transform: translateX(-14px); }
-  to   { opacity: 1; transform: none; }
+  to   { opacity: var(--o, 1); transform: none; }
 }
 @keyframes cd-draw {
   from { stroke-dasharray: 1 600; stroke-dashoffset: 300; opacity: 0; }
-  to   { stroke-dasharray: 600 0; stroke-dashoffset: 0; opacity: 1; }
+  to   { stroke-dasharray: 600 0; stroke-dashoffset: 0; opacity: var(--o, 1); }
 }
+
+/* CSS transforms on SVG shapes resolve against the SVG origin, not the shape,
+   so a scaled rect flies in from the top-left corner instead of growing where
+   it sits. fill-box puts the origin back on the element itself. */
+.cd-in, .cd-pop, .cd-rise, .cd-slide {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.cd-rise { transform-origin: bottom; }
 
 .cd-in    { animation: cd-in    .55s cubic-bezier(.2,.7,.3,1) both; }
 .cd-pop   { animation: cd-pop   .45s cubic-bezier(.2,.9,.3,1)  both; }

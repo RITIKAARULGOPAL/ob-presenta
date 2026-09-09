@@ -185,7 +185,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         <SlideRail />
         <main className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-8">
           <div className="aspect-video max-h-full w-full max-w-5xl overflow-y-auto rounded-lg bg-white shadow-lg ring-1 ring-slate-200">
-            {currentSlide && <SlideRenderer slide={currentSlide} editable />}
+            {currentSlide && <SlideRenderer slide={currentSlide} editable animate />}
           </div>
         </main>
         <PropertiesPanel />

@@ -143,3 +143,58 @@ export function centroidOf(points: Point[]): Point | null {
     y: points.reduce((s, p) => s + p.y, 0) / points.length,
   };
 }
+
+/** Snaps a segment's direction to a multiple of `stepDeg`, holding Shift.
+ *
+ * The maths runs in display space, not normalised space. Points are stored 0–1
+ * against a 16:9 box, so a 45° line in normalised units renders at about 29° on
+ * screen and "horizontal" is the only angle that happens to survive. `aspect`
+ * is the box's width/height, which puts the constraint back where the eye
+ * expects it. The point follows the cursor's projection onto the chosen axis,
+ * rather than jumping to a fixed radius, so it still tracks the hand.
+ */
+export function snapAngle(from: Point, to: Point, aspect: number, stepDeg = 45): Point {
+  const dx = (to.x - from.x) * aspect;
+  const dy = to.y - from.y;
+  if (dx === 0 && dy === 0) return to;
+
+  const step = (Math.PI * stepDeg) / 180;
+  const angle = Math.round(Math.atan2(dy, dx) / step) * step;
+  const ux = Math.cos(angle);
+  const uy = Math.sin(angle);
+
+  // Shorten along the locked axis to stay in bounds. Clamping x and y
+  // separately would pull the point off the axis and quietly bend the angle,
+  // which is the whole thing the constraint is meant to prevent.
+  const along = Math.max(0, Math.min(dx * ux + dy * uy, roomAlong(from, ux, uy, aspect)));
+
+  return { x: from.x + (ux * along) / aspect, y: from.y + uy * along };
+}
+
+/** How far a unit direction can travel from `from` before leaving the box,
+ *  measured in the same display units the constraints work in. */
+function roomAlong(from: Point, ux: number, uy: number, aspect: number): number {
+  const limits: number[] = [];
+  if (ux > 0) limits.push(((1 - from.x) * aspect) / ux);
+  else if (ux < 0) limits.push((from.x * aspect) / -ux);
+  if (uy > 0) limits.push((1 - from.y) / uy);
+  else if (uy < 0) limits.push(from.y / -uy);
+  return limits.length ? Math.min(...limits) : 0;
+}
+
+/** Shift on the rectangle tool: a square as drawn, which in normalised
+ *  coordinates over a 16:9 box is not an equal delta on both axes. */
+export function squareFrom(from: Point, to: Point, aspect: number): Point {
+  const dx = (to.x - from.x) * aspect;
+  const dy = to.y - from.y;
+  const sx = dx < 0 ? -1 : 1;
+  const sy = dy < 0 ? -1 : 1;
+
+  // Shrink to fit rather than clamp per axis — clamping one side turns the
+  // square back into a rectangle, which is what it was asked not to be.
+  const roomX = sx > 0 ? (1 - from.x) * aspect : from.x * aspect;
+  const roomY = sy > 0 ? 1 - from.y : from.y;
+  const side = Math.min(Math.max(Math.abs(dx), Math.abs(dy)), roomX, roomY);
+
+  return { x: from.x + (sx * side) / aspect, y: from.y + sy * side };
+}

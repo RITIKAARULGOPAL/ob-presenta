@@ -14,6 +14,8 @@ import {
   rectPoints,
   shapePath,
   simplify,
+  snapAngle,
+  squareFrom,
   type ShapeKind,
 } from '@/lib/hotspotShape';
 import { ConceptDiagram } from './ConceptDiagram';
@@ -330,8 +332,8 @@ function BrandFooter({ slide, dark }: { slide: Slide; dark: boolean }) {
 type DrawTool = 'rect' | 'polygon' | 'pen';
 
 const TOOLS: { key: DrawTool; label: string; hint: string }[] = [
-  { key: 'rect', label: '▭ Rectangle', hint: 'Drag a box over the area.' },
-  { key: 'polygon', label: '⬡ Polygon', hint: 'Click each corner. Click the first point again, or press Enter, to close.' },
+  { key: 'rect', label: '▭ Rectangle', hint: 'Drag a box over the area. Shift for a square.' },
+  { key: 'polygon', label: '⬡ Polygon', hint: 'Click each corner. Shift locks to 45°. Click the first point, or Enter, to close.' },
   { key: 'pen', label: '✎ Curve', hint: 'Hold and trace the edge — it smooths into a curve.' },
 ];
 
@@ -356,6 +358,10 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   const [cursor, setCursor] = useState<Point | null>(null);
   /** True while a rect drag or a pen stroke is in progress. */
   const [dragging, setDragging] = useState(false);
+  /** Shift held, read off the pointer event rather than tracked separately —
+   *  a separate keydown listener can drift out of step with the pointer and
+   *  then the preview and the committed point disagree. */
+  const [ortho, setOrtho] = useState(false);
   const [pickingTarget, setPickingTarget] = useState(false);
   const [pendingTarget, setPendingTarget] = useState('');
   const [pendingTime, setPendingTime] = useState('');
@@ -415,7 +421,20 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
 
   function pointAt(e: React.PointerEvent<HTMLDivElement>): Point {
     const rect = e.currentTarget.getBoundingClientRect();
-    return clamp01({ x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height });
+    const raw = clamp01({ x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height });
+    if (!e.shiftKey) return raw;
+
+    const aspect = rect.width / rect.height;
+    if (tool === 'rect') {
+      // Anchored to the corner the drag started from.
+      return drawingPoints?.[0] ? squareFrom(drawingPoints[0], raw, aspect) : raw;
+    }
+    if (tool === 'polygon') {
+      const from = drawingPoints?.[drawingPoints.length - 1];
+      return from ? snapAngle(from, raw, aspect) : raw;
+    }
+    // Freehand is freehand — constraining a traced curve would fight the hand.
+    return raw;
   }
 
   function drawable(): boolean {
@@ -424,6 +443,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
 
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (!drawable()) return;
+    setOrtho(e.shiftKey);
     const point = pointAt(e);
 
     if (tool === 'polygon') {
@@ -453,6 +473,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
 
   function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
     if (!drawable()) return;
+    setOrtho(e.shiftKey);
     const point = pointAt(e);
     setCursor(point);
     if (!dragging) return;
@@ -471,6 +492,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
 
   function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
     if (!drawable() || !dragging) return;
+    setOrtho(e.shiftKey);
     setDragging(false);
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
@@ -481,6 +503,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     if (!pts) return;
 
     if (tool === 'rect' && pts.length === 2) {
+      // pts[1] already carries the square constraint from pointAt.
       // Ignore an accidental click that produced no area.
       if (distance(pts[0], pts[1]) < 0.02) {
         setDrawingPoints(null);
@@ -513,6 +536,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     setTool(null);
     setCursor(null);
     setDragging(false);
+    setOrtho(false);
   }
 
   function selectView(id: string) {
@@ -678,17 +702,35 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               {/* Rubber band from the last vertex to the cursor, so a polygon
                   shows the edge you're about to commit. */}
               {tool === 'polygon' && cursor && !pickingTarget && (
-                <line
-                  x1={drawingPoints[drawingPoints.length - 1].x * 100}
-                  y1={drawingPoints[drawingPoints.length - 1].y * 100}
-                  x2={cursor.x * 100}
-                  y2={cursor.y * 100}
-                  vectorEffect="non-scaling-stroke"
-                  className="stroke-[var(--accent)]"
-                  strokeWidth={1}
-                  strokeDasharray="2,3"
-                  opacity={0.7}
-                />
+                <>
+                  {/* Guide through the anchor, extended past the cursor, so a
+                      locked direction reads as a direction and not just a
+                      shorter rubber band. */}
+                  {ortho && (
+                    <line
+                      x1={drawingPoints[drawingPoints.length - 1].x * 100}
+                      y1={drawingPoints[drawingPoints.length - 1].y * 100}
+                      x2={(drawingPoints[drawingPoints.length - 1].x + (cursor.x - drawingPoints[drawingPoints.length - 1].x) * 6) * 100}
+                      y2={(drawingPoints[drawingPoints.length - 1].y + (cursor.y - drawingPoints[drawingPoints.length - 1].y) * 6) * 100}
+                      vectorEffect="non-scaling-stroke"
+                      className="stroke-[var(--accent)]"
+                      strokeWidth={0.75}
+                      strokeDasharray="1,4"
+                      opacity={0.5}
+                    />
+                  )}
+                  <line
+                    x1={drawingPoints[drawingPoints.length - 1].x * 100}
+                    y1={drawingPoints[drawingPoints.length - 1].y * 100}
+                    x2={cursor.x * 100}
+                    y2={cursor.y * 100}
+                    vectorEffect="non-scaling-stroke"
+                    className="stroke-[var(--accent)]"
+                    strokeWidth={ortho ? 1.75 : 1}
+                    strokeDasharray={ortho ? undefined : '2,3'}
+                    opacity={ortho ? 1 : 0.7}
+                  />
+                </>
               )}
 
               {tool !== 'pen' &&
@@ -727,6 +769,11 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               </>
             ) : (
               <span>{TOOLS.find((t) => t.key === tool)?.hint}</span>
+            )}
+            {tool !== 'pen' && (
+              <span className={ortho ? 'font-semibold text-[#7fd1ff]' : 'text-white/50'}>
+                {ortho ? (tool === 'rect' ? '⇧ square' : '⇧ 45° locked') : '⇧ to constrain'}
+              </span>
             )}
             <button onClick={cancelDrawing} className="underline decoration-white/50 hover:decoration-white">
               Cancel

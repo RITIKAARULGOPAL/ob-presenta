@@ -26,6 +26,7 @@ interface EditorState {
   addConceptSlide: (slide: Slide) => void;
   addStyledSlide: (style: SlideStyleKind) => void;
   removeSlide: (id: string) => void;
+  toggleSkip: (id: string) => void;
   changeLayout: (layout: SlideLayout) => void;
   changeStyle: (style: SlideStyleKind) => void;
   setBrandOverride: (brand: Brand | undefined) => void;
@@ -68,6 +69,16 @@ function dropLinksTo(slide: Slide, deletedId: string): Slide {
   };
 }
 
+/** The next slide in a direction, passing over skipped ones when presenting.
+ *  The editor still walks every slide — you have to be able to reach a skipped
+ *  slide in order to edit it or un-skip it. */
+function step(slides: Slide[], from: number, dir: 1 | -1, skipSkipped: boolean): Slide | undefined {
+  for (let i = from + dir; i >= 0 && i < slides.length; i += dir) {
+    if (!skipSkipped || !slides[i].skipped) return slides[i];
+  }
+  return undefined;
+}
+
 function persist(project: Project) {
   // Fire-and-forget, but not silent: a save that fails has to reach the user,
   // or they keep editing a deck that isn't being written anywhere.
@@ -95,19 +106,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectSlide: (id) => set({ currentSlideId: id }),
 
   goNext: () => {
-    const { project, currentSlideId } = get();
+    const { project, currentSlideId, mode } = get();
     if (!project) return;
     const idx = project.slides.findIndex((s) => s.id === currentSlideId);
-    const next = project.slides[idx + 1];
+    const next = step(project.slides, idx, 1, mode === 'presenter');
     if (next) set({ currentSlideId: next.id });
   },
 
   goPrev: () => {
-    const { project, currentSlideId } = get();
+    const { project, currentSlideId, mode } = get();
     if (!project) return;
     const idx = project.slides.findIndex((s) => s.id === currentSlideId);
-    const prev = project.slides[idx - 1];
+    const prev = step(project.slides, idx, -1, mode === 'presenter');
     if (prev) set({ currentSlideId: prev.id });
+  },
+
+  toggleSkip: (id) => {
+    const { project } = get();
+    if (!project) return;
+    const slides = project.slides.map((s) => (s.id === id ? { ...s, skipped: !s.skipped || undefined } : s));
+    const next = { ...project, slides };
+    set({ project: next });
+    persist(next);
   },
 
   updateField: (field, value) => {

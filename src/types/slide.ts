@@ -124,6 +124,9 @@ export interface Slide {
   brandOverride?: Brand;
   /** Present when this slide was inserted from the concept library. */
   conceptOrigin?: ConceptOrigin;
+  /** Kept in the deck but left out of Presenter and export — for a slide that
+   *  belongs to the project but not to this particular telling of it. */
+  skipped?: boolean;
 }
 
 export interface Project {

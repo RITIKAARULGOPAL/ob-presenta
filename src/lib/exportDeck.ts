@@ -37,8 +37,11 @@ async function captureSlides(project: Project, onProgress?: ExportProgress): Pro
   try {
     await document.fonts.ready;
 
-    for (let i = 0; i < project.slides.length; i++) {
-      const slide = project.slides[i];
+    // Skipped slides stay in the project but out of the deliverable.
+    const exportable = project.slides.filter((s) => !s.skipped);
+
+    for (let i = 0; i < exportable.length; i++) {
+      const slide = exportable[i];
       root.render(createElement(SlideRenderer, { slide, editable: false }));
       // Two frames: one for React to commit, one for layout/paint to settle.
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -50,7 +53,7 @@ async function captureSlides(project: Project, onProgress?: ExportProgress): Pro
         cacheBust: true,
       });
       images.push(dataUrl);
-      onProgress?.(i + 1, project.slides.length);
+      onProgress?.(i + 1, exportable.length);
     }
   } finally {
     root.unmount();

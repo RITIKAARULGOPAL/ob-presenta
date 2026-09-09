@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# supabase cli scratch
+/supabase/.temp/
+
+# Paused AI-import feature. These import pdfjs-dist, which is deliberately not
+# in package.json while the feature is on hold — so they compile locally off a
+# stale node_modules but fail a clean Vercel build. `git add -A` swept them in
+# once already (fixed in e4629f6); ignoring them stops that recurring.
+/src/lib/importDeck.ts
+/src/app/api/import-slide/

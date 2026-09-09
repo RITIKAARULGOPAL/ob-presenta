@@ -34,7 +34,11 @@ export interface ViewHotspot {
   id: string;
   /** Polygon outlining the linked region — each vertex relative to the image, 0–1. At least 3 points. */
   points: { x: number; y: number }[];
-  targetViewId: string;
+  /** A view within this same slide. Mutually exclusive with targetSlideId. */
+  targetViewId?: string;
+  /** Another slide in the deck — e.g. a zone on a plan pointing at the concept
+   *  that explains it. Mutually exclusive with targetViewId. */
+  targetSlideId?: string;
   /** Seconds — only meaningful when the target view is a walkthrough video. */
   targetTime?: number;
   /** All optional — fall back to a default accent look when unset. */
@@ -70,6 +74,19 @@ export interface SlideFields {
   subtitle?: string;
   numeral?: string;
   views?: LinkedView[];
+  /** Other slides this one references — a concept pointing at the layout or
+   *  design slide that demonstrates it. Ids may go stale if a slide is deleted,
+   *  so every reader must tolerate a miss. */
+  linkedSlideIds?: string[];
+}
+
+/** Set on slides generated from the concept library, so the UI can show what a
+ *  slide came from and offer to re-link it. Pillar/concept ids are stable
+ *  slugs, not array indices. */
+export interface ConceptOrigin {
+  pillarId: string;
+  /** Unset on a pillar's own section-starter slide. */
+  conceptId?: string;
 }
 
 export type AnimationEntry = 'none' | 'fadeUp' | 'fadeIn' | 'scaleIn' | 'slideLeft';
@@ -92,6 +109,8 @@ export interface Slide {
   animation: SlideAnimation;
   /** Overrides the project's brand for just this slide; unset = inherit. */
   brandOverride?: Brand;
+  /** Present when this slide was inserted from the concept library. */
+  conceptOrigin?: ConceptOrigin;
 }
 
 export interface Project {

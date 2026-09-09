@@ -149,6 +149,43 @@ function ClientLogo({ editable, dark }: { editable: boolean; dark: boolean }) {
   );
 }
 
+/** A concept slide's links to the plans and renders that demonstrate it.
+ *  Targets can vanish if a slide is deleted mid-session, so misses are skipped
+ *  rather than rendered as dead chips. */
+function LinkedSlideChips({ slide, dark }: { slide: Slide; dark: boolean }) {
+  const project = useEditorStore((s) => s.project);
+  const selectSlide = useEditorStore((s) => s.selectSlide);
+  const ids = slide.fields.linkedSlideIds ?? [];
+  if (ids.length === 0) return null;
+
+  const targets = ids
+    .map((id) => project?.slides.find((s) => s.id === id))
+    .filter((s): s is Slide => Boolean(s));
+  if (targets.length === 0) return null;
+
+  return (
+    <div className="mt-6 flex flex-wrap items-center gap-2">
+      <span className={`text-[10px] font-semibold uppercase tracking-wide ${dark ? 'text-white/40' : 'text-[var(--ink-3)]'}`}>
+        See
+      </span>
+      {targets.map((target) => (
+        <button
+          key={target.id}
+          type="button"
+          onClick={() => selectSlide(target.id)}
+          className={`rounded-full border px-3 py-1 text-[11px] font-medium transition ${
+            dark
+              ? 'border-white/25 text-white/75 hover:border-white/60 hover:text-white'
+              : 'border-[var(--accent-soft-line)] bg-[var(--accent-soft)] text-[var(--accent)] hover:border-[var(--accent)]'
+          }`}
+        >
+          {target.fields.title || 'Untitled slide'} {ARROW}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function BrandFooter({ slide, dark }: { slide: Slide; dark: boolean }) {
   const project = useEditorStore((s) => s.project);
   const brand: Brand = slide.brandOverride ?? project?.brand ?? 'ob';
@@ -187,6 +224,8 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   const updateField = useEditorStore((s) => s.updateField);
   const views = slide.fields.views ?? [];
   const [activeId, setActiveId] = useState<string | undefined>(views[0]?.id);
+  const project = useEditorStore((s) => s.project);
+  const selectSlide = useEditorStore((s) => s.selectSlide);
   const [drawMode, setDrawMode] = useState(false);
   const [drawingPoints, setDrawingPoints] = useState<Point[] | null>(null);
   const [pickingTarget, setPickingTarget] = useState(false);
@@ -207,7 +246,12 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
 
   const otherViews = views.filter((v) => v.id !== active.id);
   const hotspots = active.hotspots ?? [];
-  const targetView = otherViews.find((v) => v.id === pendingTarget);
+  const targetView = otherViews.find((v) => `view:${v.id}` === pendingTarget);
+  // Concept and design slides are the meaningful cross-slide destinations: a
+  // zone on a plan should be able to point at the principle behind it.
+  const linkableSlides = (project?.slides ?? []).filter(
+    (s) => s.id !== slide.id && (s.conceptOrigin || s.style === 'design' || s.layout === 'linked-views'),
+  );
 
   function handleMediaClick(e: React.MouseEvent<HTMLDivElement>) {
     if (!drawMode || !editable || !active.url || active.kind === 'walkthrough' || pickingTarget) return;
@@ -233,7 +277,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
 
   function startPickingTarget() {
     if (!drawingPoints || drawingPoints.length < 3) return;
-    setPendingTarget(otherViews[0]?.id ?? '');
+    setPendingTarget(otherViews[0] ? `view:${otherViews[0].id}` : (linkableSlides[0] ? `slide:${linkableSlides[0].id}` : ''));
     setPendingTime('');
     setPendingFill(DEFAULT_FILL);
     setPendingFillOpacity(DEFAULT_FILL_OPACITY);
@@ -245,10 +289,11 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   function confirmRegion() {
     if (!drawingPoints || drawingPoints.length < 3 || !pendingTarget) return;
     const time = pendingTime.trim() ? Number(pendingTime) : undefined;
+    const [kind, targetId] = pendingTarget.split(':');
     const hotspot: ViewHotspot = {
       id: makeId('hotspot'),
       points: drawingPoints,
-      targetViewId: pendingTarget,
+      ...(kind === 'slide' ? { targetSlideId: targetId } : { targetViewId: targetId }),
       targetTime: time,
       fillColor: pendingFill,
       fillOpacity: pendingFillOpacity,
@@ -264,6 +309,11 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   }
 
   function jumpTo(hotspot: ViewHotspot) {
+    if (hotspot.targetSlideId) {
+      selectSlide(hotspot.targetSlideId);
+      return;
+    }
+    if (!hotspot.targetViewId) return;
     setActiveId(hotspot.targetViewId);
     if (hotspot.targetTime != null) {
       requestAnimationFrame(() => {
@@ -331,7 +381,13 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
                 else jumpTo(h);
               }}
             >
-              <title>{editable ? 'Click to remove' : views.find((v) => v.id === h.targetViewId)?.label}</title>
+              <title>
+                {editable
+                  ? 'Click to remove'
+                  : h.targetSlideId
+                    ? (project?.slides.find((s) => s.id === h.targetSlideId)?.fields.title ?? 'Linked slide')
+                    : views.find((v) => v.id === h.targetViewId)?.label}
+              </title>
             </polygon>
           ))}
           {drawingPoints && (
@@ -389,11 +445,24 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               onChange={(e) => setPendingTarget(e.target.value)}
               className="mb-2 w-full rounded-md border border-[var(--line)] px-2 py-1.5 text-xs outline-none"
             >
-              {otherViews.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.label}
-                </option>
-              ))}
+              {otherViews.length > 0 && (
+                <optgroup label="This slide">
+                  {otherViews.map((v) => (
+                    <option key={v.id} value={`view:${v.id}`}>
+                      {v.label}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {linkableSlides.length > 0 && (
+                <optgroup label="Another slide">
+                  {linkableSlides.map((s) => (
+                    <option key={s.id} value={`slide:${s.id}`}>
+                      {s.fields.title || 'Untitled slide'}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
             {targetView?.kind === 'walkthrough' && (
               <input
@@ -776,6 +845,7 @@ export function SlideRenderer({ slide, editable }: SlideRendererProps) {
         </>
       )}
 
+      <LinkedSlideChips slide={slide} dark={dark} />
       <BrandFooter slide={slide} dark={dark} />
     </div>
   );

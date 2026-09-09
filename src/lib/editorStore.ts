@@ -22,6 +22,7 @@ interface EditorState {
 
   updateField: <K extends keyof SlideFields>(field: K, value: SlideFields[K]) => void;
   addSlide: (layout?: SlideLayout) => void;
+  addSlides: (slides: Slide[]) => void;
   addStyledSlide: (style: SlideStyleKind) => void;
   removeSlide: (id: string) => void;
   changeLayout: (layout: SlideLayout) => void;
@@ -29,6 +30,7 @@ interface EditorState {
   setBrandOverride: (brand: Brand | undefined) => void;
   setClientLogo: (dataUrl: string | undefined) => void;
   setAccentColor: (hex: string | undefined) => void;
+  setLinkedSlideIds: (ids: string[]) => void;
 
   addStatItem: () => void;
   removeStatItem: (statId: string) => void;
@@ -37,6 +39,30 @@ interface EditorState {
 
   currentSlide: () => Slide | null;
   currentIndex: () => number;
+}
+
+/** Removes every reference to a deleted slide — both the chip links on a slide
+ *  and any linked-view hotspot that pointed at it. */
+function dropLinksTo(slide: Slide, deletedId: string): Slide {
+  const linked = slide.fields.linkedSlideIds?.filter((id) => id !== deletedId);
+  const views = slide.fields.views?.map((v) =>
+    v.hotspots?.some((h) => h.targetSlideId === deletedId)
+      ? { ...v, hotspots: v.hotspots.filter((h) => h.targetSlideId !== deletedId) }
+      : v,
+  );
+
+  const linkedChanged = (linked?.length ?? 0) !== (slide.fields.linkedSlideIds?.length ?? 0);
+  const viewsChanged = views !== undefined && views.some((v, i) => v !== slide.fields.views?.[i]);
+  if (!linkedChanged && !viewsChanged) return slide;
+
+  return {
+    ...slide,
+    fields: {
+      ...slide.fields,
+      ...(linkedChanged ? { linkedSlideIds: linked && linked.length ? linked : undefined } : {}),
+      ...(viewsChanged ? { views } : {}),
+    },
+  };
 }
 
 function persist(project: Project) {
@@ -104,6 +130,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     persist(next);
   },
 
+  addSlides: (incoming: Slide[]) => {
+    const { project, currentSlideId } = get();
+    if (!project || incoming.length === 0) return;
+    const idx = project.slides.findIndex((s) => s.id === currentSlideId);
+    const slides = [...project.slides];
+    slides.splice(idx + 1, 0, ...incoming);
+    const next = { ...project, slides };
+    // Land on the first inserted slide, so a bulk insert is visibly where it went.
+    set({ project: next, currentSlideId: incoming[0].id });
+    persist(next);
+  },
+
   addStyledSlide: (style: SlideStyleKind) => {
     const { project, currentSlideId } = get();
     if (!project) return;
@@ -120,7 +158,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { project } = get();
     if (!project || project.slides.length <= 1) return;
     const idx = project.slides.findIndex((s) => s.id === id);
-    const slides = project.slides.filter((s) => s.id !== id);
+    // Links hold slide ids, so deleting a target would otherwise leave chips and
+    // hotspots pointing nowhere — silently doing nothing when clicked.
+    const slides = project.slides.filter((s) => s.id !== id).map((s) => dropLinksTo(s, id));
     const next = { ...project, slides };
     const fallback = slides[Math.max(0, idx - 1)]?.id ?? slides[0]?.id ?? null;
     set((state) => ({ project: next, currentSlideId: state.currentSlideId === id ? fallback : state.currentSlideId }));
@@ -177,6 +217,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { project } = get();
     if (!project) return;
     const next = { ...project, accentColor: hex };
+    set({ project: next });
+    persist(next);
+  },
+
+  setLinkedSlideIds: (ids) => {
+    const { project, currentSlideId } = get();
+    if (!project || !currentSlideId) return;
+    const slides = project.slides.map((s) =>
+      s.id === currentSlideId
+        ? { ...s, fields: { ...s.fields, linkedSlideIds: ids.length ? ids : undefined } }
+        : s,
+    );
+    const next = { ...project, slides };
     set({ project: next });
     persist(next);
   },

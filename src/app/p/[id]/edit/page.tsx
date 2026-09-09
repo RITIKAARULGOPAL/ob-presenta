@@ -8,6 +8,7 @@ import { useEditorStore } from '@/lib/editorStore';
 import { SlideRail } from '@/components/SlideRail';
 import { SlideRenderer } from '@/components/SlideRenderer';
 import { PropertiesPanel } from '@/components/PropertiesPanel';
+import { ConceptLibraryPicker } from '@/components/ConceptLibraryPicker';
 import { exportToPdf, exportToPptx } from '@/lib/exportDeck';
 
 export default function EditorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -15,6 +16,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const router = useRouter();
   const [notFound, setNotFound] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showConceptPicker, setShowConceptPicker] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exportStatus, setExportStatus] = useState('');
 
@@ -22,6 +24,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const loadProject = useEditorStore((s) => s.loadProject);
   const currentSlide = useEditorStore((s) => s.currentSlide());
   const addSlide = useEditorStore((s) => s.addSlide);
+  const addSlides = useEditorStore((s) => s.addSlides);
   const saveError = useEditorStore((s) => s.saveError);
   const logoSaveUnavailable = useEditorStore((s) => s.logoSaveUnavailable);
 
@@ -76,6 +79,15 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
   return (
     <div className="flex h-screen flex-col bg-slate-100">
+      {showConceptPicker && (
+        <ConceptLibraryPicker
+          onCancel={() => setShowConceptPicker(false)}
+          onInsert={(slides) => {
+            addSlides(slides);
+            setShowConceptPicker(false);
+          }}
+        />
+      )}
       {saveBanner}
       <header className="flex flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-2.5">
         <div className="flex items-center gap-2 rounded-full bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-white">
@@ -95,7 +107,16 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               + Add slide
             </button>
             {showAddMenu && (
-              <div className="absolute right-0 top-10 z-10 w-40 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
+              <div className="absolute right-0 top-10 z-10 w-48 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
+                <button
+                  onClick={() => {
+                    setShowConceptPicker(true);
+                    setShowAddMenu(false);
+                  }}
+                  className="mb-1 block w-full rounded-md border-b border-slate-100 px-3 py-2 text-left text-xs font-semibold text-[#0b72c2] hover:bg-slate-50"
+                >
+                  From concept library…
+                </button>
                 <button
                   onClick={() => {
                     addSlide('title-content');

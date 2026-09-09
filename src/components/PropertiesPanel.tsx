@@ -22,6 +22,14 @@ export function PropertiesPanel() {
   const changeStyle = useEditorStore((s) => s.changeStyle);
   const setBrandOverride = useEditorStore((s) => s.setBrandOverride);
   const setAccentColor = useEditorStore((s) => s.setAccentColor);
+  const setLinkedSlideIds = useEditorStore((s) => s.setLinkedSlideIds);
+
+  const linkedIds = slide?.fields.linkedSlideIds ?? [];
+  // Plans, renders and design slides are what a concept wants to point at —
+  // linking one body-copy slide to another isn't the useful case.
+  const linkTargets = (project?.slides ?? []).filter(
+    (s) => s.id !== slide?.id && (s.layout === 'linked-views' || s.style === 'design'),
+  );
 
   if (!slide) return null;
 
@@ -88,6 +96,40 @@ export function PropertiesPanel() {
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
           This project defaults to <span className="font-semibold text-slate-500">{project?.brand === 'both' ? 'Both' : project?.brand?.toUpperCase() ?? 'OB'}</span> — override it for just this slide if needed.
+        </p>
+      </div>
+
+      <div className="mb-2 border-t border-slate-100 pt-6">
+        <h4 className="mb-2.5 text-xs font-bold uppercase tracking-wide text-slate-400">Linked Slides</h4>
+        {linkTargets.length === 0 ? (
+          <p className="text-[11px] leading-relaxed text-slate-400">
+            Nothing to link to yet — add a Linked Views or Design slide and it&apos;ll appear here.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {linkTargets.map((target) => {
+              const on = linkedIds.includes(target.id);
+              return (
+                <label key={target.id} className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    onChange={() =>
+                      setLinkedSlideIds(on ? linkedIds.filter((id) => id !== target.id) : [...linkedIds, target.id])
+                    }
+                    className="accent-[#0b72c2]"
+                  />
+                  <span className="truncate text-[12px] text-slate-600">{target.fields.title || 'Untitled slide'}</span>
+                  <span className="ml-auto shrink-0 text-[10px] uppercase text-slate-400">
+                    {target.layout === 'linked-views' ? 'views' : target.style === 'design' ? 'design' : 'slide'}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        )}
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+          Shown as chips on this slide — click one in Presenter to jump straight to that plan or render.
         </p>
       </div>
 

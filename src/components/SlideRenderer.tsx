@@ -5,6 +5,7 @@ import { EditableText } from './EditableText';
 import { useEditorStore } from '@/lib/editorStore';
 import { tintWithWhite } from '@/lib/color';
 import { fileToDataUrl } from '@/lib/imageFile';
+import { ConceptDiagram } from './ConceptDiagram';
 import { makeId } from '@/lib/id';
 import type { Brand, LinkedView, Slide, ViewHotspot } from '@/types/slide';
 
@@ -786,15 +787,45 @@ function ConceptBody({ slide, editable }: SlideRendererProps) {
         </div>
       </div>
 
-      {/* Where the project's own plan or render goes — the whole point of the
-          split is that a concept slide isn't a wall of text. */}
-      <MediaBox
-        url={slide.fields.imageUrl ?? ''}
-        kind="image"
-        editable={editable}
-        onChangeUrl={(url) => updateField('imageUrl', url)}
-        className="aspect-[4/3] w-[42%] shrink-0"
-      />
+      {/* The visual half. A generated diagram is the default so the slide is
+          never just text; pasting a real plan or render replaces it. */}
+      {slide.fields.visual === 'image' || slide.fields.imageUrl ? (
+        <div className="relative w-[42%] shrink-0">
+          <MediaBox
+            url={slide.fields.imageUrl ?? ''}
+            kind="image"
+            editable={editable}
+            onChangeUrl={(url) => updateField('imageUrl', url)}
+            className="aspect-[4/3] w-full"
+          />
+          {editable && !slide.fields.imageUrl && (
+            <button
+              onClick={() => updateField('visual', 'diagram')}
+              className="absolute bottom-2 right-2 rounded-md border border-dashed border-[var(--line)] bg-white/80 px-2 py-1 text-[10px] font-semibold text-[var(--ink-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            >
+              Back to diagram
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="relative w-[42%] shrink-0">
+          <ConceptDiagram
+            pillarId={slide.conceptOrigin?.pillarId}
+            conceptId={slide.conceptOrigin?.conceptId}
+            labels={points.map((pt) => pt.label)}
+            seedKey={slide.id}
+            className="aspect-[4/3] w-full"
+          />
+          {editable && (
+            <button
+              onClick={() => updateField('visual', 'image')}
+              className="absolute bottom-2 right-2 rounded-md border border-dashed border-[var(--line)] bg-white/80 px-2 py-1 text-[10px] font-semibold text-[var(--ink-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            >
+              Use an image instead
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -826,11 +857,18 @@ export function SlideRenderer({ slide, editable }: SlideRendererProps) {
   const accentColor = useEditorStore((s) => s.project?.accentColor) ?? DEFAULT_ACCENT;
   const dark = slide.style === 'section-starter' || slide.style === 'design';
 
+  const entry = slide.animation?.entry ?? 'none';
+  // Only animate the live canvas — rail thumbnails re-mount constantly and
+  // would flicker, and an export needs the settled frame.
+  const animClass = editable && entry !== 'none' ? `slide-anim-${entry}` : '';
+
   const base = (
     <div
-      className={`relative flex min-h-full w-full flex-col justify-center px-16 pb-14 pt-10 ${dark ? 'bg-[var(--ink)]' : 'bg-white'}`}
+      className={`relative flex min-h-full w-full flex-col justify-center px-16 pb-14 pt-10 ${animClass} ${dark ? 'bg-[var(--ink)]' : 'bg-white'}`}
       style={
         {
+          '--slide-anim-duration': `${slide.animation?.duration ?? 600}ms`,
+          '--slide-anim-delay': `${slide.animation?.delay ?? 0}ms`,
           // Every accent-coloured thing on a slide reads from these, so a
           // project-level accent flows through without touching each component.
           '--accent': accentColor,

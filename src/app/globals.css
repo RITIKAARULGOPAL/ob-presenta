@@ -25,3 +25,58 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ---- Diagram motion -------------------------------------------------------
+   Concept diagrams assemble on entry rather than appearing. Kept in CSS (not
+   SMIL or JS) so it costs nothing at runtime and so prefers-reduced-motion can
+   switch it off wholesale — which is also what makes a headless screenshot
+   capture the finished state instead of frame zero. */
+
+@keyframes cd-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes cd-pop {
+  from { opacity: 0; transform: scale(0.6); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes cd-rise {
+  from { opacity: 0; transform: scaleY(0); }
+  to   { opacity: 1; transform: scaleY(1); }
+}
+@keyframes cd-slide {
+  from { opacity: 0; transform: translateX(-14px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes cd-draw {
+  from { stroke-dasharray: 1 600; stroke-dashoffset: 300; opacity: 0; }
+  to   { stroke-dasharray: 600 0; stroke-dashoffset: 0; opacity: 1; }
+}
+
+.cd-in    { animation: cd-in    .55s cubic-bezier(.2,.7,.3,1) both; }
+.cd-pop   { animation: cd-pop   .45s cubic-bezier(.2,.9,.3,1)  both; }
+.cd-rise  { animation: cd-rise  .6s  cubic-bezier(.2,.8,.3,1)  both; }
+.cd-slide { animation: cd-slide .5s  cubic-bezier(.2,.8,.3,1)  both; }
+.cd-draw  { animation: cd-draw  .9s  ease-out both; }
+
+/* ---- Slide entry ----------------------------------------------------------
+   slide.animation has been in the data model from the start but was never
+   applied to anything. These are the four entries it can name. */
+
+@keyframes slide-fadeUp  { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+@keyframes slide-fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slide-scaleIn { from { opacity: 0; transform: scale(.965); } to { opacity: 1; transform: none; } }
+@keyframes slide-slideLeft { from { opacity: 0; transform: translateX(34px); } to { opacity: 1; transform: none; } }
+
+.slide-anim-fadeUp    { animation: slide-fadeUp    var(--slide-anim-duration,600ms) cubic-bezier(.2,.7,.3,1) var(--slide-anim-delay,0ms) both; }
+.slide-anim-fadeIn    { animation: slide-fadeIn    var(--slide-anim-duration,600ms) ease-out var(--slide-anim-delay,0ms) both; }
+.slide-anim-scaleIn   { animation: slide-scaleIn   var(--slide-anim-duration,600ms) cubic-bezier(.2,.7,.3,1) var(--slide-anim-delay,0ms) both; }
+.slide-anim-slideLeft { animation: slide-slideLeft var(--slide-anim-duration,600ms) cubic-bezier(.2,.7,.3,1) var(--slide-anim-delay,0ms) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cd-in, .cd-pop, .cd-rise, .cd-slide, .cd-draw,
+  .slide-anim-fadeUp, .slide-anim-fadeIn, .slide-anim-scaleIn, .slide-anim-slideLeft {
+    animation: none !important;
+  }
+  .cd-draw { stroke-dasharray: none; stroke-dashoffset: 0; }
+}

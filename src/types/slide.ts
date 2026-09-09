@@ -76,8 +76,11 @@ export interface SlideFields {
   numeral?: string;
   /** Concept layout: one-line essence under the title. */
   lead?: string;
-  /** Concept layout: short scannable cards beside the project image. */
+  /** Concept layout: short scannable cards beside the visual. */
   points?: MergeItem[];
+  /** Concept layout: which visual fills the right half. Defaults to the
+   *  generated diagram; 'image' hands the slot to a pasted plan or render. */
+  visual?: 'diagram' | 'image';
   views?: LinkedView[];
   /** Other slides this one references — a concept pointing at the layout or
    *  design slide that demonstrates it. Ids may go stale if a slide is deleted,

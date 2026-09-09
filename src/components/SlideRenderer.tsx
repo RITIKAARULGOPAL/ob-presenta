@@ -1,13 +1,25 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { EditableText } from './EditableText';
 import { useEditorStore } from '@/lib/editorStore';
 import { tintWithWhite } from '@/lib/color';
 import { dataUrlBytes, fileToDataUrl, fileToSlideImage } from '@/lib/imageFile';
+import {
+  centroidOf,
+  clamp01,
+  distance,
+  isTooClose,
+  previewPath,
+  rectPoints,
+  shapePath,
+  simplify,
+  type ShapeKind,
+} from '@/lib/hotspotShape';
 import { ConceptDiagram } from './ConceptDiagram';
 import { makeId } from '@/lib/id';
 import type { Brand, LinkedView, Slide, ViewHotspot } from '@/types/slide';
+import type { Point } from '@/lib/hotspotShape';
 
 interface SlideRendererProps {
   slide: Slide;
@@ -158,8 +170,6 @@ function MediaBox({
     </div>
   );
 }
-
-type Point = { x: number; y: number };
 
 export const DEFAULT_ACCENT = '#0b72c2';
 
@@ -317,6 +327,19 @@ function BrandFooter({ slide, dark }: { slide: Slide; dark: boolean }) {
   );
 }
 
+type DrawTool = 'rect' | 'polygon' | 'pen';
+
+const TOOLS: { key: DrawTool; label: string; hint: string }[] = [
+  { key: 'rect', label: '▭ Rectangle', hint: 'Drag a box over the area.' },
+  { key: 'polygon', label: '⬡ Polygon', hint: 'Click each corner. Click the first point again, or press Enter, to close.' },
+  { key: 'pen', label: '✎ Curve', hint: 'Hold and trace the edge — it smooths into a curve.' },
+];
+
+/** Regions the pen tool draws are curved; the others are straight-edged. */
+function shapeForTool(tool: DrawTool): ShapeKind {
+  return tool === 'pen' ? 'spline' : 'polygon';
+}
+
 /** A region drawn as a polygon on a source image. Editable mode: click to place
  * vertices, Finish once there are 3+, then pick the target view (+ optional video
  * timestamp); click a finished region to delete it. Non-editable (Presenter): click
@@ -327,8 +350,12 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   const [activeId, setActiveId] = useState<string | undefined>(views[0]?.id);
   const project = useEditorStore((s) => s.project);
   const selectSlide = useEditorStore((s) => s.selectSlide);
-  const [drawMode, setDrawMode] = useState(false);
+  const [tool, setTool] = useState<DrawTool | null>(null);
   const [drawingPoints, setDrawingPoints] = useState<Point[] | null>(null);
+  /** Where the cursor is, for the rubber-band edge and the close-snap hint. */
+  const [cursor, setCursor] = useState<Point | null>(null);
+  /** True while a rect drag or a pen stroke is in progress. */
+  const [dragging, setDragging] = useState(false);
   const [pickingTarget, setPickingTarget] = useState(false);
   const [pendingTarget, setPendingTarget] = useState('');
   const [pendingTime, setPendingTime] = useState('');
@@ -343,6 +370,32 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     updateField('views', views.map((v) => (v.id === id ? { ...v, ...patch } : v)));
   }
 
+  // Declared before the early return below so the hook order never changes.
+  useEffect(() => {
+    if (tool === null) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setDrawingPoints(null);
+        setPickingTarget(false);
+        setTool(null);
+        setCursor(null);
+        setDragging(false);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        setDrawingPoints((pts) => {
+          if (pts && pts.length >= 3) setPickingTarget(true);
+          return pts;
+        });
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        setDrawingPoints((pts) => (pts && pts.length > 1 ? pts.slice(0, -1) : null));
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [tool]);
+
   if (!active) return null;
 
   const otherViews = views.filter((v) => v.id !== active.id);
@@ -354,11 +407,100 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     (s) => s.id !== slide.id && (s.conceptOrigin || s.style === 'design' || s.layout === 'linked-views'),
   );
 
-  function handleMediaClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (!drawMode || !editable || !active.url || active.kind === 'walkthrough' || pickingTarget) return;
+  const drawing = tool !== null;
+  /** Cursor is within snapping distance of the first vertex, so a click closes
+   *  the shape rather than adding another point. */
+  const canClose =
+    tool === 'polygon' && !!drawingPoints && drawingPoints.length >= 3 && !!cursor && distance(cursor, drawingPoints[0]) < 0.02;
+
+  function pointAt(e: React.PointerEvent<HTMLDivElement>): Point {
     const rect = e.currentTarget.getBoundingClientRect();
-    const point = { x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height };
-    setDrawingPoints((prev) => (prev ? [...prev, point] : [point]));
+    return clamp01({ x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height });
+  }
+
+  function drawable(): boolean {
+    return drawing && editable && !!active.url && active.kind !== 'walkthrough' && !pickingTarget;
+  }
+
+  function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (!drawable()) return;
+    const point = pointAt(e);
+
+    if (tool === 'polygon') {
+      if (canClose) {
+        finishShape(drawingPoints!);
+        return;
+      }
+      setDrawingPoints((prev) => {
+        if (!prev) return [point];
+        // A stray double-click used to leave a duplicate vertex and a kink.
+        return isTooClose(prev, point) ? prev : [...prev, point];
+      });
+      return;
+    }
+
+    // Rect and pen are both drags, so capture the pointer to keep receiving
+    // moves even if it leaves the box. Capture is an optimisation, not a
+    // requirement — if it fails the drag must still start.
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // No active pointer to capture; pointermove on the box still works.
+    }
+    setDragging(true);
+    setDrawingPoints([point]);
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!drawable()) return;
+    const point = pointAt(e);
+    setCursor(point);
+    if (!dragging) return;
+
+    if (tool === 'rect') {
+      setDrawingPoints((prev) => (prev ? [prev[0], point] : [point]));
+    } else if (tool === 'pen') {
+      setDrawingPoints((prev) => {
+        if (!prev) return [point];
+        // Sample by distance, not by event — pointermove fires far denser than
+        // the shape needs, and the stroke gets simplified again on finish.
+        return isTooClose(prev, point, 0.004) ? prev : [...prev, point];
+      });
+    }
+  }
+
+  function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (!drawable() || !dragging) return;
+    setDragging(false);
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // Capture may already be gone; nothing to release.
+    }
+    const pts = drawingPoints;
+    if (!pts) return;
+
+    if (tool === 'rect' && pts.length === 2) {
+      // Ignore an accidental click that produced no area.
+      if (distance(pts[0], pts[1]) < 0.02) {
+        setDrawingPoints(null);
+        return;
+      }
+      finishShape(rectPoints(pts[0], pts[1]));
+    } else if (tool === 'pen') {
+      const thinned = simplify(pts);
+      if (thinned.length < 3) {
+        setDrawingPoints(null);
+        return;
+      }
+      finishShape(thinned);
+    }
+  }
+
+  /** Hands a completed outline to the target picker. */
+  function finishShape(points: Point[]) {
+    setDrawingPoints(points);
+    startPickingTarget(points);
   }
 
   function undoPoint() {
@@ -368,7 +510,9 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   function cancelDrawing() {
     setDrawingPoints(null);
     setPickingTarget(false);
-    setDrawMode(false);
+    setTool(null);
+    setCursor(null);
+    setDragging(false);
   }
 
   function selectView(id: string) {
@@ -376,8 +520,8 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     cancelDrawing();
   }
 
-  function startPickingTarget() {
-    if (!drawingPoints || drawingPoints.length < 3) return;
+  function startPickingTarget(points: Point[] = drawingPoints ?? []) {
+    if (points.length < 3) return;
     setPendingTarget(otherViews[0] ? `view:${otherViews[0].id}` : (linkableSlides[0] ? `slide:${linkableSlides[0].id}` : ''));
     setPendingTime('');
     setPendingFill(DEFAULT_FILL);
@@ -394,6 +538,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     const hotspot: ViewHotspot = {
       id: makeId('hotspot'),
       points: drawingPoints,
+      shape: tool ? shapeForTool(tool) : 'polygon',
       ...(kind === 'slide' ? { targetSlideId: targetId } : { targetViewId: targetId }),
       targetTime: time,
       fillColor: pendingFill,
@@ -423,12 +568,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     }
   }
 
-  const centroid: Point | null = drawingPoints
-    ? {
-        x: drawingPoints.reduce((s, p) => s + p.x, 0) / drawingPoints.length,
-        y: drawingPoints.reduce((s, p) => s + p.y, 0) / drawingPoints.length,
-      }
-    : null;
+  const centroid: Point | null = drawingPoints ? centroidOf(drawingPoints) : null;
 
   return (
     <div className="mt-6 flex flex-col">
@@ -446,16 +586,36 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
             {v.label}
           </button>
         ))}
-        {editable && active.url && active.kind !== 'walkthrough' && !drawMode && (
-          <button
-            onClick={() => setDrawMode(true)}
-            className="ml-auto rounded-full border border-dashed border-[var(--line)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-2)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-          >
-            + Draw region
-          </button>
+        {editable && active.url && active.kind !== 'walkthrough' && (
+          <div className="ml-auto flex items-center gap-1.5">
+            {TOOLS.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => {
+                  setDrawingPoints(null);
+                  setPickingTarget(false);
+                  setTool(tool === t.key ? null : t.key);
+                }}
+                title={t.hint}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                  tool === t.key
+                    ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                    : 'border-dashed border-[var(--line)] text-[var(--ink-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         )}
       </div>
-      <div className={`relative aspect-video w-full ${drawMode ? 'cursor-crosshair' : ''}`} onClick={handleMediaClick}>
+      <div
+        className={`relative aspect-video w-full select-none ${drawing ? 'cursor-crosshair' : ''}`}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={() => setCursor(null)}
+      >
         <MediaBox
           url={active.url}
           kind={active.kind === 'walkthrough' ? 'video' : 'image'}
@@ -467,15 +627,15 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
 
         <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
           {hotspots.filter((h) => h.points && h.points.length >= 3).map((h) => (
-            <polygon
+            <path
               key={h.id}
-              points={h.points.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
+              d={shapePath(h.points, h.shape)}
               vectorEffect="non-scaling-stroke"
               fill={h.fillColor ?? DEFAULT_FILL}
               fillOpacity={h.fillOpacity ?? DEFAULT_FILL_OPACITY}
               stroke={h.strokeColor ?? DEFAULT_STROKE}
               strokeWidth={h.strokeWidth ?? DEFAULT_STROKE_WIDTH}
-              className={drawMode ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer'}
+              className={drawing ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer'}
               onClick={(e) => {
                 e.stopPropagation();
                 if (editable) removeHotspot(h.id);
@@ -489,27 +649,67 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
                     ? (project?.slides.find((s) => s.id === h.targetSlideId)?.fields.title ?? 'Linked slide')
                     : views.find((v) => v.id === h.targetViewId)?.label}
               </title>
-            </polygon>
+            </path>
           ))}
           {drawingPoints && (
             <>
-              <polyline
-                points={drawingPoints.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
-                vectorEffect="non-scaling-stroke"
-                className="fill-none stroke-[var(--accent)]"
-                strokeWidth={1.5}
-                strokeDasharray="4,3"
-              />
-              {drawingPoints.map((p, i) => (
-                <circle key={i} cx={p.x * 100} cy={p.y * 100} r={0.9} vectorEffect="non-scaling-stroke" className="fill-white stroke-[var(--accent)]" strokeWidth={1.5} />
-              ))}
+              {/* Rect previews as its filled box; the others as an open outline
+                  so it's obvious the shape isn't closed yet. */}
+              {tool === 'rect' && drawingPoints.length === 2 ? (
+                <path
+                  d={shapePath(rectPoints(drawingPoints[0], drawingPoints[1]))}
+                  vectorEffect="non-scaling-stroke"
+                  fill={DEFAULT_FILL}
+                  fillOpacity={0.18}
+                  className="stroke-[var(--accent)]"
+                  strokeWidth={1.5}
+                  strokeDasharray="4,3"
+                />
+              ) : (
+                <path
+                  d={previewPath(drawingPoints, tool ? shapeForTool(tool) : undefined)}
+                  vectorEffect="non-scaling-stroke"
+                  className="fill-none stroke-[var(--accent)]"
+                  strokeWidth={1.5}
+                  strokeDasharray={tool === 'pen' ? undefined : '4,3'}
+                />
+              )}
+
+              {/* Rubber band from the last vertex to the cursor, so a polygon
+                  shows the edge you're about to commit. */}
+              {tool === 'polygon' && cursor && !pickingTarget && (
+                <line
+                  x1={drawingPoints[drawingPoints.length - 1].x * 100}
+                  y1={drawingPoints[drawingPoints.length - 1].y * 100}
+                  x2={cursor.x * 100}
+                  y2={cursor.y * 100}
+                  vectorEffect="non-scaling-stroke"
+                  className="stroke-[var(--accent)]"
+                  strokeWidth={1}
+                  strokeDasharray="2,3"
+                  opacity={0.7}
+                />
+              )}
+
+              {tool !== 'pen' &&
+                drawingPoints.map((p, i) => (
+                  <circle
+                    key={i}
+                    cx={p.x * 100}
+                    cy={p.y * 100}
+                    r={i === 0 && canClose ? 1.8 : 0.9}
+                    vectorEffect="non-scaling-stroke"
+                    className={i === 0 && canClose ? 'fill-[var(--accent)] stroke-white' : 'fill-white stroke-[var(--accent)]'}
+                    strokeWidth={1.5}
+                  />
+                ))}
             </>
           )}
         </svg>
 
-        {drawMode && !pickingTarget && (
-          <div onClick={(e) => e.stopPropagation()} className="absolute left-2 top-2 z-20 flex items-center gap-2 rounded-md bg-black/75 px-2.5 py-1.5 text-[11px] font-medium text-white">
-            {drawingPoints ? (
+        {drawing && !pickingTarget && (
+          <div onPointerDown={(e) => e.stopPropagation()} className="absolute left-2 top-2 z-20 flex items-center gap-2 rounded-md bg-black/75 px-2.5 py-1.5 text-[11px] font-medium text-white">
+            {tool === 'polygon' && drawingPoints ? (
               <>
                 <span>
                   {drawingPoints.length} point{drawingPoints.length === 1 ? '' : 's'}
@@ -518,15 +718,15 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
                   Undo
                 </button>
                 <button
-                  onClick={startPickingTarget}
+                  onClick={() => startPickingTarget()}
                   disabled={drawingPoints.length < 3}
                   className="rounded bg-[var(--accent)] px-2 py-0.5 font-semibold disabled:opacity-40"
                 >
-                  {drawingPoints.length < 3 ? `Finish (${3 - drawingPoints.length} more)` : 'Finish'}
+                  {drawingPoints.length < 3 ? `Finish (${3 - drawingPoints.length} more)` : canClose ? 'Click first point' : 'Finish'}
                 </button>
               </>
             ) : (
-              <span>Click the image to place your first point</span>
+              <span>{TOOLS.find((t) => t.key === tool)?.hint}</span>
             )}
             <button onClick={cancelDrawing} className="underline decoration-white/50 hover:decoration-white">
               Cancel

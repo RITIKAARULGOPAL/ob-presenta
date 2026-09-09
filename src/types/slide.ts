@@ -40,6 +40,9 @@ export interface ViewHotspot {
   /** Another slide in the deck — e.g. a zone on a plan pointing at the concept
    *  that explains it. Mutually exclusive with targetViewId. */
   targetSlideId?: string;
+  /** How the space between points is drawn. Absent means straight edges, which
+   *  is every region created before curves existed. */
+  shape?: 'polygon' | 'spline';
   /** Seconds — only meaningful when the target view is a walkthrough video. */
   targetTime?: number;
   /** All optional — fall back to a default accent look when unset. */

@@ -7,9 +7,13 @@
 
 export type Point = { x: number; y: number };
 
-/** How the space between stored points is drawn. Absent means polygon, which
- *  is what every hotspot created before this existed is. */
-export type ShapeKind = 'polygon' | 'spline';
+/** How the stored points become an outline. Absent means polygon, which is
+ *  what every hotspot created before this existed is.
+ *
+ *  'ellipse' stores exactly two points — opposite corners of the drag — and
+ *  'spline' is kept for regions traced with the old freehand tool, which no
+ *  longer exists but whose output still has to render. */
+export type ShapeKind = 'polygon' | 'spline' | 'ellipse';
 
 const S = 100; // normalised → viewBox units
 
@@ -67,15 +71,39 @@ function splinePath(points: Point[], closed = true): string {
   return closed ? `${d} Z` : d;
 }
 
+/** An ellipse inscribed in the box the drag defined, as two arcs. Exact rather
+ *  than an approximation in Béziers, and only two points to store. */
+function ellipsePath(a: Point, b: Point): string {
+  const rx = (Math.abs(b.x - a.x) / 2) * S;
+  const ry = (Math.abs(b.y - a.y) / 2) * S;
+  if (rx <= 0 || ry <= 0) return '';
+  const cx = ((a.x + b.x) / 2) * S;
+  const cy = ((a.y + b.y) / 2) * S;
+  return (
+    `M ${fmt(cx - rx)} ${fmt(cy)} ` +
+    `A ${fmt(rx)} ${fmt(ry)} 0 1 0 ${fmt(cx + rx)} ${fmt(cy)} ` +
+    `A ${fmt(rx)} ${fmt(ry)} 0 1 0 ${fmt(cx - rx)} ${fmt(cy)} Z`
+  );
+}
+
+/** Whether a stored region has enough points to draw. Ellipses need two; the
+ *  outline shapes need three. */
+export function hasEnoughPoints(points: Point[] | null | undefined, shape?: ShapeKind): boolean {
+  if (!points) return false;
+  return points.length >= (shape === 'ellipse' ? 2 : 3);
+}
+
 /** The `d` for a stored region. */
 export function shapePath(points: Point[], shape?: ShapeKind): string {
   if (!points || points.length < 2) return '';
+  if (shape === 'ellipse') return ellipsePath(points[0], points[1]);
   return shape === 'spline' ? splinePath(points, true) : polygonPath(points);
 }
 
 /** Open preview path while still drawing — no Z, so it reads as unfinished. */
 export function previewPath(points: Point[], shape?: ShapeKind): string {
   if (!points || points.length < 2) return '';
+  if (shape === 'ellipse') return ellipsePath(points[0], points[1]);
   if (shape === 'spline' && points.length >= 3) return splinePath(points, false);
   const [first, ...rest] = points;
   return `M ${fmt(first.x * S)} ${fmt(first.y * S)} ` + rest.map((p) => `L ${fmt(p.x * S)} ${fmt(p.y * S)}`).join(' ');
@@ -90,44 +118,6 @@ export function distance(a: Point, b: Point): number {
 export function isTooClose(points: Point[], candidate: Point, min = 0.008): boolean {
   const prev = points[points.length - 1];
   return !!prev && distance(prev, candidate) < min;
-}
-
-/** Ramer–Douglas–Peucker. A freehand drag samples far more points than the
- *  shape needs; thinning them before storing keeps the row small and stops the
- *  spline from wobbling between near-identical samples. */
-export function simplify(points: Point[], tolerance = 0.006): Point[] {
-  if (points.length < 3) return points;
-
-  const perpendicular = (p: Point, a: Point, b: Point): number => {
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const len = Math.hypot(dx, dy);
-    if (len === 0) return distance(p, a);
-    return Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / len;
-  };
-
-  const keep = new Array<boolean>(points.length).fill(false);
-  keep[0] = true;
-  keep[points.length - 1] = true;
-
-  const stack: [number, number][] = [[0, points.length - 1]];
-  while (stack.length) {
-    const [from, to] = stack.pop()!;
-    let worst = 0;
-    let index = -1;
-    for (let i = from + 1; i < to; i++) {
-      const dist = perpendicular(points[i], points[from], points[to]);
-      if (dist > worst) {
-        worst = dist;
-        index = i;
-      }
-    }
-    if (index >= 0 && worst > tolerance) {
-      keep[index] = true;
-      stack.push([from, index], [index, to]);
-    }
-  }
-  return points.filter((_, i) => keep[i]);
 }
 
 /** Keeps a drawn point inside the image. */

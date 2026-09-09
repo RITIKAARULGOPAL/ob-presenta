@@ -12,8 +12,8 @@ import {
   isTooClose,
   previewPath,
   rectPoints,
+  hasEnoughPoints,
   shapePath,
-  simplify,
   snapAngle,
   squareFrom,
   type ShapeKind,
@@ -329,17 +329,21 @@ function BrandFooter({ slide, dark }: { slide: Slide; dark: boolean }) {
   );
 }
 
-type DrawTool = 'rect' | 'polygon' | 'pen';
+type DrawTool = 'rect' | 'ellipse' | 'polygon';
 
 const TOOLS: { key: DrawTool; label: string; hint: string }[] = [
   { key: 'rect', label: '▭ Rectangle', hint: 'Drag a box over the area. Shift for a square.' },
+  { key: 'ellipse', label: '◯ Ellipse', hint: 'Drag to size it. Shift for a circle.' },
   { key: 'polygon', label: '⬡ Polygon', hint: 'Click each corner. Shift locks to 45°. Click the first point, or Enter, to close.' },
-  { key: 'pen', label: '✎ Curve', hint: 'Hold and trace the edge — it smooths into a curve.' },
 ];
 
-/** Regions the pen tool draws are curved; the others are straight-edged. */
 function shapeForTool(tool: DrawTool): ShapeKind {
-  return tool === 'pen' ? 'spline' : 'polygon';
+  return tool === 'ellipse' ? 'ellipse' : 'polygon';
+}
+
+/** Rect and ellipse are drags; polygon is a series of clicks. */
+function isDragTool(tool: DrawTool | null): boolean {
+  return tool === 'rect' || tool === 'ellipse';
 }
 
 /** A region drawn as a polygon on a source image. Editable mode: click to place
@@ -425,16 +429,13 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     if (!e.shiftKey) return raw;
 
     const aspect = rect.width / rect.height;
-    if (tool === 'rect') {
-      // Anchored to the corner the drag started from.
+    if (isDragTool(tool)) {
+      // Anchored to the corner the drag started from: a square box, and so a
+      // circle for the ellipse inscribed in it.
       return drawingPoints?.[0] ? squareFrom(drawingPoints[0], raw, aspect) : raw;
     }
-    if (tool === 'polygon') {
-      const from = drawingPoints?.[drawingPoints.length - 1];
-      return from ? snapAngle(from, raw, aspect) : raw;
-    }
-    // Freehand is freehand — constraining a traced curve would fight the hand.
-    return raw;
+    const from = drawingPoints?.[drawingPoints.length - 1];
+    return from ? snapAngle(from, raw, aspect) : raw;
   }
 
   function drawable(): boolean {
@@ -459,7 +460,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
       return;
     }
 
-    // Rect and pen are both drags, so capture the pointer to keep receiving
+    // Both drag tools capture the pointer to keep receiving
     // moves even if it leaves the box. Capture is an optimisation, not a
     // requirement — if it fails the drag must still start.
     try {
@@ -478,15 +479,8 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     setCursor(point);
     if (!dragging) return;
 
-    if (tool === 'rect') {
+    if (isDragTool(tool)) {
       setDrawingPoints((prev) => (prev ? [prev[0], point] : [point]));
-    } else if (tool === 'pen') {
-      setDrawingPoints((prev) => {
-        if (!prev) return [point];
-        // Sample by distance, not by event — pointermove fires far denser than
-        // the shape needs, and the stroke gets simplified again on finish.
-        return isTooClose(prev, point, 0.004) ? prev : [...prev, point];
-      });
     }
   }
 
@@ -502,28 +496,30 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     const pts = drawingPoints;
     if (!pts) return;
 
-    if (tool === 'rect' && pts.length === 2) {
-      // pts[1] already carries the square constraint from pointAt.
-      // Ignore an accidental click that produced no area.
-      if (distance(pts[0], pts[1]) < 0.02) {
-        setDrawingPoints(null);
-        return;
-      }
-      finishShape(rectPoints(pts[0], pts[1]));
-    } else if (tool === 'pen') {
-      const thinned = simplify(pts);
-      if (thinned.length < 3) {
-        setDrawingPoints(null);
-        return;
-      }
-      finishShape(thinned);
+    if (!isDragTool(tool) || pts.length !== 2) return;
+    // pts[1] already carries the square constraint from pointAt. Ignore an
+    // accidental click that produced no area.
+    if (distance(pts[0], pts[1]) < 0.02) {
+      setDrawingPoints(null);
+      return;
     }
+    // An ellipse keeps the two corners; a rectangle expands to four.
+    finishShape(tool === 'ellipse' ? pts : rectPoints(pts[0], pts[1]));
   }
 
   /** Hands a completed outline to the target picker. */
   function finishShape(points: Point[]) {
     setDrawingPoints(points);
     startPickingTarget(points);
+  }
+
+  /** Clears the outline but keeps the tool armed, so regions can be added one
+   *  after another without re-picking the tool each time. */
+  function resetShape() {
+    setDrawingPoints(null);
+    setPickingTarget(false);
+    setCursor(null);
+    setDragging(false);
   }
 
   function undoPoint() {
@@ -545,7 +541,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   }
 
   function startPickingTarget(points: Point[] = drawingPoints ?? []) {
-    if (points.length < 3) return;
+    if (!hasEnoughPoints(points, tool ? shapeForTool(tool) : 'polygon')) return;
     setPendingTarget(otherViews[0] ? `view:${otherViews[0].id}` : (linkableSlides[0] ? `slide:${linkableSlides[0].id}` : ''));
     setPendingTime('');
     setPendingFill(DEFAULT_FILL);
@@ -556,13 +552,14 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   }
 
   function confirmRegion() {
-    if (!drawingPoints || drawingPoints.length < 3 || !pendingTarget) return;
+    const shape = tool ? shapeForTool(tool) : 'polygon';
+    if (!hasEnoughPoints(drawingPoints, shape) || !pendingTarget) return;
     const time = pendingTime.trim() ? Number(pendingTime) : undefined;
     const [kind, targetId] = pendingTarget.split(':');
     const hotspot: ViewHotspot = {
       id: makeId('hotspot'),
-      points: drawingPoints,
-      shape: tool ? shapeForTool(tool) : 'polygon',
+      points: drawingPoints!,
+      shape,
       ...(kind === 'slide' ? { targetSlideId: targetId } : { targetViewId: targetId }),
       targetTime: time,
       fillColor: pendingFill,
@@ -571,7 +568,8 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
       strokeWidth: pendingStrokeWidth,
     };
     setView(active.id, { hotspots: [...hotspots, hotspot] });
-    cancelDrawing();
+    // Stay on the tool rather than dropping out after every single region.
+    resetShape();
   }
 
   function removeHotspot(id: string) {
@@ -650,7 +648,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
         />
 
         <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-          {hotspots.filter((h) => h.points && h.points.length >= 3).map((h) => (
+          {hotspots.filter((h) => hasEnoughPoints(h.points, h.shape)).map((h) => (
             <path
               key={h.id}
               d={shapePath(h.points, h.shape)}
@@ -677,11 +675,15 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           ))}
           {drawingPoints && (
             <>
-              {/* Rect previews as its filled box; the others as an open outline
-                  so it's obvious the shape isn't closed yet. */}
-              {tool === 'rect' && drawingPoints.length === 2 ? (
+              {/* A drag tool previews filled, since its shape is already
+                  closed; a polygon previews as an open outline. */}
+              {isDragTool(tool) && drawingPoints.length === 2 ? (
                 <path
-                  d={shapePath(rectPoints(drawingPoints[0], drawingPoints[1]))}
+                  d={
+                    tool === 'ellipse'
+                      ? shapePath(drawingPoints, 'ellipse')
+                      : shapePath(rectPoints(drawingPoints[0], drawingPoints[1]))
+                  }
                   vectorEffect="non-scaling-stroke"
                   fill={DEFAULT_FILL}
                   fillOpacity={0.18}
@@ -695,7 +697,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
                   vectorEffect="non-scaling-stroke"
                   className="fill-none stroke-[var(--accent)]"
                   strokeWidth={1.5}
-                  strokeDasharray={tool === 'pen' ? undefined : '4,3'}
+                  strokeDasharray="4,3"
                 />
               )}
 
@@ -733,9 +735,8 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
                 </>
               )}
 
-              {tool !== 'pen' &&
-                drawingPoints.map((p, i) => (
-                  <circle
+              {drawingPoints.map((p, i) => (
+                <circle
                     key={i}
                     cx={p.x * 100}
                     cy={p.y * 100}
@@ -770,11 +771,15 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
             ) : (
               <span>{TOOLS.find((t) => t.key === tool)?.hint}</span>
             )}
-            {tool !== 'pen' && (
-              <span className={ortho ? 'font-semibold text-[#7fd1ff]' : 'text-white/50'}>
-                {ortho ? (tool === 'rect' ? '⇧ square' : '⇧ 45° locked') : '⇧ to constrain'}
-              </span>
-            )}
+            <span className={ortho ? 'font-semibold text-[#7fd1ff]' : 'text-white/50'}>
+              {ortho
+                ? tool === 'rect'
+                  ? '⇧ square'
+                  : tool === 'ellipse'
+                    ? '⇧ circle'
+                    : '⇧ 45° locked'
+                : '⇧ to constrain'}
+            </span>
             <button onClick={cancelDrawing} className="underline decoration-white/50 hover:decoration-white">
               Cancel
             </button>

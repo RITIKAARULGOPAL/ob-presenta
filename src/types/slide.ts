@@ -40,9 +40,11 @@ export interface ViewHotspot {
   /** Another slide in the deck — e.g. a zone on a plan pointing at the concept
    *  that explains it. Mutually exclusive with targetViewId. */
   targetSlideId?: string;
-  /** How the space between points is drawn. Absent means straight edges, which
-   *  is every region created before curves existed. */
-  shape?: 'polygon' | 'spline';
+  /** How the stored points become an outline. Absent means straight edges,
+   *  which is every region drawn before shapes were distinguished. 'ellipse'
+   *  stores two corner points; 'spline' is retained for regions traced with
+   *  the freehand tool that has since been removed. */
+  shape?: 'polygon' | 'spline' | 'ellipse';
   /** Seconds — only meaningful when the target view is a walkthrough video. */
   targetTime?: number;
   /** All optional — fall back to a default accent look when unset. */

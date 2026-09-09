@@ -24,7 +24,6 @@ interface EditorState {
   addSlide: (layout?: SlideLayout) => void;
   addSlides: (slides: Slide[]) => void;
   addConceptSlide: (slide: Slide) => void;
-  removeConceptSlide: (match: { pillarId: string; conceptId?: string }) => void;
   addStyledSlide: (style: SlideStyleKind) => void;
   removeSlide: (id: string) => void;
   changeLayout: (layout: SlideLayout) => void;
@@ -163,27 +162,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     const next = { ...project, slides };
     set({ project: next, currentSlideId: slide.id });
-    persist(next);
-  },
-
-  removeConceptSlide: ({ pillarId, conceptId }) => {
-    const { project } = get();
-    if (!project) return;
-    const victim = project.slides.find(
-      (s) => s.conceptOrigin?.pillarId === pillarId && s.conceptOrigin?.conceptId === conceptId,
-    );
-    if (!victim || project.slides.length <= 1) return;
-
-    const idx = project.slides.findIndex((s) => s.id === victim.id);
-    // Same link cleanup as a manual delete — a toggled-off slide can still be
-    // somebody's link target.
-    const slides = project.slides.filter((s) => s.id !== victim.id).map((s) => dropLinksTo(s, victim.id));
-    const next = { ...project, slides };
-    const fallback = slides[Math.max(0, idx - 1)]?.id ?? slides[0]?.id ?? null;
-    set((state) => ({
-      project: next,
-      currentSlideId: state.currentSlideId === victim.id ? fallback : state.currentSlideId,
-    }));
     persist(next);
   },
 

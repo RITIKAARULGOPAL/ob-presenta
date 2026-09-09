@@ -159,16 +159,3 @@ export function buildConceptSlides(selection: ConceptSelection, pillars: DesignP
   if (selection.includeKeyIdea) slides.push(keyIdeaSlide());
   return slides;
 }
-
-/** True when a generated concept slide has been changed from its template, so
- *  toggling it off would throw away real work rather than an untouched insert. */
-export function isConceptSlideEdited(slide: Slide, pillar: DesignPillar, concept: DesignConcept): boolean {
-  const fresh = conceptSlide(pillar, concept).fields;
-  const f = slide.fields;
-  if ((f.title ?? '') !== (fresh.title ?? '')) return true;
-  if ((f.lead ?? '') !== (fresh.lead ?? '')) return true;
-  if ((f.imageUrl ?? '') !== '') return true;
-  const a = (f.points ?? []).map((p) => p.label);
-  const b = (fresh.points ?? []).map((p) => p.label);
-  return a.length !== b.length || a.some((label, i) => label !== b[i]);
-}

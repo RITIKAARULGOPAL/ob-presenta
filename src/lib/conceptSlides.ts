@@ -6,6 +6,7 @@
 
 import { makeId } from './id';
 import { DESIGN_SEQUENCE, KEY_IDEA, type DesignConcept, type DesignPillar } from './conceptLibrary';
+import { CONCEPT_DETAIL } from './conceptDetail';
 import type { Slide } from '@/types/slide';
 
 const animation = () => ({ entry: 'fadeUp' as const, duration: 600, delay: 0 });
@@ -26,17 +27,22 @@ export function pillarSectionSlide(pillar: DesignPillar): Slide {
   };
 }
 
-/** One concept, one slide — the framework text becomes the starting body copy. */
+/** One concept, one composed slide: a lead line, scannable point cards, and an
+ *  empty image slot for the project's own plan or render. Falls back to the
+ *  library description when a concept has no authored presentation copy. */
 export function conceptSlide(pillar: DesignPillar, concept: DesignConcept): Slide {
+  const detail = CONCEPT_DETAIL[concept.id];
   return {
     id: makeId('slide'),
-    layout: 'title-content',
+    layout: 'concept',
     style: 'standard',
     fields: {
       kickerEyebrow: pillar.title,
       kickerLabel: pillar.numeral,
       title: concept.title,
-      body: concept.description,
+      lead: detail?.lead ?? concept.description,
+      points: (detail?.points ?? []).map((label) => ({ id: makeId('point'), label })),
+      imageUrl: '',
     },
     animation: animation(),
     conceptOrigin: { pillarId: pillar.id, conceptId: concept.id },
@@ -152,4 +158,17 @@ export function buildConceptSlides(selection: ConceptSelection, pillars: DesignP
   if (selection.includeSequence) slides.push(designSequenceSlide());
   if (selection.includeKeyIdea) slides.push(keyIdeaSlide());
   return slides;
+}
+
+/** True when a generated concept slide has been changed from its template, so
+ *  toggling it off would throw away real work rather than an untouched insert. */
+export function isConceptSlideEdited(slide: Slide, pillar: DesignPillar, concept: DesignConcept): boolean {
+  const fresh = conceptSlide(pillar, concept).fields;
+  const f = slide.fields;
+  if ((f.title ?? '') !== (fresh.title ?? '')) return true;
+  if ((f.lead ?? '') !== (fresh.lead ?? '')) return true;
+  if ((f.imageUrl ?? '') !== '') return true;
+  const a = (f.points ?? []).map((p) => p.label);
+  const b = (fresh.points ?? []).map((p) => p.label);
+  return a.length !== b.length || a.some((label, i) => label !== b[i]);
 }

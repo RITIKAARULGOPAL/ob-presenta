@@ -68,6 +68,15 @@ export function defaultFieldsForLayout(layout: SlideLayout) {
         statLabel: 'Stat description',
         caption: 'Supporting caption text.',
       };
+    case 'concept':
+      return {
+        kickerEyebrow: 'Design Concept',
+        kickerLabel: 'Principle',
+        title: 'Concept title',
+        lead: 'One line describing the principle.',
+        points: [makeItem('Point one'), makeItem('Point two'), makeItem('Point three')],
+        imageUrl: '',
+      };
     case 'linked-views':
       return {
         kickerEyebrow: 'New Section',
@@ -133,6 +142,7 @@ export const LAYOUT_LABELS: Record<SlideLayout, string> = {
   'title-slide': 'Title Slide',
   'merge-diagram': 'Merge Diagram',
   'stat-hero': 'Stat Hero',
+  concept: 'Concept',
   'linked-views': 'Linked Views',
 };
 

@@ -13,6 +13,7 @@ export type SlideLayout =
   | 'title-slide'
   | 'merge-diagram'
   | 'stat-hero'
+  | 'concept'
   | 'linked-views';
 
 export type SlideStyleKind = 'standard' | 'section-starter' | 'company' | 'design';
@@ -73,6 +74,10 @@ export interface SlideFields {
   imageUrl?: string;
   subtitle?: string;
   numeral?: string;
+  /** Concept layout: one-line essence under the title. */
+  lead?: string;
+  /** Concept layout: short scannable cards beside the project image. */
+  points?: MergeItem[];
   views?: LinkedView[];
   /** Other slides this one references — a concept pointing at the layout or
    *  design slide that demonstrates it. Ids may go stale if a slide is deleted,

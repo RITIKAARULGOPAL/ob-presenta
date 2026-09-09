@@ -730,6 +730,75 @@ function StatHero({ slide, editable }: SlideRendererProps) {
   );
 }
 
+function ConceptBody({ slide, editable }: SlideRendererProps) {
+  const updateField = useEditorStore((s) => s.updateField);
+  const addPoint = useEditorStore((s) => s.addPoint);
+  const removePoint = useEditorStore((s) => s.removePoint);
+  const points = slide.fields.points ?? [];
+
+  function setPoint(id: string, label: string) {
+    updateField('points', points.map((pt) => (pt.id === id ? { ...pt, label } : pt)));
+  }
+
+  return (
+    <div className="mt-5 flex flex-1 items-start gap-10">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <EditableText
+          editable={editable}
+          value={slide.fields.lead ?? ''}
+          onChange={(v) => updateField('lead', v)}
+          as="p"
+          className="max-w-md text-lg leading-snug text-[var(--ink-2)] outline-none"
+        />
+
+        <div className="mt-6 flex flex-wrap gap-2">
+          {points.map((pt) => (
+            <span
+              key={pt.id}
+              className="group/pt relative inline-flex items-center rounded-md border border-[var(--accent-soft-line)] bg-[var(--accent-soft)] px-3 py-2"
+            >
+              <EditableText
+                editable={editable}
+                value={pt.label}
+                onChange={(v) => setPoint(pt.id, v)}
+                as="span"
+                className="text-[13px] font-medium leading-none text-[var(--accent)] outline-none"
+              />
+              {editable && (
+                <button
+                  onClick={() => removePoint(pt.id)}
+                  aria-label={`Remove ${pt.label}`}
+                  className="ml-1.5 hidden text-[10px] text-[var(--ink-3)] hover:text-red-500 group-hover/pt:block"
+                >
+                  ✕
+                </button>
+              )}
+            </span>
+          ))}
+          {editable && (
+            <button
+              onClick={addPoint}
+              className="rounded-md border border-dashed border-[var(--line)] px-3 py-2 text-[13px] font-medium text-[var(--ink-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            >
+              + Point
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Where the project's own plan or render goes — the whole point of the
+          split is that a concept slide isn't a wall of text. */}
+      <MediaBox
+        url={slide.fields.imageUrl ?? ''}
+        kind="image"
+        editable={editable}
+        onChangeUrl={(url) => updateField('imageUrl', url)}
+        className="aspect-[4/3] w-[42%] shrink-0"
+      />
+    </div>
+  );
+}
+
 function TwoContent({ slide, editable }: SlideRendererProps) {
   const updateField = useEditorStore((s) => s.updateField);
   return (
@@ -832,6 +901,7 @@ export function SlideRenderer({ slide, editable }: SlideRendererProps) {
           {slide.layout === 'two-content' && <TwoContent slide={slide} editable={editable} />}
           {slide.layout === 'merge-diagram' && <MergeDiagram slide={slide} editable={editable} />}
           {slide.layout === 'stat-hero' && <StatHero slide={slide} editable={editable} />}
+          {slide.layout === 'concept' && <ConceptBody slide={slide} editable={editable} />}
           {slide.layout === 'linked-views' && <LinkedViewsExplorer slide={slide} editable={editable} />}
           {slide.style === 'design' && (
             <MediaBox

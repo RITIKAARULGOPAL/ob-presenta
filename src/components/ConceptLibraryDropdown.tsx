@@ -103,9 +103,9 @@ export function ConceptLibraryDropdown({ onClose }: { onClose: () => void }) {
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="absolute right-0 top-10 z-50 flex max-h-[74vh] w-[620px] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl">
+      <div className="fixed right-3 top-14 z-50 flex max-h-[74vh] w-[620px] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl">
         {/* Pillars */}
-        <div className="w-[168px] shrink-0 overflow-y-auto border-r border-slate-100 bg-slate-50 py-1">
+        <div className="w-[130px] shrink-0 overflow-y-auto border-r border-slate-100 bg-slate-50 py-1 sm:w-[168px]">
           {DESIGN_PILLARS.map((p) => {
             const count = p.concepts.filter((c) => inDeck.has(c.id)).length;
             return (
@@ -140,7 +140,7 @@ export function ConceptLibraryDropdown({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))' }}>
               <GalleryItem
                 slide={dividerPreview}
                 label="Section divider"

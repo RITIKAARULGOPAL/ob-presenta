@@ -21,17 +21,59 @@ function sanitizeFilename(name: string): string {
   return name.trim().replace(/[^a-z0-9-_ ]/gi, '').replace(/\s+/g, '-').slice(0, 80) || 'presenta-deck';
 }
 
-async function captureSlides(project: Project, onProgress?: ExportProgress): Promise<string[]> {
-  const container = document.createElement('div');
-  container.style.position = 'fixed';
-  container.style.top = '0';
-  container.style.left = '-99999px';
-  container.style.width = `${SLIDE_W}px`;
-  container.style.height = `${SLIDE_H}px`;
-  container.style.overflow = 'hidden';
-  document.body.appendChild(container);
+/** Wait until what's on the stage is actually what we asked for.
+ *
+ *  Two things here run on their own clock. React 19 commits asynchronously, so
+ *  a frame has to pass before the new slide is even in the DOM; and a slide's
+ *  images are fetched by the browser rather than by React, so they can still be
+ *  decoding after that commit. Rasterizing early yields a frame with its photo
+ *  missing — or, since html-to-image serializes whatever it finds, one that
+ *  still shows the slide before it. */
+async function settleStage(stage: HTMLElement): Promise<void> {
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-  const root = createRoot(container);
+  await Promise.all(
+    Array.from(stage.querySelectorAll('img')).map(
+      (img) =>
+        new Promise<void>((res) => {
+          if (img.complete && img.naturalWidth > 0) return res();
+          img.addEventListener('load', () => res(), { once: true });
+          img.addEventListener('error', () => res(), { once: true });
+        })
+    )
+  );
+
+  // One more frame, so a just-decoded image is painted before we serialize.
+  await new Promise((r) => requestAnimationFrame(r));
+}
+
+async function captureSlides(project: Project, onProgress?: ExportProgress): Promise<string[]> {
+  // Two elements, and the split matters. html-to-image copies the CAPTURED
+  // node's own computed style onto its clone and renders that clone inside an
+  // SVG foreignObject — so when the captured node is the one holding
+  // `left: -99999px`, the clone lands 99999px outside the frame and every page
+  // comes back fully transparent. Keep the hiding on an outer wrapper that is
+  // never captured, and give the stage no positioning of its own.
+  const wrapper = document.createElement('div');
+  wrapper.style.position = 'fixed';
+  wrapper.style.top = '0';
+  wrapper.style.left = '-99999px';
+  wrapper.style.width = `${SLIDE_W}px`;
+  wrapper.style.height = `${SLIDE_H}px`;
+  wrapper.style.overflow = 'hidden';
+
+  const stage = document.createElement('div');
+  stage.style.width = `${SLIDE_W}px`;
+  stage.style.height = `${SLIDE_H}px`;
+  stage.style.overflow = 'hidden';
+  // A slide paints its own background, but an explicit ground here means a
+  // transparent PNG can never reach a PDF page or a PPTX picture frame.
+  stage.style.background = '#ffffff';
+
+  wrapper.appendChild(stage);
+  document.body.appendChild(wrapper);
+
+  const root = createRoot(stage);
   const images: string[] = [];
 
   try {
@@ -43,10 +85,9 @@ async function captureSlides(project: Project, onProgress?: ExportProgress): Pro
     for (let i = 0; i < exportable.length; i++) {
       const slide = exportable[i];
       root.render(createElement(SlideRenderer, { slide, editable: false }));
-      // Two frames: one for React to commit, one for layout/paint to settle.
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await settleStage(stage);
 
-      const dataUrl = await htmlToImage.toPng(container, {
+      const dataUrl = await htmlToImage.toPng(stage, {
         width: SLIDE_W,
         height: SLIDE_H,
         pixelRatio: 2,
@@ -57,7 +98,7 @@ async function captureSlides(project: Project, onProgress?: ExportProgress): Pro
     }
   } finally {
     root.unmount();
-    container.remove();
+    wrapper.remove();
   }
 
   return images;

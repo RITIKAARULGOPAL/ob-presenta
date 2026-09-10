@@ -33,6 +33,12 @@ export function EditableText({
 }: EditableTextProps) {
   const ref = useRef<HTMLElement>(null);
 
+  // An unfilled field is nothing to show. In Presenter and in an export the
+  // element drops out entirely rather than reserving an empty line, which is
+  // what lets a slide default to empty (slideDefaults.ts) without leaving
+  // holes in front of an audience.
+  const blank = !value.trim();
+
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -40,6 +46,8 @@ export function EditableText({
       el.textContent = value;
     }
   }, [value]);
+
+  if (!editable && blank) return null;
 
   // Forwarding `ref` through createElement's props is the standard way to attach a ref to a
   // dynamically-chosen tag; nothing here reads ref.current during render, only inside the
@@ -50,7 +58,8 @@ export function EditableText({
     contentEditable: editable,
     suppressContentEditableWarning: true,
     className,
-    'data-placeholder': placeholder,
+    // Editor-only, so a hint can never reach a rendered deck.
+    'data-placeholder': editable ? placeholder : undefined,
     onBlur: (e: React.FocusEvent<HTMLElement>) => onChange(e.currentTarget.textContent ?? ''),
   });
 }

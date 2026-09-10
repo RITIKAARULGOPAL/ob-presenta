@@ -3,13 +3,15 @@ import type { Slide, SlideLayout, SlideStyleKind, StatItem, MergeItem, LinkedVie
 
 const defaultAnimation = () => ({ entry: 'none' as const, duration: 600, delay: 0 });
 
-function makeStat(label: string, value = '0'): StatItem {
-  return { id: makeId('stat'), value, label };
+function makeStat(): StatItem {
+  return { id: makeId('stat'), value: '', label: '' };
 }
-function makeItem(label: string): MergeItem {
-  return { id: makeId('item'), label };
+function makeItem(): MergeItem {
+  return { id: makeId('item'), label: '' };
 }
 function makeLinkedViews(): LinkedView[] {
+  // The labels here name the kind of view a slot holds, so they're structure
+  // rather than filler — the URL is what the project supplies.
   return [
     { id: makeId('view'), kind: 'layout', label: 'Layout', url: '' },
     { id: makeId('view'), kind: 'render', label: 'Render', url: '' },
@@ -19,69 +21,73 @@ function makeLinkedViews(): LinkedView[] {
 }
 
 /** One factory per layout — the fields a fresh slide of that layout starts with.
- *  Mirrors the POC's SLIDE_LAYOUTS.build() functions, just returning data instead
- *  of an HTML string. */
+ *
+ *  Every text field starts EMPTY on purpose. A new slide should carry this
+ *  project's words and nobody else's, and copy that was never written is copy
+ *  that can end up in front of a client. The keys stay here so the layout still
+ *  renders its full structure — three stat slots, the kicker's divider rule —
+ *  and SlideRenderer shows each empty field's name as an editor-only hint, so a
+ *  blank slide still reads as a shape you fill in rather than a void.
+ *
+ *  Written copy arrives exactly one way: picking an entry from the concept
+ *  library, which composes its own fields in conceptSlides.ts and never routes
+ *  through here. */
 export function defaultFieldsForLayout(layout: SlideLayout) {
   switch (layout) {
     case 'blank':
       return {};
     case 'title-only':
-      return { kickerEyebrow: 'New Section', kickerLabel: 'Untitled', title: 'Slide title' };
+      return { kickerEyebrow: '', kickerLabel: '', title: '' };
     case 'title-content':
-      return {
-        kickerEyebrow: 'New Section',
-        kickerLabel: 'Untitled',
-        title: 'Slide title',
-        body: 'Click to edit this placeholder copy.',
-      };
+      return { kickerEyebrow: '', kickerLabel: '', title: '', body: '' };
     case 'title-stats':
       return {
-        kickerEyebrow: 'New Section',
-        kickerLabel: 'Untitled',
-        title: 'Slide title',
-        stats: [makeStat('Stat one'), makeStat('Stat two'), makeStat('Stat three')],
+        kickerEyebrow: '',
+        kickerLabel: '',
+        title: '',
+        stats: [makeStat(), makeStat(), makeStat()],
       };
     case 'two-content':
       return {
-        kickerEyebrow: 'New Section',
-        kickerLabel: 'Untitled',
-        title: 'Slide title',
-        leftColumn: 'Left column placeholder copy.',
-        rightColumn: 'Right column placeholder copy.',
+        kickerEyebrow: '',
+        kickerLabel: '',
+        title: '',
+        leftColumn: '',
+        rightColumn: '',
       };
     case 'title-slide':
-      return { kickerEyebrow: 'New Section', title: 'Slide title', subtitle: 'Subtitle placeholder' };
+      return { kickerEyebrow: '', title: '', subtitle: '' };
     case 'merge-diagram':
       return {
-        kickerEyebrow: 'New Section',
-        kickerLabel: 'Untitled',
-        title: 'Slide title',
-        items: [makeItem('Item one'), makeItem('Item two'), makeItem('Item three')],
-        result: 'Result',
+        kickerEyebrow: '',
+        kickerLabel: '',
+        title: '',
+        items: [makeItem(), makeItem(), makeItem()],
+        result: '',
       };
     case 'stat-hero':
       return {
-        kickerEyebrow: 'New Section',
-        kickerLabel: 'Untitled',
-        title: 'Slide title',
-        statValue: '123',
-        statLabel: 'Stat description',
-        caption: 'Supporting caption text.',
+        kickerEyebrow: '',
+        kickerLabel: '',
+        title: '',
+        statValue: '',
+        statLabel: '',
+        caption: '',
       };
     case 'concept':
       return {
-        kickerEyebrow: 'Design Concept',
-        kickerLabel: 'Principle',
-        title: 'Concept title',
-        lead: 'One line describing the principle.',
-        points: [makeItem('Point one'), makeItem('Point two'), makeItem('Point three')],
+        kickerEyebrow: '',
+        kickerLabel: '',
+        title: '',
+        lead: '',
+        points: [makeItem(), makeItem(), makeItem()],
         imageUrl: '',
       };
     case 'linked-views':
       return {
-        kickerEyebrow: 'New Section',
-        kickerLabel: 'Untitled',
-        title: 'Slide title',
+        kickerEyebrow: '',
+        kickerLabel: '',
+        title: '',
         views: makeLinkedViews(),
       };
     default:
@@ -92,22 +98,17 @@ export function defaultFieldsForLayout(layout: SlideLayout) {
 export function defaultFieldsForStyle(style: SlideStyleKind) {
   switch (style) {
     case 'section-starter':
-      return { numeral: '01', title: 'Section title', subtitle: 'Chapter subtitle' };
+      return { numeral: '', title: '', subtitle: '' };
     case 'company':
       return {
-        kickerEyebrow: 'Company Profile',
-        kickerLabel: 'Overview',
-        title: 'About us',
-        body: 'A short introduction to who we are and what we do.',
-        stats: [makeStat('Stat one'), makeStat('Stat two'), makeStat('Stat three')],
+        kickerEyebrow: '',
+        kickerLabel: '',
+        title: '',
+        body: '',
+        stats: [makeStat(), makeStat(), makeStat()],
       };
     case 'design':
-      return {
-        kickerEyebrow: 'Design Thinking',
-        kickerLabel: 'Visual Direction',
-        title: 'Design title',
-        imageUrl: '',
-      };
+      return { kickerEyebrow: '', kickerLabel: '', title: '', imageUrl: '' };
     default:
       return defaultFieldsForLayout('title-content');
   }

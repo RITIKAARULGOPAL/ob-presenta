@@ -73,7 +73,7 @@ export function PropertiesPanel() {
             </button>
           ))}
         </div>
-        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">A generic structure — replaces this slide&apos;s content with that layout&apos;s placeholders.</p>
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">Switches this slide to that structure and clears its fields — the words are yours to write. Ready-made copy comes from the concept library.</p>
       </div>
 
       <div className="mb-2 border-t border-slate-100 pt-6">

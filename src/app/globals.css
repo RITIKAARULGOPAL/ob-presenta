@@ -89,3 +89,25 @@ body {
   }
   .cd-draw { stroke-dasharray: none; stroke-dashoffset: 0; }
 }
+
+/* ---- Empty-field hints ----------------------------------------------------
+   A fresh slide starts with every text field empty (see slideDefaults.ts), so
+   each field names itself until someone types into it. EditableText only emits
+   data-placeholder while the slide is editable, and that is what keeps these
+   words out of Presenter and out of an export — they are a hint about where
+   copy goes, never copy.
+
+   :empty does the work, so the hint vanishes on the first keystroke with no
+   React re-render fighting the caret. A contenteditable that was typed into and
+   then cleared can hold on to a stray <br>, so that case is matched too. */
+
+[data-placeholder]:empty::before,
+[data-placeholder]:has(br:only-child)::before {
+  content: attr(data-placeholder);
+  color: var(--ink-3, #848da6);
+  opacity: 0.5;
+  font-style: italic;
+  font-weight: 400;
+  pointer-events: none;
+  user-select: none;
+}

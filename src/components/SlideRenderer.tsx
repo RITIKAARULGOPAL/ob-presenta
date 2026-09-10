@@ -902,9 +902,10 @@ function Kicker({ slide, editable }: SlideRendererProps) {
         value={slide.fields.kickerEyebrow ?? ''}
         onChange={(v) => updateField('kickerEyebrow', v)}
         as="span"
+        placeholder="Section"
         className="text-[var(--accent)] outline-none"
       />
-      {slide.fields.kickerLabel !== undefined && (
+      {(editable ? slide.fields.kickerLabel !== undefined : !!slide.fields.kickerLabel?.trim()) && (
         <>
           <span className="h-px w-6 bg-[var(--line)]" />
           <EditableText
@@ -912,6 +913,7 @@ function Kicker({ slide, editable }: SlideRendererProps) {
             value={slide.fields.kickerLabel ?? ''}
             onChange={(v) => updateField('kickerLabel', v)}
             as="span"
+            placeholder="Label"
             className="outline-none"
           />
         </>
@@ -928,6 +930,7 @@ function Title({ slide, editable, dark }: SlideRendererProps & { dark?: boolean 
       value={slide.fields.title ?? ''}
       onChange={(v) => updateField('title', v)}
       as="h2"
+      placeholder="Slide title"
       className={`font-display text-3xl font-extrabold leading-tight tracking-tight outline-none ${
         dark ? 'text-white' : 'text-[var(--accent)]'
       }`}
@@ -943,6 +946,7 @@ function Body({ slide, editable }: SlideRendererProps) {
       value={slide.fields.body ?? ''}
       onChange={(v) => updateField('body', v)}
       as="p"
+      placeholder="Body copy"
       className="mt-4 max-w-2xl text-base leading-relaxed text-[var(--ink-2)] outline-none"
     />
   );
@@ -953,6 +957,10 @@ function StatsRow({ slide, editable }: SlideRendererProps) {
   const addStatItem = useEditorStore((s) => s.addStatItem);
   const removeStatItem = useEditorStore((s) => s.removeStatItem);
   const stats = slide.fields.stats ?? [];
+  // Editing shows every slot, so there is something to type into. A deck shows
+  // only what was written — an untouched slide reads as blank rather than as a
+  // row of empty boxes.
+  const shownStats = editable ? stats : stats.filter((st) => st.value.trim() || st.label.trim());
 
   function setStat(id: string, patch: Partial<{ value: string; label: string }>) {
     updateField(
@@ -961,16 +969,19 @@ function StatsRow({ slide, editable }: SlideRendererProps) {
     );
   }
 
+  if (!editable && shownStats.length === 0) return null;
+
   return (
     <div className="mt-8">
-      <div className="grid gap-px overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--line)]" style={{ gridTemplateColumns: `repeat(${Math.min(stats.length, 4) || 1}, 1fr)` }}>
-        {stats.map((st) => (
+      <div className="grid gap-px overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--line)]" style={{ gridTemplateColumns: `repeat(${Math.min(shownStats.length, 4) || 1}, 1fr)` }}>
+        {shownStats.map((st) => (
           <div key={st.id} className="bg-white p-5">
             <EditableText
               editable={editable}
               value={st.value}
               onChange={(v) => setStat(st.id, { value: v })}
               as="div"
+              placeholder="0"
               className="font-display text-3xl font-extrabold text-[var(--accent)] outline-none"
             />
             <EditableText
@@ -978,6 +989,7 @@ function StatsRow({ slide, editable }: SlideRendererProps) {
               value={st.label}
               onChange={(v) => setStat(st.id, { label: v })}
               as="div"
+              placeholder="Label"
               className="mt-1 text-sm text-[var(--ink-2)] outline-none"
             />
           </div>
@@ -1004,11 +1016,13 @@ function MergeDiagram({ slide, editable }: SlideRendererProps) {
   const addMergeItem = useEditorStore((s) => s.addMergeItem);
   const removeMergeItem = useEditorStore((s) => s.removeMergeItem);
   const items = slide.fields.items ?? [];
+  const shownItems = editable ? items : items.filter((it) => it.label.trim());
+  const result = slide.fields.result?.trim() ?? '';
 
   return (
     <div className="mt-6 flex flex-wrap items-center gap-8">
       <div className="flex flex-col gap-4">
-        {items.map((it) => (
+        {shownItems.map((it) => (
           <div key={it.id} className="flex items-center gap-3">
             <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--surface-2)]">
               <span className="h-2.5 w-2.5 rounded-full bg-[var(--ink-3)]" />
@@ -1018,6 +1032,7 @@ function MergeDiagram({ slide, editable }: SlideRendererProps) {
               value={it.label}
               onChange={(v) => updateField('items', items.map((i) => (i.id === it.id ? { ...i, label: v } : i)))}
               as="span"
+              placeholder="Item"
               className="text-sm font-semibold text-[var(--ink)] outline-none"
             />
           </div>
@@ -1035,21 +1050,26 @@ function MergeDiagram({ slide, editable }: SlideRendererProps) {
           </div>
         )}
       </div>
-      <span className="text-2xl text-[var(--ink-3)]">{ARROW}</span>
-      <div className="flex flex-col items-center gap-3 text-center">
-        <span className="flex h-20 w-20 items-center justify-center rounded-2xl border border-[var(--accent-soft-line)] bg-[var(--accent-soft)]">
-          <svg viewBox="0 0 24 24" className="h-8 w-8 stroke-[var(--accent)]" fill="none" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2l2.6 6.2 6.7.6-5.1 4.4 1.6 6.6L12 16.3 6.2 19.8l1.6-6.6L2.7 8.8l6.7-.6z" />
-          </svg>
-        </span>
-        <EditableText
-          editable={editable}
-          value={slide.fields.result ?? ''}
-          onChange={(v) => updateField('result', v)}
-          as="span"
-          className="text-sm font-semibold text-[var(--ink)] outline-none"
-        />
-      </div>
+      {(editable || result) && (
+        <>
+          <span className="text-2xl text-[var(--ink-3)]">{ARROW}</span>
+          <div className="flex flex-col items-center gap-3 text-center">
+            <span className="flex h-20 w-20 items-center justify-center rounded-2xl border border-[var(--accent-soft-line)] bg-[var(--accent-soft)]">
+              <svg viewBox="0 0 24 24" className="h-8 w-8 stroke-[var(--accent)]" fill="none" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2l2.6 6.2 6.7.6-5.1 4.4 1.6 6.6L12 16.3 6.2 19.8l1.6-6.6L2.7 8.8l6.7-.6z" />
+              </svg>
+            </span>
+            <EditableText
+              editable={editable}
+              value={slide.fields.result ?? ''}
+              onChange={(v) => updateField('result', v)}
+              as="span"
+              placeholder="Result"
+              className="text-sm font-semibold text-[var(--ink)] outline-none"
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1063,6 +1083,7 @@ function StatHero({ slide, editable }: SlideRendererProps) {
         value={slide.fields.statValue ?? ''}
         onChange={(v) => updateField('statValue', v)}
         as="div"
+        placeholder="0"
         className="font-display text-8xl font-extrabold leading-none text-[var(--accent)] outline-none"
       />
       <EditableText
@@ -1070,6 +1091,7 @@ function StatHero({ slide, editable }: SlideRendererProps) {
         value={slide.fields.statLabel ?? ''}
         onChange={(v) => updateField('statLabel', v)}
         as="div"
+        placeholder="Stat description"
         className="mt-3 text-sm font-semibold uppercase tracking-wide text-[var(--ink-3)] outline-none"
       />
       <EditableText
@@ -1077,6 +1099,7 @@ function StatHero({ slide, editable }: SlideRendererProps) {
         value={slide.fields.caption ?? ''}
         onChange={(v) => updateField('caption', v)}
         as="p"
+        placeholder="Supporting caption"
         className="mt-5 max-w-xl text-base text-[var(--ink-2)] outline-none"
       />
     </div>
@@ -1088,6 +1111,7 @@ function ConceptBody({ slide, editable, animate, dark }: SlideRendererProps & { 
   const addPoint = useEditorStore((s) => s.addPoint);
   const removePoint = useEditorStore((s) => s.removePoint);
   const points = slide.fields.points ?? [];
+  const shownPoints = editable ? points : points.filter((pt) => pt.label.trim());
 
   function setPoint(id: string, label: string) {
     updateField('points', points.map((pt) => (pt.id === id ? { ...pt, label } : pt)));
@@ -1103,11 +1127,12 @@ function ConceptBody({ slide, editable, animate, dark }: SlideRendererProps & { 
           value={slide.fields.lead ?? ''}
           onChange={(v) => updateField('lead', v)}
           as="p"
+          placeholder="One line describing the principle"
           className="mt-4 max-w-md text-lg leading-snug text-[var(--ink-2)] outline-none"
         />
 
         <div className="mt-6 flex flex-wrap gap-2">
-          {points.map((pt) => (
+          {shownPoints.map((pt) => (
             <span
               key={pt.id}
               className="group/pt relative inline-flex items-center rounded-md border border-[var(--accent-soft-line)] bg-[var(--accent-soft)] px-3 py-2"
@@ -1117,6 +1142,7 @@ function ConceptBody({ slide, editable, animate, dark }: SlideRendererProps & { 
                 value={pt.label}
                 onChange={(v) => setPoint(pt.id, v)}
                 as="span"
+                placeholder="Point"
                 className="text-[13px] font-medium leading-none text-[var(--accent)] outline-none"
               />
               {editable && (
@@ -1194,6 +1220,7 @@ function TwoContent({ slide, editable }: SlideRendererProps) {
         value={slide.fields.leftColumn ?? ''}
         onChange={(v) => updateField('leftColumn', v)}
         as="p"
+        placeholder="Left column"
         className="flex-1 text-base leading-relaxed text-[var(--ink-2)] outline-none"
       />
       <EditableText
@@ -1201,6 +1228,7 @@ function TwoContent({ slide, editable }: SlideRendererProps) {
         value={slide.fields.rightColumn ?? ''}
         onChange={(v) => updateField('rightColumn', v)}
         as="p"
+        placeholder="Right column"
         className="flex-1 text-base leading-relaxed text-[var(--ink-2)] outline-none"
       />
     </div>
@@ -1242,6 +1270,7 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
             value={slide.fields.numeral ?? ''}
             onChange={(v) => updateField('numeral', v)}
             as="div"
+            placeholder="01"
             className="font-display text-8xl font-extrabold leading-none text-white/15 outline-none"
           />
           <EditableText
@@ -1249,6 +1278,7 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
             value={slide.fields.title ?? ''}
             onChange={(v) => updateField('title', v)}
             as="h1"
+            placeholder="Section title"
             className="mt-2 font-display text-4xl font-extrabold text-white outline-none"
           />
           <EditableText
@@ -1256,6 +1286,7 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
             value={slide.fields.subtitle ?? ''}
             onChange={(v) => updateField('subtitle', v)}
             as="p"
+            placeholder="Chapter subtitle"
             className="mx-auto mt-4 max-w-lg text-white/65 outline-none"
           />
         </div>
@@ -1267,6 +1298,7 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
             value={slide.fields.title ?? ''}
             onChange={(v) => updateField('title', v)}
             as="h1"
+            placeholder="Presentation title"
             className="font-display text-5xl font-extrabold text-[var(--accent)] outline-none"
           />
           <EditableText
@@ -1274,6 +1306,7 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
             value={slide.fields.subtitle ?? ''}
             onChange={(v) => updateField('subtitle', v)}
             as="p"
+            placeholder="Subtitle"
             className="mx-auto mt-4 max-w-lg text-[var(--ink-2)] outline-none"
           />
           <ClientLogo editable={editable} dark={dark} />

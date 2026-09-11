@@ -1,0 +1,7 @@
+# Vercel CLI's local-directory upload includes gitignored files that are
+# still present on disk — .gitignore only controls git tracking, not what
+# gets shipped to a `vercel deploy`. Mirror the paused-feature exclusions
+# here too, or a clean Vercel build breaks on the missing `pdfjs-dist`
+# dependency these files import (see .gitignore's own note on this).
+src/lib/importDeck.ts
+src/app/api/import-slide/

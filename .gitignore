@@ -49,3 +49,6 @@ next-env.d.ts
 # once already (fixed in e4629f6); ignoring them stops that recurring.
 /src/lib/importDeck.ts
 /src/app/api/import-slide/
+
+.vercel
+.env*

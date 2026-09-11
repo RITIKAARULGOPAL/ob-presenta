@@ -106,13 +106,17 @@ async function captureSlides(project: Project, onProgress?: ExportProgress): Pro
 
 export async function exportToPdf(project: Project, onProgress?: ExportProgress): Promise<void> {
   const images = await captureSlides(project, onProgress);
-  // Passing both `orientation` and a custom pixel `format` array makes jsPDF
-  // swap the dimensions a second time, silently producing a portrait canvas
-  // the wrong size for our image draws — the format array alone is enough.
-  const pdf = new jsPDF({ unit: 'px', format: [SLIDE_W, SLIDE_H] });
+  // jsPDF defaults `orientation` to 'p' whenever it's omitted — not "infer
+  // from the format array" — and then swaps a landscape [1280, 720] array to
+  // portrait to match. Omitting orientation (the previous code here) produced
+  // exactly that: every exported page was a 960×1706.67pt portrait sheet with
+  // our 1280×720 landscape image drawn in the top-left corner, not filling
+  // it. `orientation: 'l'` has to be passed to the constructor AND to every
+  // addPage() call — each one re-runs the same default-to-portrait check.
+  const pdf = new jsPDF({ orientation: 'l', unit: 'px', format: [SLIDE_W, SLIDE_H] });
 
   images.forEach((dataUrl, i) => {
-    if (i > 0) pdf.addPage([SLIDE_W, SLIDE_H]);
+    if (i > 0) pdf.addPage([SLIDE_W, SLIDE_H], 'l');
     pdf.addImage(dataUrl, 'PNG', 0, 0, SLIDE_W, SLIDE_H);
   });
 

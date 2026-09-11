@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { EditableText } from './EditableText';
 import { useEditorStore } from '@/lib/editorStore';
 import { tintWithWhite } from '@/lib/color';
-import { resolveFontVar } from '@/lib/fonts';
+import { resolveFontVar, resolveTypography, headlineStyle } from '@/lib/fonts';
 import { dataUrlBytes, fileToDataUrl, fileToSlideImage } from '@/lib/imageFile';
 import {
   centroidOf,
@@ -932,9 +932,8 @@ function Title({ slide, editable, dark }: SlideRendererProps & { dark?: boolean 
       onChange={(v) => updateField('title', v)}
       as="h2"
       placeholder="Slide title"
-      className={`font-display text-3xl font-extrabold leading-tight tracking-tight outline-none ${
-        dark ? 'text-white' : 'text-[var(--accent)]'
-      }`}
+      style={headlineStyle(1.875)}
+      className={`font-display leading-tight outline-none ${dark ? 'text-white' : 'text-[var(--accent)]'}`}
     />
   );
 }
@@ -983,7 +982,8 @@ function StatsRow({ slide, editable }: SlideRendererProps) {
               onChange={(v) => setStat(st.id, { value: v })}
               as="div"
               placeholder="0"
-              className="font-display text-3xl font-extrabold text-[var(--accent)] outline-none"
+              style={headlineStyle(1.875)}
+              className="font-display text-[var(--accent)] outline-none"
             />
             <EditableText
               editable={editable}
@@ -1085,7 +1085,8 @@ function StatHero({ slide, editable }: SlideRendererProps) {
         onChange={(v) => updateField('statValue', v)}
         as="div"
         placeholder="0"
-        className="font-display text-8xl font-extrabold leading-none text-[var(--accent)] outline-none"
+        style={headlineStyle(6)}
+        className="font-display leading-none text-[var(--accent)] outline-none"
       />
       <EditableText
         editable={editable}
@@ -1240,6 +1241,8 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
   const updateField = useEditorStore((s) => s.updateField);
   const accentColor = useEditorStore((s) => s.project?.accentColor) ?? DEFAULT_ACCENT;
   const fontVar = resolveFontVar(useEditorStore((s) => s.project?.fontFamily));
+  const projectTypography = useEditorStore((s) => s.project?.typography);
+  const typography = resolveTypography(projectTypography, slide.typographyOverride);
   const dark = slide.style === 'section-starter' || slide.style === 'design';
 
   const entry = slide.animation?.entry ?? 'none';
@@ -1265,6 +1268,18 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
           // static substitution, so this keeps resolving correctly however many
           // var() layers of indirection sit in between.
           '--font-archivo': fontVar,
+          // Body text never sets an explicit font-family (it just inherits the
+          // theme's --font-sans default), so overriding --font-geist-sans here
+          // reaches every kicker, description and caption below the same way
+          // --font-archivo reaches every font-display headline — no changes
+          // needed in Kicker/Body/TwoContent/etc. themselves.
+          '--font-geist-sans': typography.bodyFontVar,
+          // headlineStyle() (fonts.ts) reads these three on each of the six
+          // headline/hero-number elements, so one slide-level resolve here
+          // reaches all of them.
+          '--type-scale': typography.scaleMultiplier,
+          '--headline-weight': typography.weightValue,
+          '--headline-tracking': typography.trackingValue,
           '--ink': '#141a2b',
           '--ink-2': '#525a72',
           '--ink-3': '#848da6',
@@ -1281,7 +1296,8 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
             onChange={(v) => updateField('numeral', v)}
             as="div"
             placeholder="01"
-            className="font-display text-8xl font-extrabold leading-none text-white/15 outline-none"
+            style={headlineStyle(6)}
+            className="font-display leading-none text-white/15 outline-none"
           />
           <EditableText
             editable={editable}
@@ -1289,7 +1305,8 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
             onChange={(v) => updateField('title', v)}
             as="h1"
             placeholder="Section title"
-            className="mt-2 font-display text-4xl font-extrabold text-white outline-none"
+            style={headlineStyle(2.25)}
+            className="mt-2 font-display text-white outline-none"
           />
           <EditableText
             editable={editable}
@@ -1309,7 +1326,8 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
             onChange={(v) => updateField('title', v)}
             as="h1"
             placeholder="Presentation title"
-            className="font-display text-5xl font-extrabold text-[var(--accent)] outline-none"
+            style={headlineStyle(3)}
+            className="font-display text-[var(--accent)] outline-none"
           />
           <EditableText
             editable={editable}

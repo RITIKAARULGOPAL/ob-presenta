@@ -117,6 +117,21 @@ export type Brand = 'skv' | 'ob' | 'both';
 /** A deck-wide headline face — see src/lib/fonts.ts for what each resolves to. */
 export type FontPairing = 'default' | 'editorial' | 'structural' | 'classic';
 
+/** The four typography axes beyond which face to use — size, weight, body
+ * face and letter-spacing, each independently settable. Every field is
+ * optional at both the project and slide level: a slide falls back to the
+ * project's choice for whatever it doesn't set, and the project falls back
+ * to a built-in default (see resolveTypography in src/lib/fonts.ts) for
+ * whatever it doesn't set either — the same two-layer fallback
+ * Logo & Copyright already uses for `brand`/`brandOverride`, just with four
+ * independent knobs instead of one. */
+export interface TypographySettings {
+  scale?: 'compact' | 'standard' | 'bold';
+  weight?: 'regular' | 'bold';
+  bodyFont?: 'geist' | 'plexSans' | 'sourceSerif';
+  tracking?: 'tight' | 'normal' | 'wide';
+}
+
 export interface Slide {
   id: string;
   layout: SlideLayout;
@@ -125,6 +140,9 @@ export interface Slide {
   animation: SlideAnimation;
   /** Overrides the project's brand for just this slide; unset = inherit. */
   brandOverride?: Brand;
+  /** Per-axis typography overrides for just this slide; each unset key
+   *  inherits the project's setting for that axis. */
+  typographyOverride?: TypographySettings;
   /** Present when this slide was inserted from the concept library. */
   conceptOrigin?: ConceptOrigin;
   /** Kept in the deck but left out of Presenter and export — for a slide that
@@ -145,6 +163,9 @@ export interface Project {
   accentColor?: string;
   /** Headline face for the whole deck. Undefined means Studio (Archivo). */
   fontFamily?: FontPairing;
+  /** Deck-wide defaults for size/weight/body-face/tracking; a slide's own
+   *  typographyOverride wins per-axis over these. */
+  typography?: TypographySettings;
   slides: Slide[];
   createdAt: number;
   updatedAt: number;

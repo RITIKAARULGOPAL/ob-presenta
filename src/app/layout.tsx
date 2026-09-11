@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Archivo, Fraunces, Big_Shoulders, Playfair_Display } from "next/font/google";
+import { Geist, Geist_Mono, Archivo, Fraunces, Big_Shoulders, Playfair_Display, IBM_Plex_Sans, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -41,6 +41,20 @@ const playfairDisplay = Playfair_Display({
   weight: ["700", "800"],
 });
 
+// Body-face choices (Typography → Body Font). Geist itself needs no separate
+// load — it's already above — these two are the alternates.
+const plexSans = IBM_Plex_Sans({
+  variable: "--font-plex-sans",
+  subsets: ["latin"],
+  weight: ["400", "500"],
+});
+
+const sourceSerif = Source_Serif_4({
+  variable: "--font-source-serif",
+  subsets: ["latin"],
+  weight: ["400", "500"],
+});
+
 export const metadata: Metadata = {
   title: "Presenta",
   description: "An Interactive Presentation Platform, by Officebanao",
@@ -50,7 +64,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${archivo.variable} ${fraunces.variable} ${bigShoulders.variable} ${playfairDisplay.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${archivo.variable} ${fraunces.variable} ${bigShoulders.variable} ${playfairDisplay.variable} ${plexSans.variable} ${sourceSerif.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

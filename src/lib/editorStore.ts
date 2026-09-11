@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { createSlide, createStyledSlide, defaultFieldsForLayout, defaultFieldsForStyle } from './slideDefaults';
 import { optionalColumnsMissing, saveProject } from './data';
 import { makeId } from './id';
-import type { Brand, FontPairing, Project, Slide, SlideFields, SlideLayout, SlideStyleKind } from '@/types/slide';
+import type { Brand, FontPairing, Project, Slide, SlideFields, SlideLayout, SlideStyleKind, TypographySettings } from '@/types/slide';
 
 type Mode = 'editor' | 'presenter';
 
@@ -33,6 +33,14 @@ interface EditorState {
   setClientLogo: (dataUrl: string | undefined) => void;
   setAccentColor: (hex: string | undefined) => void;
   setFontFamily: (font: FontPairing | undefined) => void;
+  /** Merges into the project's deck-wide typography defaults — pass just the
+   *  axis (or axes) you're changing; the rest are left as they were.
+   *  Passing `undefined` for a key clears that one axis back to built-in. */
+  setTypography: (patch: TypographySettings) => void;
+  /** Same merge, but for one slide's override over the project default.
+   *  Passing `undefined` for a key clears that one axis back to inheriting
+   *  the project's setting, not all the way to built-in. */
+  setSlideTypographyOverride: (patch: TypographySettings) => void;
   setLinkedSlideIds: (ids: string[]) => void;
 
   addStatItem: () => void;
@@ -269,6 +277,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { project } = get();
     if (!project) return;
     const next = { ...project, fontFamily: font };
+    set({ project: next });
+    persist(next);
+  },
+
+  setTypography: (patch) => {
+    const { project } = get();
+    if (!project) return;
+    const next = { ...project, typography: { ...project.typography, ...patch } };
+    set({ project: next });
+    persist(next);
+  },
+
+  setSlideTypographyOverride: (patch) => {
+    const { project, currentSlideId } = get();
+    if (!project || !currentSlideId) return;
+    const slides = project.slides.map((s) =>
+      s.id === currentSlideId ? { ...s, typographyOverride: { ...s.typographyOverride, ...patch } } : s
+    );
+    const next = { ...project, slides };
     set({ project: next });
     persist(next);
   },

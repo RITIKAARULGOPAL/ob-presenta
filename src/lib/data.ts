@@ -1,7 +1,7 @@
 import { makeId } from './id';
 import { createSlide } from './slideDefaults';
 import { supabase } from './supabaseClient';
-import type { Brand, FontPairing, Project, ProjectSummary } from '@/types/slide';
+import type { Brand, FontPairing, Project, ProjectSummary, TypographySettings } from '@/types/slide';
 
 // ---------------------------------------------------------------------------
 // Data layer — backed by Supabase Postgres. This is the only file that talks
@@ -20,6 +20,7 @@ interface ProjectRow {
   client_logo: string | null;
   accent_color: string | null;
   font_family: FontPairing | null;
+  typography: TypographySettings | null;
   slides: Project['slides'];
   created_at: number;
   updated_at: number;
@@ -36,6 +37,7 @@ function fromRow(row: ProjectRow): Project {
     clientLogo: row.client_logo ?? undefined,
     accentColor: row.accent_color ?? undefined,
     fontFamily: row.font_family ?? undefined,
+    typography: row.typography ?? undefined,
     slides: row.slides,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -60,12 +62,13 @@ export async function listProjects(): Promise<ProjectSummary[]> {
   }));
 }
 
-/** Columns added by migrations 0003 and 0004. When a migration hasn't been
- * applied to the target database, Postgres rejects the entire write with
- * 42703 rather than ignoring the unknown columns — which silently broke every
- * create and every save. We retry once without them, so the deck still works
- * and only the newer fields (logo, accent colour, font) fail to stick. */
-const OPTIONAL_COLUMNS = ['client_logo', 'accent_color', 'font_family'] as const;
+/** Columns added by migrations 0003 through 0005. When a migration hasn't
+ * been applied to the target database, Postgres rejects the entire write
+ * with 42703 rather than ignoring the unknown columns — which silently broke
+ * every create and every save. We retry once without them, so the deck still
+ * works and only the newer fields (logo, accent colour, font, typography)
+ * fail to stick. */
+const OPTIONAL_COLUMNS = ['client_logo', 'accent_color', 'font_family', 'typography'] as const;
 
 /** An unknown column surfaces under two different codes depending on who
  * catches it: PostgREST rejects writes against its own schema cache before
@@ -89,9 +92,9 @@ function warnOnce() {
   if (missingOptionalColumns) return;
   missingOptionalColumns = true;
   console.warn(
-    'Presenta: migration 0003_add_client_logo.sql and/or 0004_add_font_family.sql ' +
-      'have not been applied, so the client logo, accent colour and/or font choice ' +
-      'cannot be saved. Everything else works.',
+    'Presenta: migration 0003_add_client_logo.sql, 0004_add_font_family.sql and/or ' +
+      '0005_add_typography.sql have not been applied, so the client logo, accent colour, ' +
+      'font choice and/or typography settings cannot be saved. Everything else works.',
   );
 }
 
@@ -128,6 +131,7 @@ export async function createProject(input: {
   clientLogo?: string;
   accentColor?: string;
   fontFamily?: FontPairing;
+  typography?: TypographySettings;
 }): Promise<Project> {
   const now = Date.now();
   const project: Project = {
@@ -140,6 +144,7 @@ export async function createProject(input: {
     clientLogo: input.clientLogo,
     accentColor: input.accentColor,
     fontFamily: input.fontFamily,
+    typography: input.typography,
     slides: [createSlide('title-slide')],
     createdAt: now,
     updatedAt: now,
@@ -154,6 +159,7 @@ export async function createProject(input: {
     client_logo: project.clientLogo ?? null,
     accent_color: project.accentColor ?? null,
     font_family: project.fontFamily ?? null,
+    typography: project.typography ?? null,
     slides: project.slides,
     created_at: project.createdAt,
     updated_at: project.updatedAt,
@@ -181,6 +187,7 @@ export async function saveProject(project: Project): Promise<void> {
     client_logo: project.clientLogo ?? null,
     accent_color: project.accentColor ?? null,
     font_family: project.fontFamily ?? null,
+    typography: project.typography ?? null,
     slides: project.slides,
     updated_at: updatedAt,
   };

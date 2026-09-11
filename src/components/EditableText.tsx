@@ -9,6 +9,7 @@ interface EditableTextProps {
   onChange: (value: string) => void;
   as?: Tag;
   className?: string;
+  style?: React.CSSProperties;
   placeholder?: string;
   editable?: boolean;
 }
@@ -28,6 +29,7 @@ export function EditableText({
   onChange,
   as = 'div',
   className,
+  style,
   placeholder,
   editable = true,
 }: EditableTextProps) {
@@ -58,6 +60,7 @@ export function EditableText({
     contentEditable: editable,
     suppressContentEditableWarning: true,
     className,
+    style,
     // Editor-only, so a hint can never reach a rendered deck.
     'data-placeholder': editable ? placeholder : undefined,
     onBlur: (e: React.FocusEvent<HTMLElement>) => onChange(e.currentTarget.textContent ?? ''),

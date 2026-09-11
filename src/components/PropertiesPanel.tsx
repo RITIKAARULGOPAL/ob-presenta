@@ -3,7 +3,7 @@
 import { useEditorStore } from '@/lib/editorStore';
 import { AccentPicker } from './AccentPicker';
 import { LAYOUT_LABELS, STYLE_LABELS } from '@/lib/slideDefaults';
-import { FONT_PAIRINGS } from '@/lib/fonts';
+import { FONT_PAIRINGS, TYPE_SCALES, HEADLINE_WEIGHTS, BODY_FONTS, TRACKINGS } from '@/lib/fonts';
 import { IconLayers, IconGrid, IconImage, IconLink, IconDroplet, IconType } from './icons';
 import type { Brand, SlideLayout, SlideStyleKind } from '@/types/slide';
 
@@ -17,6 +17,49 @@ const BRAND_OPTIONS: { key: Brand | 'default'; label: string }[] = [
   { key: 'both', label: 'Both' },
 ];
 
+/** One row of "Project default" plus that axis's presets — the same
+ *  pattern Logo & Copyright already uses, just generic across the four
+ *  typography axes instead of one brand value. `value` is the slide's own
+ *  override for this axis (undefined = inheriting the project's setting). */
+function TypeAxisRow<K extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: { key: K; label: string }[];
+  value: K | undefined;
+  onChange: (key: K | undefined) => void;
+}) {
+  return (
+    <div className="mt-3 first:mt-0">
+      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          onClick={() => onChange(undefined)}
+          className={`rounded-md border px-2 py-1 text-[11px] font-medium transition ${
+            value === undefined ? 'border-[#0b72c2] bg-[#e8f2fb] text-[#0b72c2]' : 'border-slate-200 text-slate-500 hover:border-slate-300'
+          }`}
+        >
+          Default
+        </button>
+        {options.map((o) => (
+          <button
+            key={o.key}
+            onClick={() => onChange(o.key)}
+            className={`rounded-md border px-2 py-1 text-[11px] font-medium transition ${
+              value === o.key ? 'border-[#0b72c2] bg-[#e8f2fb] text-[#0b72c2]' : 'border-slate-200 text-slate-500 hover:border-slate-300'
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function PropertiesPanel() {
   const slide = useEditorStore((s) => s.currentSlide());
   const project = useEditorStore((s) => s.project);
@@ -25,6 +68,7 @@ export function PropertiesPanel() {
   const setBrandOverride = useEditorStore((s) => s.setBrandOverride);
   const setAccentColor = useEditorStore((s) => s.setAccentColor);
   const setFontFamily = useEditorStore((s) => s.setFontFamily);
+  const setSlideTypographyOverride = useEditorStore((s) => s.setSlideTypographyOverride);
   const setLinkedSlideIds = useEditorStore((s) => s.setLinkedSlideIds);
 
   const linkedIds = slide?.fields.linkedSlideIds ?? [];
@@ -171,6 +215,33 @@ export function PropertiesPanel() {
               </button>
             );
           })}
+        </div>
+
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          <TypeAxisRow
+            label="Size"
+            options={TYPE_SCALES.map((s) => ({ key: s.key, label: s.label }))}
+            value={slide.typographyOverride?.scale}
+            onChange={(v) => setSlideTypographyOverride({ scale: v })}
+          />
+          <TypeAxisRow
+            label="Weight"
+            options={HEADLINE_WEIGHTS.map((w) => ({ key: w.key, label: w.label }))}
+            value={slide.typographyOverride?.weight}
+            onChange={(v) => setSlideTypographyOverride({ weight: v })}
+          />
+          <TypeAxisRow
+            label="Body Font"
+            options={BODY_FONTS.map((b) => ({ key: b.key, label: b.label }))}
+            value={slide.typographyOverride?.bodyFont}
+            onChange={(v) => setSlideTypographyOverride({ bodyFont: v })}
+          />
+          <TypeAxisRow
+            label="Tracking"
+            options={TRACKINGS.map((t) => ({ key: t.key, label: t.label }))}
+            value={slide.typographyOverride?.tracking}
+            onChange={(v) => setSlideTypographyOverride({ tracking: v })}
+          />
         </div>
       </div>
     </aside>

@@ -126,6 +126,10 @@ export type FontPairing = 'default' | 'editorial' | 'structural' | 'classic';
  * Logo & Copyright already uses for `brand`/`brandOverride`, just with four
  * independent knobs instead of one. */
 export interface TypographySettings {
+  /** Headline face — only meaningful in a slide's typographyOverride, since
+   *  the project's own default lives in the separate `fontFamily` field
+   *  (it predates this interface and already has its own DB column). */
+  font?: FontPairing;
   scale?: 'compact' | 'standard' | 'bold';
   weight?: 'regular' | 'bold';
   bodyFont?: 'geist' | 'plexSans' | 'sourceSerif';

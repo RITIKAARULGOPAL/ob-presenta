@@ -56,6 +56,7 @@ export const TRACKINGS: { key: NonNullable<TypographySettings['tracking']>; labe
 ];
 
 const BUILT_IN_DEFAULTS: Required<TypographySettings> = {
+  font: 'default',
   scale: 'standard',
   weight: 'bold',
   bodyFont: 'geist',
@@ -66,18 +67,27 @@ const BUILT_IN_DEFAULTS: Required<TypographySettings> = {
  * fallback into one resolved value per axis — slide wins, then project,
  * then the built-in. Also returns the actual CSS values (multiplier, weight
  * number, CSS var, letter-spacing) each key resolves to, so callers don't
- * need to re-look those up themselves. */
+ * need to re-look those up themselves.
+ *
+ * `font` is the one axis whose project-level default lives outside this
+ * settings object — it's `project.fontFamily`, a field of its own predating
+ * TypographySettings, with its own DB column. Callers fold it in as
+ * `project.font` before calling (see SlideRenderer), so it still resolves
+ * through the same slide-wins-then-project-then-built-in chain as the rest. */
 export function resolveTypography(project: TypographySettings | undefined, slideOverride: TypographySettings | undefined) {
+  const font = slideOverride?.font ?? project?.font ?? BUILT_IN_DEFAULTS.font;
   const scale = slideOverride?.scale ?? project?.scale ?? BUILT_IN_DEFAULTS.scale;
   const weight = slideOverride?.weight ?? project?.weight ?? BUILT_IN_DEFAULTS.weight;
   const bodyFont = slideOverride?.bodyFont ?? project?.bodyFont ?? BUILT_IN_DEFAULTS.bodyFont;
   const tracking = slideOverride?.tracking ?? project?.tracking ?? BUILT_IN_DEFAULTS.tracking;
 
   return {
+    font,
     scale,
     weight,
     bodyFont,
     tracking,
+    fontVar: resolveFontVar(font),
     scaleMultiplier: TYPE_SCALES.find((s) => s.key === scale)!.multiplier,
     weightValue: HEADLINE_WEIGHTS.find((w) => w.key === weight)!.value,
     bodyFontVar: BODY_FONTS.find((b) => b.key === bodyFont)!.cssVar,

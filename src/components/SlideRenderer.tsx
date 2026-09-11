@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { EditableText } from './EditableText';
 import { useEditorStore } from '@/lib/editorStore';
 import { tintWithWhite } from '@/lib/color';
-import { resolveFontVar, resolveTypography, headlineStyle } from '@/lib/fonts';
+import { resolveTypography, headlineStyle } from '@/lib/fonts';
 import { dataUrlBytes, fileToDataUrl, fileToSlideImage } from '@/lib/imageFile';
 import {
   centroidOf,
@@ -1240,9 +1240,13 @@ function TwoContent({ slide, editable }: SlideRendererProps) {
 export function SlideRenderer({ slide, editable, animate = false }: SlideRendererProps) {
   const updateField = useEditorStore((s) => s.updateField);
   const accentColor = useEditorStore((s) => s.project?.accentColor) ?? DEFAULT_ACCENT;
-  const fontVar = resolveFontVar(useEditorStore((s) => s.project?.fontFamily));
+  const projectFontFamily = useEditorStore((s) => s.project?.fontFamily);
   const projectTypography = useEditorStore((s) => s.project?.typography);
-  const typography = resolveTypography(projectTypography, slide.typographyOverride);
+  // font's own project-level default is `project.fontFamily`, a field of its
+  // own predating TypographySettings (see resolveTypography in fonts.ts) —
+  // folded in here so a slide's typographyOverride.font still resolves
+  // through the same slide-then-project-then-built-in chain as the rest.
+  const typography = resolveTypography({ ...projectTypography, font: projectFontFamily }, slide.typographyOverride);
   const dark = slide.style === 'section-starter' || slide.style === 'design';
 
   const entry = slide.animation?.entry ?? 'none';
@@ -1267,7 +1271,7 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
           // trick as the accent vars above. It's a live CSS var reference, not a
           // static substitution, so this keeps resolving correctly however many
           // var() layers of indirection sit in between.
-          '--font-archivo': fontVar,
+          '--font-archivo': typography.fontVar,
           // Body text never sets an explicit font-family (it just inherits the
           // theme's --font-sans default), so overriding --font-geist-sans here
           // reaches every kicker, description and caption below the same way

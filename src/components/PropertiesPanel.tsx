@@ -67,7 +67,6 @@ export function PropertiesPanel() {
   const changeStyle = useEditorStore((s) => s.changeStyle);
   const setBrandOverride = useEditorStore((s) => s.setBrandOverride);
   const setAccentColor = useEditorStore((s) => s.setAccentColor);
-  const setFontFamily = useEditorStore((s) => s.setFontFamily);
   const setSlideTypographyOverride = useEditorStore((s) => s.setSlideTypographyOverride);
   const setLinkedSlideIds = useEditorStore((s) => s.setLinkedSlideIds);
 
@@ -197,12 +196,24 @@ export function PropertiesPanel() {
           <IconType className="h-3.5 w-3.5" /> Typography
         </h4>
         <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setSlideTypographyOverride({ font: undefined })}
+            title="Inherit the project's own headline face"
+            className={`flex flex-col items-center gap-1 rounded-md border px-3 py-1.5 transition ${
+              slide.typographyOverride?.font === undefined
+                ? 'border-[#0b72c2] bg-[#e8f2fb] text-[#0b72c2]'
+                : 'border-slate-200 text-slate-600 hover:border-slate-300'
+            }`}
+          >
+            <span className="text-lg leading-none text-slate-300">—</span>
+            <span className="text-[10px] font-medium">Default</span>
+          </button>
           {FONT_PAIRINGS.map((f) => {
-            const selected = (project?.fontFamily ?? 'default') === f.key;
+            const selected = slide.typographyOverride?.font === f.key;
             return (
               <button
                 key={f.key}
-                onClick={() => setFontFamily(f.key === 'default' ? undefined : f.key)}
+                onClick={() => setSlideTypographyOverride({ font: f.key })}
                 title={f.label}
                 className={`flex flex-col items-center gap-1 rounded-md border px-3 py-1.5 transition ${
                   selected ? 'border-[#0b72c2] bg-[#e8f2fb] text-[#0b72c2]' : 'border-slate-200 text-slate-600 hover:border-slate-300'

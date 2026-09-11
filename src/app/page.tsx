@@ -83,6 +83,9 @@ export default function HomePage() {
               Presenta<span className="tracking-normal">.</span>
             </div>
             <p className="mb-1 text-lg font-medium text-white/90">An Interactive Presentation Platform</p>
+            <p className="mb-3 max-w-md text-sm leading-relaxed text-white/70">
+              Bringing clarity to every decision. Creating spaces that work, inspire and endure.
+            </p>
             <p className="mb-14 text-sm text-white/60">Powered by Officebanao</p>
 
             <button

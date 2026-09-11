@@ -62,6 +62,7 @@ export function PropertiesPanel() {
             <button
               key={k}
               onClick={() => changeLayout(k)}
+              title="Clears this slide's fields to match"
               className={`rounded-md border px-2.5 py-1.5 text-xs font-medium transition ${
                 slide.layout === k && slide.style === 'standard'
                   ? 'border-[#0b72c2] bg-[#e8f2fb] text-[#0b72c2]'
@@ -72,7 +73,6 @@ export function PropertiesPanel() {
             </button>
           ))}
         </div>
-        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">Clears this slide&apos;s fields to match.</p>
       </div>
 
       <div className="mb-2 border-t border-slate-100 pt-6">
@@ -93,9 +93,6 @@ export function PropertiesPanel() {
             );
           })}
         </div>
-        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
-          Project default: <span className="font-semibold text-slate-500">{project?.brand === 'both' ? 'Both' : project?.brand?.toUpperCase() ?? 'OB'}</span> — override for this slide only.
-        </p>
       </div>
 
       <div className="mb-2 border-t border-slate-100 pt-6">
@@ -109,7 +106,11 @@ export function PropertiesPanel() {
             {linkTargets.map((target) => {
               const on = linkedIds.includes(target.id);
               return (
-                <label key={target.id} className="flex cursor-pointer items-center gap-2">
+                <label
+                  key={target.id}
+                  className="flex cursor-pointer items-center gap-2"
+                  title="Shows as a chip on this slide — click it in Presenter to jump there"
+                >
                   <input
                     type="checkbox"
                     checked={on}
@@ -127,15 +128,11 @@ export function PropertiesPanel() {
             })}
           </div>
         )}
-        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
-          Shows as a chip — click it in Presenter to jump there.
-        </p>
       </div>
 
       <div className="mb-2 border-t border-slate-100 pt-6">
         <h4 className="mb-2.5 text-xs font-bold uppercase tracking-wide text-slate-400">Accent Colour</h4>
         <AccentPicker logo={project?.clientLogo} value={project?.accentColor} onChange={setAccentColor} tone="panel" />
-        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">Applies deck-wide, not per slide.</p>
       </div>
     </aside>
   );

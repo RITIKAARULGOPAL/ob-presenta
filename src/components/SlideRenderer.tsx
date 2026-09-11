@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { EditableText } from './EditableText';
 import { useEditorStore } from '@/lib/editorStore';
 import { tintWithWhite } from '@/lib/color';
+import { resolveFontVar } from '@/lib/fonts';
 import { dataUrlBytes, fileToDataUrl, fileToSlideImage } from '@/lib/imageFile';
 import {
   centroidOf,
@@ -1238,6 +1239,7 @@ function TwoContent({ slide, editable }: SlideRendererProps) {
 export function SlideRenderer({ slide, editable, animate = false }: SlideRendererProps) {
   const updateField = useEditorStore((s) => s.updateField);
   const accentColor = useEditorStore((s) => s.project?.accentColor) ?? DEFAULT_ACCENT;
+  const fontVar = resolveFontVar(useEditorStore((s) => s.project?.fontFamily));
   const dark = slide.style === 'section-starter' || slide.style === 'design';
 
   const entry = slide.animation?.entry ?? 'none';
@@ -1255,6 +1257,14 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
           '--accent': accentColor,
           '--accent-soft': tintWithWhite(accentColor, 0.9),
           '--accent-soft-line': tintWithWhite(accentColor, 0.78),
+          // Tailwind's font-display utility resolves --font-display, which
+          // globals.css points at --font-archivo — redeclaring it here, at the
+          // slide's own scope, is what lets a project's font choice reach every
+          // font-display element below without touching each component, same
+          // trick as the accent vars above. It's a live CSS var reference, not a
+          // static substitution, so this keeps resolving correctly however many
+          // var() layers of indirection sit in between.
+          '--font-archivo': fontVar,
           '--ink': '#141a2b',
           '--ink-2': '#525a72',
           '--ink-3': '#848da6',

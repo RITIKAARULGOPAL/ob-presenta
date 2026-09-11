@@ -114,6 +114,9 @@ export interface SlideAnimation {
  * (Officebanao) the child — 'both' covers projects the two do jointly. */
 export type Brand = 'skv' | 'ob' | 'both';
 
+/** A deck-wide headline face — see src/lib/fonts.ts for what each resolves to. */
+export type FontPairing = 'default' | 'editorial' | 'structural' | 'classic';
+
 export interface Slide {
   id: string;
   layout: SlideLayout;
@@ -140,6 +143,8 @@ export interface Project {
   clientLogo?: string;
   /** Hex accent for the whole deck, usually pulled from the client logo. */
   accentColor?: string;
+  /** Headline face for the whole deck. Undefined means Studio (Archivo). */
+  fontFamily?: FontPairing;
   slides: Slide[];
   createdAt: number;
   updatedAt: number;

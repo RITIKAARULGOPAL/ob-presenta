@@ -3,7 +3,8 @@
 import { useEditorStore } from '@/lib/editorStore';
 import { AccentPicker } from './AccentPicker';
 import { LAYOUT_LABELS, STYLE_LABELS } from '@/lib/slideDefaults';
-import { IconLayers, IconGrid, IconImage, IconLink, IconDroplet } from './icons';
+import { FONT_PAIRINGS } from '@/lib/fonts';
+import { IconLayers, IconGrid, IconImage, IconLink, IconDroplet, IconType } from './icons';
 import type { Brand, SlideLayout, SlideStyleKind } from '@/types/slide';
 
 const LAYOUTS = Object.keys(LAYOUT_LABELS) as SlideLayout[];
@@ -23,6 +24,7 @@ export function PropertiesPanel() {
   const changeStyle = useEditorStore((s) => s.changeStyle);
   const setBrandOverride = useEditorStore((s) => s.setBrandOverride);
   const setAccentColor = useEditorStore((s) => s.setAccentColor);
+  const setFontFamily = useEditorStore((s) => s.setFontFamily);
   const setLinkedSlideIds = useEditorStore((s) => s.setLinkedSlideIds);
 
   const linkedIds = slide?.fields.linkedSlideIds ?? [];
@@ -144,6 +146,32 @@ export function PropertiesPanel() {
           <IconDroplet className="h-3.5 w-3.5" /> Accent Colour
         </h4>
         <AccentPicker logo={project?.clientLogo} value={project?.accentColor} onChange={setAccentColor} tone="panel" />
+      </div>
+
+      <div className="mb-2 border-t border-slate-100 pt-6">
+        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+          <IconType className="h-3.5 w-3.5" /> Typography
+        </h4>
+        <div className="flex flex-wrap gap-2">
+          {FONT_PAIRINGS.map((f) => {
+            const selected = (project?.fontFamily ?? 'default') === f.key;
+            return (
+              <button
+                key={f.key}
+                onClick={() => setFontFamily(f.key === 'default' ? undefined : f.key)}
+                title={f.label}
+                className={`flex flex-col items-center gap-1 rounded-md border px-3 py-1.5 transition ${
+                  selected ? 'border-[#0b72c2] bg-[#e8f2fb] text-[#0b72c2]' : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                <span style={{ fontFamily: f.cssVar }} className="text-lg font-bold leading-none">
+                  {f.sample}
+                </span>
+                <span className="text-[10px] font-medium">{f.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </aside>
   );

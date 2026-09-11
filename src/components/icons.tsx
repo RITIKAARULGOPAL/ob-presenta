@@ -39,6 +39,15 @@ export function IconGrid(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Typography — a capital T, for the deck's headline face. */
+export function IconType(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="M4 6h16M12 6v13" />
+    </Base>
+  );
+}
+
 /** Logo & Copyright — a picture frame, for the client/OB logo mark. */
 export function IconImage(props: SVGProps<SVGSVGElement>) {
   return (

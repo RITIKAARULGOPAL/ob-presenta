@@ -1,7 +1,7 @@
 import { makeId } from './id';
 import { createSlide } from './slideDefaults';
 import { supabase } from './supabaseClient';
-import type { Brand, Project, ProjectSummary } from '@/types/slide';
+import type { Brand, FontPairing, Project, ProjectSummary } from '@/types/slide';
 
 // ---------------------------------------------------------------------------
 // Data layer — backed by Supabase Postgres. This is the only file that talks
@@ -19,6 +19,7 @@ interface ProjectRow {
   brand: Brand;
   client_logo: string | null;
   accent_color: string | null;
+  font_family: FontPairing | null;
   slides: Project['slides'];
   created_at: number;
   updated_at: number;
@@ -34,6 +35,7 @@ function fromRow(row: ProjectRow): Project {
     brand: row.brand ?? 'ob',
     clientLogo: row.client_logo ?? undefined,
     accentColor: row.accent_color ?? undefined,
+    fontFamily: row.font_family ?? undefined,
     slides: row.slides,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -58,12 +60,12 @@ export async function listProjects(): Promise<ProjectSummary[]> {
   }));
 }
 
-/** Columns added by migration 0003. When that migration hasn't been applied to
- * the target database, Postgres rejects the entire write with 42703 rather than
- * ignoring the unknown columns — which silently broke every create and every
- * save. We retry once without them, so the deck still works and only the logo
- * and accent colour fail to stick. */
-const OPTIONAL_COLUMNS = ['client_logo', 'accent_color'] as const;
+/** Columns added by migrations 0003 and 0004. When a migration hasn't been
+ * applied to the target database, Postgres rejects the entire write with
+ * 42703 rather than ignoring the unknown columns — which silently broke every
+ * create and every save. We retry once without them, so the deck still works
+ * and only the newer fields (logo, accent colour, font) fail to stick. */
+const OPTIONAL_COLUMNS = ['client_logo', 'accent_color', 'font_family'] as const;
 
 /** An unknown column surfaces under two different codes depending on who
  * catches it: PostgREST rejects writes against its own schema cache before
@@ -87,8 +89,9 @@ function warnOnce() {
   if (missingOptionalColumns) return;
   missingOptionalColumns = true;
   console.warn(
-    'Presenta: migration 0003_add_client_logo.sql has not been applied, so the ' +
-      'client logo and accent colour cannot be saved. Everything else works.',
+    'Presenta: migration 0003_add_client_logo.sql and/or 0004_add_font_family.sql ' +
+      'have not been applied, so the client logo, accent colour and/or font choice ' +
+      'cannot be saved. Everything else works.',
   );
 }
 
@@ -105,10 +108,14 @@ export async function getProject(id: string): Promise<Project | null> {
     return null;
   }
   if (!data) return null;
-  // select('*') returns only the columns that exist, so a row missing these
-  // keys tells us migration 0003 is absent without spending another request —
-  // and lets the editor warn on load rather than after the first failed save.
-  if (!(OPTIONAL_COLUMNS[0] in (data as Record<string, unknown>))) warnOnce();
+  // select('*') returns only the columns that exist, so a row missing any of
+  // these keys tells us a migration is absent without spending another
+  // request — and lets the editor warn on load rather than after the first
+  // failed save. Checking all of them (not just the first) matters once
+  // migrations can land independently: 0003 applied without 0004 would
+  // otherwise read as "nothing missing" and hide the font column gap.
+  const row = data as Record<string, unknown>;
+  if (OPTIONAL_COLUMNS.some((c) => !(c in row))) warnOnce();
   return fromRow(data as ProjectRow);
 }
 
@@ -120,6 +127,7 @@ export async function createProject(input: {
   brand: Brand;
   clientLogo?: string;
   accentColor?: string;
+  fontFamily?: FontPairing;
 }): Promise<Project> {
   const now = Date.now();
   const project: Project = {
@@ -131,6 +139,7 @@ export async function createProject(input: {
     brand: input.brand,
     clientLogo: input.clientLogo,
     accentColor: input.accentColor,
+    fontFamily: input.fontFamily,
     slides: [createSlide('title-slide')],
     createdAt: now,
     updatedAt: now,
@@ -144,6 +153,7 @@ export async function createProject(input: {
     brand: project.brand,
     client_logo: project.clientLogo ?? null,
     accent_color: project.accentColor ?? null,
+    font_family: project.fontFamily ?? null,
     slides: project.slides,
     created_at: project.createdAt,
     updated_at: project.updatedAt,
@@ -170,6 +180,7 @@ export async function saveProject(project: Project): Promise<void> {
     brand: project.brand,
     client_logo: project.clientLogo ?? null,
     accent_color: project.accentColor ?? null,
+    font_family: project.fontFamily ?? null,
     slides: project.slides,
     updated_at: updatedAt,
   };

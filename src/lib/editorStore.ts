@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { createSlide, createStyledSlide, defaultFieldsForLayout, defaultFieldsForStyle } from './slideDefaults';
 import { optionalColumnsMissing, saveProject } from './data';
 import { makeId } from './id';
-import type { Brand, Project, Slide, SlideFields, SlideLayout, SlideStyleKind } from '@/types/slide';
+import type { Brand, FontPairing, Project, Slide, SlideFields, SlideLayout, SlideStyleKind } from '@/types/slide';
 
 type Mode = 'editor' | 'presenter';
 
@@ -32,6 +32,7 @@ interface EditorState {
   setBrandOverride: (brand: Brand | undefined) => void;
   setClientLogo: (dataUrl: string | undefined) => void;
   setAccentColor: (hex: string | undefined) => void;
+  setFontFamily: (font: FontPairing | undefined) => void;
   setLinkedSlideIds: (ids: string[]) => void;
 
   addStatItem: () => void;
@@ -260,6 +261,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { project } = get();
     if (!project) return;
     const next = { ...project, accentColor: hex };
+    set({ project: next });
+    persist(next);
+  },
+
+  setFontFamily: (font) => {
+    const { project } = get();
+    if (!project) return;
+    const next = { ...project, fontFamily: font };
     set({ project: next });
     persist(next);
   },

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createProject, deleteProject, listProjects } from '@/lib/data';
 import { fileToDataUrl } from '@/lib/imageFile';
 import { AccentPicker } from '@/components/AccentPicker';
+import { IconTrash } from '@/components/icons';
 import type { Brand, ProjectSummary } from '@/types/slide';
 
 const BRAND_CHOICES: { key: Brand; label: string; hint: string }[] = [
@@ -117,9 +118,9 @@ export default function HomePage() {
                     </span>
                   </button>
                   {confirmDeleteId === p.id ? (
-                    <span className="flex flex-shrink-0 items-center gap-2 text-xs font-semibold">
-                      <button onClick={() => handleDelete(p.id)} className="text-red-400 hover:text-red-300">
-                        Delete
+                    <span className="flex flex-shrink-0 items-center gap-3 text-xs font-semibold">
+                      <button onClick={() => handleDelete(p.id)} className="flex items-center gap-1.5 text-red-400 hover:text-red-300">
+                        <IconTrash className="h-3.5 w-3.5" /> Delete
                       </button>
                       <button onClick={() => setConfirmDeleteId(null)} className="text-white/50 hover:text-white/80">
                         Cancel
@@ -129,10 +130,11 @@ export default function HomePage() {
                     <>
                       <button
                         onClick={() => setConfirmDeleteId(p.id)}
-                        className="flex-shrink-0 text-xs font-semibold text-white/40 hover:text-red-400"
+                        className="flex-shrink-0 text-white/40 hover:text-red-400"
                         aria-label={`Delete ${p.name}`}
+                        title={`Delete ${p.name}`}
                       >
-                        Delete
+                        <IconTrash className="h-4 w-4" />
                       </button>
                       <button onClick={() => router.push(`/p/${p.id}/edit`)} className="flex-shrink-0 text-xs font-semibold text-white/60 hover:text-white">
                         Open →

@@ -3,6 +3,7 @@
 import { useEditorStore } from '@/lib/editorStore';
 import { AccentPicker } from './AccentPicker';
 import { LAYOUT_LABELS, STYLE_LABELS } from '@/lib/slideDefaults';
+import { IconLayers, IconGrid, IconImage, IconLink, IconDroplet } from './icons';
 import type { Brand, SlideLayout, SlideStyleKind } from '@/types/slide';
 
 const LAYOUTS = Object.keys(LAYOUT_LABELS) as SlideLayout[];
@@ -39,7 +40,9 @@ export function PropertiesPanel() {
       <div className="mb-6 font-display text-base font-bold text-slate-900">Properties</div>
 
       <div className="mb-6">
-        <h4 className="mb-2.5 text-xs font-bold uppercase tracking-wide text-slate-400">Slide Style</h4>
+        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+          <IconLayers className="h-3.5 w-3.5" /> Slide Style
+        </h4>
         <div className="flex flex-wrap gap-2">
           {STYLES.map((k) => (
             <button
@@ -56,7 +59,9 @@ export function PropertiesPanel() {
       </div>
 
       <div className="mb-2 border-t border-slate-100 pt-6">
-        <h4 className="mb-2.5 text-xs font-bold uppercase tracking-wide text-slate-400">Slide Layout</h4>
+        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+          <IconGrid className="h-3.5 w-3.5" /> Slide Layout
+        </h4>
         <div className="flex flex-wrap gap-2">
           {LAYOUTS.map((k) => (
             <button
@@ -76,7 +81,9 @@ export function PropertiesPanel() {
       </div>
 
       <div className="mb-2 border-t border-slate-100 pt-6">
-        <h4 className="mb-2.5 text-xs font-bold uppercase tracking-wide text-slate-400">Logo &amp; Copyright</h4>
+        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+          <IconImage className="h-3.5 w-3.5" /> Logo &amp; Copyright
+        </h4>
         <div className="flex flex-wrap gap-2">
           {BRAND_OPTIONS.map((o) => {
             const selected = o.key === 'default' ? slide.brandOverride === undefined : slide.brandOverride === o.key;
@@ -96,7 +103,9 @@ export function PropertiesPanel() {
       </div>
 
       <div className="mb-2 border-t border-slate-100 pt-6">
-        <h4 className="mb-2.5 text-xs font-bold uppercase tracking-wide text-slate-400">Linked Slides</h4>
+        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+          <IconLink className="h-3.5 w-3.5" /> Linked Slides
+        </h4>
         {linkTargets.length === 0 ? (
           <p className="text-[11px] leading-relaxed text-slate-400">
             Add a Linked Views or Design slide to link one here.
@@ -131,7 +140,9 @@ export function PropertiesPanel() {
       </div>
 
       <div className="mb-2 border-t border-slate-100 pt-6">
-        <h4 className="mb-2.5 text-xs font-bold uppercase tracking-wide text-slate-400">Accent Colour</h4>
+        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+          <IconDroplet className="h-3.5 w-3.5" /> Accent Colour
+        </h4>
         <AccentPicker logo={project?.clientLogo} value={project?.accentColor} onChange={setAccentColor} tone="panel" />
       </div>
     </aside>

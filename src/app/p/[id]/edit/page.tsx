@@ -10,6 +10,7 @@ import { SlideRenderer } from '@/components/SlideRenderer';
 import { PropertiesPanel } from '@/components/PropertiesPanel';
 import { ConceptLibraryDropdown } from '@/components/ConceptLibraryDropdown';
 import { exportToPdf, exportToPptx } from '@/lib/exportDeck';
+import { IconBulb, IconTextBlock, IconStar, IconBars, IconLink, IconFile, IconScreen } from '@/components/icons';
 
 export default function EditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -104,45 +105,45 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                     setShowConceptPicker(true);
                     setShowAddMenu(false);
                   }}
-                  className="mb-1 block w-full rounded-md border-b border-slate-100 px-3 py-2 text-left text-xs font-semibold text-[#0b72c2] hover:bg-slate-50"
+                  className="mb-1 flex w-full items-center gap-2 rounded-md border-b border-slate-100 px-3 py-2 text-left text-xs font-semibold text-[#0b72c2] hover:bg-slate-50"
                 >
-                  Concept library…
+                  <IconBulb className="h-3.5 w-3.5 flex-shrink-0" /> Concept library…
                 </button>
                 <button
                   onClick={() => {
                     addSlide('title-content');
                     setShowAddMenu(false);
                   }}
-                  className="block w-full rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
                 >
-                  Title + Content
+                  <IconTextBlock className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" /> Title + Content
                 </button>
                 <button
                   onClick={() => {
                     addSlide('merge-diagram');
                     setShowAddMenu(false);
                   }}
-                  className="block w-full rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
                 >
-                  Merge Diagram
+                  <IconStar className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" /> Merge Diagram
                 </button>
                 <button
                   onClick={() => {
                     addSlide('stat-hero');
                     setShowAddMenu(false);
                   }}
-                  className="block w-full rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
                 >
-                  Stat Hero
+                  <IconBars className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" /> Stat Hero
                 </button>
                 <button
                   onClick={() => {
                     addSlide('linked-views');
                     setShowAddMenu(false);
                   }}
-                  className="block w-full rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
                 >
-                  Linked Views
+                  <IconLink className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" /> Linked Views
                 </button>
               </div>
             )}
@@ -156,18 +157,18 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               {exportStatus ? exportStatus : '⬇ Export'}
             </button>
             {showExportMenu && !exportStatus && (
-              <div className="absolute right-0 top-10 z-10 w-36 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
+              <div className="absolute right-0 top-10 z-10 w-40 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
                 <button
                   onClick={() => handleExport('pdf')}
-                  className="block w-full rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
                 >
-                  Export as PDF
+                  <IconFile className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" /> Export as PDF
                 </button>
                 <button
                   onClick={() => handleExport('pptx')}
-                  className="block w-full rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
                 >
-                  Export as PPTX
+                  <IconScreen className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" /> Export as PPTX
                 </button>
               </div>
             )}

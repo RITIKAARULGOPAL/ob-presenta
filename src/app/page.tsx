@@ -150,7 +150,7 @@ export default function HomePage() {
             </button>
             <div className="text-xs font-bold uppercase tracking-wider text-[#0b72c2]">Presenta · New Presentation</div>
             <h1 className="mt-2 font-display text-2xl font-bold">Set up this presentation</h1>
-            <p className="mt-2 text-sm text-slate-500">These details personalise the deck — fill them in, then create the file. Opens straight into the Editor.</p>
+            <p className="mt-2 text-sm text-slate-500">Personalises the deck, then opens straight into the editor.</p>
             <form onSubmit={handleCreate} className="mt-6 flex flex-col gap-4">
               <label className="block">
                 <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Project name</span>
@@ -208,7 +208,7 @@ export default function HomePage() {
                     </button>
                   ))}
                 </div>
-                <span className="mt-1.5 block text-[11px] text-slate-400">Sets the logo and copyright line on every slide — changeable per slide later.</span>
+                <span className="mt-1.5 block text-[11px] text-slate-400">Sets the logo and copyright on every slide — editable per slide later.</span>
               </div>
               <div className="block">
                 <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Client logo (optional)</span>

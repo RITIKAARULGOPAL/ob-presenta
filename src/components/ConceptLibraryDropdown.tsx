@@ -135,7 +135,7 @@ export function ConceptLibraryDropdown({ onClose }: { onClose: () => void }) {
               </span>
             </div>
             <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
-              {pillar.question} Click a layout to add it — the text is a scaffold to rewrite.
+              {pillar.question} Click a layout to add it — a scaffold to rewrite.
             </p>
           </div>
 

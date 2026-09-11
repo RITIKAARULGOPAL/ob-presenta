@@ -53,7 +53,6 @@ export function PropertiesPanel() {
             </button>
           ))}
         </div>
-        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">A purpose-built preset with its own background.</p>
       </div>
 
       <div className="mb-2 border-t border-slate-100 pt-6">
@@ -73,7 +72,7 @@ export function PropertiesPanel() {
             </button>
           ))}
         </div>
-        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">Switches this slide to that structure and clears its fields — the words are yours to write. Ready-made copy comes from the concept library.</p>
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">Clears this slide&apos;s fields to match.</p>
       </div>
 
       <div className="mb-2 border-t border-slate-100 pt-6">
@@ -95,7 +94,7 @@ export function PropertiesPanel() {
           })}
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
-          This project defaults to <span className="font-semibold text-slate-500">{project?.brand === 'both' ? 'Both' : project?.brand?.toUpperCase() ?? 'OB'}</span> — override it for just this slide if needed.
+          Project default: <span className="font-semibold text-slate-500">{project?.brand === 'both' ? 'Both' : project?.brand?.toUpperCase() ?? 'OB'}</span> — override for this slide only.
         </p>
       </div>
 
@@ -103,7 +102,7 @@ export function PropertiesPanel() {
         <h4 className="mb-2.5 text-xs font-bold uppercase tracking-wide text-slate-400">Linked Slides</h4>
         {linkTargets.length === 0 ? (
           <p className="text-[11px] leading-relaxed text-slate-400">
-            Nothing to link to yet — add a Linked Views or Design slide and it&apos;ll appear here.
+            Add a Linked Views or Design slide to link one here.
           </p>
         ) : (
           <div className="flex flex-col gap-1.5">
@@ -129,14 +128,14 @@ export function PropertiesPanel() {
           </div>
         )}
         <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
-          Shown as chips on this slide — click one in Presenter to jump straight to that plan or render.
+          Shows as a chip — click it in Presenter to jump there.
         </p>
       </div>
 
       <div className="mb-2 border-t border-slate-100 pt-6">
         <h4 className="mb-2.5 text-xs font-bold uppercase tracking-wide text-slate-400">Accent Colour</h4>
         <AccentPicker logo={project?.clientLogo} value={project?.accentColor} onChange={setAccentColor} tone="panel" />
-        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">Applies to the whole deck, not just this slide.</p>
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">Applies deck-wide, not per slide.</p>
       </div>
     </aside>
   );

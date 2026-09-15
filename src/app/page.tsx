@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createProject, deleteProject, listProjects } from '@/lib/data';
 import { fileToDataUrl } from '@/lib/imageFile';
+import { useEditorStore } from '@/lib/editorStore';
 import { AccentPicker } from '@/components/AccentPicker';
 import { IconTrash } from '@/components/icons';
 import type { Brand, ProjectSummary } from '@/types/slide';
@@ -42,6 +43,10 @@ export default function HomePage() {
     setError('');
     try {
       const project = await createProject({ name: name.trim(), client: client.trim(), preparedBy: preparedBy.trim(), date, brand, clientLogo, accentColor });
+      // Preload the in-memory project (with the logo/accent we just picked) so the
+      // editor's first render matches this form — its own fetch may come back
+      // without them if the optional columns aren't in the database yet.
+      useEditorStore.getState().loadProject(project);
       router.push(`/p/${project.id}/edit`);
     } catch (err) {
       // Navigating on a failed insert is what produced the dead

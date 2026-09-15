@@ -7,6 +7,7 @@ import { getProject, optionalColumnsMissing } from '@/lib/data';
 import { useEditorStore } from '@/lib/editorStore';
 import { SlideRail } from '@/components/SlideRail';
 import { SlideRenderer } from '@/components/SlideRenderer';
+import { ScaledStage } from '@/components/ScaledStage';
 import { PropertiesPanel } from '@/components/PropertiesPanel';
 import { ConceptLibraryDropdown } from '@/components/ConceptLibraryDropdown';
 import { exportToPdf, exportToPptx } from '@/lib/exportDeck';
@@ -29,6 +30,14 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const logoSaveUnavailable = useEditorStore((s) => s.logoSaveUnavailable);
 
   useEffect(() => {
+    // The home page preloads a just-created project straight into the store
+    // (see page.tsx) so its logo/accent survive even if the database is
+    // missing the optional columns for them — re-fetching here would
+    // overwrite that in-memory copy with the (possibly stripped) saved row.
+    if (useEditorStore.getState().project?.id === id) {
+      useEditorStore.setState({ logoSaveUnavailable: optionalColumnsMissing() });
+      return;
+    }
     getProject(id).then((p) => {
       if (p) {
         loadProject(p);
@@ -184,10 +193,10 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
       <div className="flex min-h-0 flex-1">
         <SlideRail />
-        <main className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-8">
-          <div className="aspect-video max-h-full w-full max-w-5xl overflow-y-auto rounded-lg bg-white shadow-lg ring-1 ring-slate-200">
+        <main className="min-h-0 flex-1 p-8">
+          <ScaledStage stageClassName="overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-slate-200">
             {currentSlide && <SlideRenderer slide={currentSlide} editable animate />}
-          </div>
+          </ScaledStage>
         </main>
         <PropertiesPanel />
       </div>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { contrastRatio, extractAccentColors, shadeWithBlack } from '@/lib/color';
 
-const DEFAULT_ACCENT = '#0b72c2';
+const DEFAULT_ACCENT = '#000000';
 
 /** Offers accent colours pulled out of a logo, plus a manual colour input.
  * Used both when setting a project up and later from the editor, so the two

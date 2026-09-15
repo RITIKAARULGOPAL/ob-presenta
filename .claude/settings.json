@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -z \"$(git status --porcelain 2>/dev/null)\" ]; then exit 0; fi; { echo '--- auto-logged '\"$(date '+%Y-%m-%d %H:%M')\"' ---'; echo 'Changed files:'; git status --porcelain; echo; echo 'Diff stat:'; git diff --stat HEAD 2>/dev/null; echo; echo 'Recent commits:'; git log --oneline -5; echo; } >> PROGRESS.md.pending",
+            "timeout": 15,
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}

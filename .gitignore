@@ -43,6 +43,15 @@ next-env.d.ts
 # supabase cli scratch
 /supabase/.temp/
 
+# Claude Code local settings — personal permission approvals with
+# machine-specific paths baked in; .claude/launch.json (the shared dev-server
+# config) is deliberately not listed here and should stay committed.
+/.claude/settings.local.json
+
+# Diagnostic output from the SessionEnd progress-log hook (see
+# .claude/settings.json) — local debugging only, not meant to be shared.
+/.claude/progress-hook.log
+
 # Paused AI-import feature. These import pdfjs-dist, which is deliberately not
 # in package.json while the feature is on hold — so they compile locally off a
 # stale node_modules but fail a clean Vercel build. `git add -A` swept them in

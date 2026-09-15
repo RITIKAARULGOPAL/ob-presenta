@@ -61,6 +61,29 @@ export interface LinkedView {
   label: string;
   url: string;
   hotspots?: ViewHotspot[];
+  /** How this view's own image sits inside its frame — zoom/pan/rotate/opacity. */
+  transform?: ImageTransform;
+}
+
+/** How an image sits inside its own frame — the frame itself (position and
+ *  size within the slide layout) is untouched; this only affects what part of
+ *  the picture shows and how. All optional; absent means "as uploaded":
+ *  filling the frame edge to edge, unrotated, fully opaque. Shared by every
+ *  image slot in the deck (slide visuals, linked views, the client logo), so
+ *  editing behaves the same everywhere. */
+export interface ImageTransform {
+  /** How far the image is zoomed in past filling the frame. 1 = exactly fills
+   *  it (today's default behaviour); higher crops in tighter. Never below 1 —
+   *  that would leave gaps at the frame's edges. */
+  zoom?: number;
+  /** Pan offset, each as a fraction of the frame's own width/height — 0 is
+   *  centered. Clamped so the zoomed image can never reveal empty space. */
+  panX?: number;
+  panY?: number;
+  /** Degrees, clockwise, rotates the image in place around the frame's center. */
+  rotation?: number;
+  /** 0–1. */
+  opacity?: number;
 }
 
 export interface SlideFields {
@@ -77,6 +100,8 @@ export interface SlideFields {
   statLabel?: string;
   caption?: string;
   imageUrl?: string;
+  /** How the image at imageUrl sits inside its frame — see ImageTransform. */
+  imageTransform?: ImageTransform;
   subtitle?: string;
   numeral?: string;
   /** Concept layout: one-line essence under the title. */
@@ -163,6 +188,8 @@ export interface Project {
   brand: Brand;
   /** The client's own logo — a downscaled data URL, or any image URL. */
   clientLogo?: string;
+  /** How the client logo sits inside its own frame — see ImageTransform. */
+  clientLogoTransform?: ImageTransform;
   /** Hex accent for the whole deck, usually pulled from the client logo. */
   accentColor?: string;
   /** Headline face for the whole deck. Undefined means Studio (Archivo). */

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { createSlide, createStyledSlide, defaultFieldsForLayout, defaultFieldsForStyle } from './slideDefaults';
 import { optionalColumnsMissing, saveProject } from './data';
 import { makeId } from './id';
-import type { Brand, FontPairing, Project, Slide, SlideFields, SlideLayout, SlideStyleKind, TypographySettings } from '@/types/slide';
+import type { Brand, FontPairing, ImageTransform, Project, Slide, SlideFields, SlideLayout, SlideStyleKind, TypographySettings } from '@/types/slide';
 
 type Mode = 'editor' | 'presenter';
 
@@ -31,6 +31,7 @@ interface EditorState {
   changeStyle: (style: SlideStyleKind) => void;
   setBrandOverride: (brand: Brand | undefined) => void;
   setClientLogo: (dataUrl: string | undefined) => void;
+  setClientLogoTransform: (transform: ImageTransform | undefined) => void;
   setAccentColor: (hex: string | undefined) => void;
   setFontFamily: (font: FontPairing | undefined) => void;
   /** Merges into the project's deck-wide typography defaults — pass just the
@@ -260,7 +261,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setClientLogo: (dataUrl) => {
     const { project } = get();
     if (!project) return;
-    const next = { ...project, clientLogo: dataUrl };
+    // A new logo very likely has a different shape than the old one, so a
+    // rotation/zoom picked for the previous file is more likely to look wrong
+    // than right on the replacement.
+    const next = { ...project, clientLogo: dataUrl, clientLogoTransform: undefined };
+    set({ project: next });
+    persist(next);
+  },
+
+  setClientLogoTransform: (transform) => {
+    const { project } = get();
+    if (!project) return;
+    const next = { ...project, clientLogoTransform: transform };
     set({ project: next });
     persist(next);
   },

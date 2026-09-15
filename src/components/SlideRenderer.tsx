@@ -20,8 +20,11 @@ import {
   type ShapeKind,
 } from '@/lib/hotspotShape';
 import { ConceptDiagram } from './ConceptDiagram';
+import { ImageAdjustOverlay } from './ImageAdjustOverlay';
+import { LogoAdjustOverlay } from './LogoAdjustOverlay';
+import { imageStyle } from '@/lib/imageTransform';
 import { makeId } from '@/lib/id';
-import type { Brand, LinkedView, Slide, ViewHotspot } from '@/types/slide';
+import type { Brand, ImageTransform, LinkedView, Slide, ViewHotspot } from '@/types/slide';
 import type { Point } from '@/lib/hotspotShape';
 
 interface SlideRendererProps {
@@ -39,12 +42,23 @@ const ARROW = '→';
 /** Image or video box. Images can be picked from disk or dropped on the box;
  * pasting a URL still works, and is the only option for video — a walkthrough
  * clip as base64 would be tens of megabytes in the row, re-fetched on every
- * deck load. Used for Design slides, Linked-Views tabs and the concept slot. */
+ * deck load. Used for Design slides, Linked-Views tabs and the concept slot.
+ *
+ * An image can also be zoomed, panned, rotated and faded in place — click it
+ * to select it and show the handles, the same way Slides does, rather than
+ * through a separate "Adjust" button; see ImageAdjustOverlay. `allowAdjust`
+ * is turned off inside Linked Views while a hotspot tool is selected, so the
+ * two drag gestures (drawing a hotspot vs. panning the photo) never compete
+ * for the same pointer events, and a plain click there falls through to
+ * placing/drawing a hotspot instead of selecting the photo. */
 function MediaBox({
   url,
   kind,
   editable,
   onChangeUrl,
+  transform,
+  onChangeTransform,
+  allowAdjust = true,
   className,
   mediaRef,
 }: {
@@ -52,14 +66,24 @@ function MediaBox({
   kind: 'image' | 'video';
   editable: boolean;
   onChangeUrl: (url: string) => void;
+  transform?: ImageTransform;
+  onChangeTransform?: (t: ImageTransform | undefined) => void;
+  allowAdjust?: boolean;
   className?: string;
   mediaRef?: React.Ref<HTMLVideoElement>;
 }) {
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [note, setNote] = useState('');
+  const [adjusting, setAdjusting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
   const canUpload = editable && kind === 'image';
+  const canAdjust = canUpload && allowAdjust && !!onChangeTransform;
+
+  useEffect(() => {
+    if (!url) setAdjusting(false);
+  }, [url]);
 
   async function accept(file: File | undefined) {
     if (!file) return;
@@ -72,6 +96,7 @@ function MediaBox({
     try {
       const dataUrl = await fileToSlideImage(file);
       onChangeUrl(dataUrl);
+      onChangeTransform?.(undefined);
       const kb = Math.round(dataUrlBytes(dataUrl) / 1024);
       // Worth saying out loud: this lands in the project row, not a bucket.
       setNote(kb > 700 ? `Added — ${kb}KB, which is heavy for one slide.` : `Added — ${kb}KB.`);
@@ -84,97 +109,118 @@ function MediaBox({
   }
 
   return (
-    <div
-      className={`relative overflow-hidden rounded-lg bg-black/30 ${dragging ? 'ring-2 ring-[var(--accent)]' : ''} ${className ?? ''}`}
-      onDragOver={canUpload ? (e) => { e.preventDefault(); setDragging(true); } : undefined}
-      onDragLeave={canUpload ? () => setDragging(false) : undefined}
-      onDrop={
-        canUpload
-          ? (e) => {
-              // Without preventDefault the browser navigates away to the file.
-              e.preventDefault();
-              setDragging(false);
-              void accept(e.dataTransfer.files?.[0]);
-            }
-          : undefined
-      }
-    >
-      {url ? (
-        kind === 'video' ? (
-          <video ref={mediaRef} src={url} controls className="h-full w-full object-cover" />
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={url} alt="" className="h-full w-full object-cover" />
-        )
-      ) : (
-        <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-white/40">
-          {canUpload ? (
-            <>
-              <span>{dragging ? 'Drop to add' : busy ? 'Reading image…' : 'Drag an image here'}</span>
-              <button
-                onClick={(e) => { e.stopPropagation(); fileRef.current?.click(); }}
-                className="rounded-md border border-dashed border-white/30 px-2.5 py-1 text-xs font-semibold text-white/70 hover:border-white/60 hover:text-white"
-              >
-                Choose a file
-              </button>
-            </>
+    <div className={`relative ${className ?? ''}`}>
+      <div
+        ref={frameRef}
+        className={`relative h-full w-full overflow-hidden rounded-lg bg-black/30 ${dragging ? 'ring-2 ring-[var(--accent)]' : ''} ${
+          canAdjust && url && !adjusting ? 'cursor-pointer' : ''
+        }`}
+        onClick={canAdjust && url && !adjusting ? () => setAdjusting(true) : undefined}
+        onDragOver={canUpload ? (e) => { e.preventDefault(); setDragging(true); } : undefined}
+        onDragLeave={canUpload ? () => setDragging(false) : undefined}
+        onDrop={
+          canUpload
+            ? (e) => {
+                // Without preventDefault the browser navigates away to the file.
+                e.preventDefault();
+                setDragging(false);
+                void accept(e.dataTransfer.files?.[0]);
+              }
+            : undefined
+        }
+      >
+        {url ? (
+          kind === 'video' ? (
+            <video ref={mediaRef} src={url} controls className="h-full w-full object-cover" />
           ) : (
-            <span>No {kind} yet</span>
-          )}
-        </div>
-      )}
-
-      {canUpload && (
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            e.target.value = '';
-            void accept(file);
-          }}
-        />
-      )}
-
-      {editable && (
-        <div className="absolute inset-x-2 bottom-2 flex flex-col gap-1">
-          {note && <span className="rounded bg-black/70 px-2 py-0.5 text-[10px] text-white/80">{note}</span>}
-          <div className="flex gap-1">
-            <input
-              value={url.startsWith('data:') ? '' : url}
-              onChange={(e) => onChangeUrl(e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              placeholder={url.startsWith('data:') ? 'Uploaded image' : `Paste ${kind} URL…`}
-              className="min-w-0 flex-1 rounded-md border border-white/20 bg-black/60 px-2 py-1 text-xs text-white outline-none placeholder:text-white/40"
-            />
-            {canUpload && (
-              <button
-                onClick={(e) => { e.stopPropagation(); fileRef.current?.click(); }}
-                disabled={busy}
-                className="shrink-0 rounded-md border border-white/20 bg-black/60 px-2 py-1 text-xs font-semibold text-white/80 hover:border-white/50 hover:text-white disabled:opacity-50"
-              >
-                {busy ? '…' : 'Upload'}
-              </button>
-            )}
-            {url && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onChangeUrl(''); setNote(''); }}
-                aria-label={`Remove ${kind}`}
-                className="shrink-0 rounded-md border border-white/20 bg-black/60 px-2 py-1 text-xs text-white/70 hover:border-red-400 hover:text-red-300"
-              >
-                ✕
-              </button>
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={url} alt="" style={imageStyle(transform)} className="h-full w-full object-cover" />
+          )
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-white/40">
+            {canUpload ? (
+              <>
+                <span>{dragging ? 'Drop to add' : busy ? 'Reading image…' : 'Drag an image here'}</span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); fileRef.current?.click(); }}
+                  className="rounded-md border border-dashed border-white/30 px-2.5 py-1 text-xs font-semibold text-white/70 hover:border-white/60 hover:text-white"
+                >
+                  Choose a file
+                </button>
+              </>
+            ) : (
+              <span>No {kind} yet</span>
             )}
           </div>
-        </div>
+        )}
+
+        {canUpload && (
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              void accept(file);
+            }}
+          />
+        )}
+
+        {editable && !adjusting && (
+          <div className="absolute inset-x-2 bottom-2 flex flex-col gap-1">
+            {note && <span className="rounded bg-black/70 px-2 py-0.5 text-[10px] text-white/80">{note}</span>}
+            <div className="flex gap-1">
+              <input
+                value={url.startsWith('data:') ? '' : url}
+                onChange={(e) => onChangeUrl(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                placeholder={url.startsWith('data:') ? 'Uploaded image' : `Paste ${kind} URL…`}
+                className="min-w-0 flex-1 rounded-md border border-white/20 bg-black/60 px-2 py-1 text-xs text-white outline-none placeholder:text-white/40"
+              />
+              {/* Replace lives in the on-image toolbar once selected (click the
+                  image) — a photo doesn't also need a standalone Upload button
+                  here. Video has no adjust overlay, so it keeps Upload as its
+                  only way to swap the file. */}
+              {canUpload && !canAdjust && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); fileRef.current?.click(); }}
+                  disabled={busy}
+                  className="shrink-0 rounded-md border border-white/20 bg-black/60 px-2 py-1 text-xs font-semibold text-white/80 hover:border-white/50 hover:text-white disabled:opacity-50"
+                >
+                  {busy ? '…' : 'Upload'}
+                </button>
+              )}
+              {url && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onChangeUrl(''); onChangeTransform?.(undefined); setNote(''); }}
+                  aria-label={`Remove ${kind}`}
+                  className="shrink-0 rounded-md border border-white/20 bg-black/60 px-2 py-1 text-xs text-white/70 hover:border-red-400 hover:text-red-300"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {canAdjust && url && adjusting && (
+        <ImageAdjustOverlay
+          frameRef={frameRef}
+          transform={transform}
+          onChange={(t) => onChangeTransform?.(t)}
+          onDone={() => setAdjusting(false)}
+          onReplace={() => fileRef.current?.click()}
+          onRemove={() => { onChangeUrl(''); onChangeTransform?.(undefined); setAdjusting(false); setNote(''); }}
+        />
       )}
     </div>
   );
 }
 
-export const DEFAULT_ACCENT = '#0b72c2';
+export const DEFAULT_ACCENT = '#000000';
 
 const DEFAULT_FILL = '#0b72c2';
 const DEFAULT_FILL_OPACITY = 0.25;
@@ -215,14 +261,22 @@ function BrandMark({ brand, dark }: { brand: 'skv' | 'ob'; dark: boolean }) {
   );
 }
 
-/** The client's logo on the title slide. In the editor it doubles as its own
- * upload control — click to pick a file, matching how every other bit of media
- * in this app is set inline rather than through a settings screen. */
+/** The client's logo on the title slide. With no logo yet, it's an upload
+ * control — click to pick a file, matching how every other bit of media in
+ * this app is set inline rather than through a settings screen. Once a logo
+ * is set, clicking it directly selects it and shows the same kind of
+ * on-canvas resize/rotate handles a MediaBox photo gets (see
+ * LogoAdjustOverlay for why it's a separate component: a logo has no
+ * cropping frame to pan around inside of, so a corner handle resizes the
+ * whole picture instead of cropping into it) — replacing or removing the
+ * logo happens from that overlay's toolbar, not a standalone button. */
 function ClientLogo({ editable, dark }: { editable: boolean; dark: boolean }) {
   const project = useEditorStore((s) => s.project);
   const setClientLogo = useEditorStore((s) => s.setClientLogo);
+  const setClientLogoTransform = useEditorStore((s) => s.setClientLogoTransform);
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [adjusting, setAdjusting] = useState(false);
   const logo = project?.clientLogo;
 
   async function handlePick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -236,6 +290,7 @@ function ClientLogo({ editable, dark }: { editable: boolean; dark: boolean }) {
       console.error('Could not read that logo file:', err);
     }
     setBusy(false);
+    setAdjusting(false);
   }
 
   if (!logo && !editable) return null;
@@ -243,20 +298,43 @@ function ClientLogo({ editable, dark }: { editable: boolean; dark: boolean }) {
   return (
     <div className="mt-10 flex flex-col items-center gap-2">
       {logo ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={logo} alt={project?.client ? `${project.client} logo` : 'Client logo'} className="h-10 w-auto object-contain" />
+        <div className="relative inline-block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={logo}
+            alt={project?.client ? `${project.client} logo` : 'Client logo'}
+            style={imageStyle(project?.clientLogoTransform)}
+            onClick={editable && !adjusting ? () => setAdjusting(true) : undefined}
+            className={`h-10 w-auto object-contain ${editable && !adjusting ? 'cursor-pointer' : ''}`}
+          />
+          {editable && adjusting && (
+            <LogoAdjustOverlay
+              transform={project?.clientLogoTransform}
+              onChange={(t) => setClientLogoTransform(t)}
+              onDone={() => setAdjusting(false)}
+              onReplace={() => inputRef.current?.click()}
+              onRemove={() => {
+                setClientLogo(undefined);
+                setClientLogoTransform(undefined);
+                setAdjusting(false);
+              }}
+            />
+          )}
+        </div>
       ) : null}
       {editable && (
         <>
           <input ref={inputRef} type="file" accept="image/*" onChange={handlePick} className="hidden" />
-          <button
-            onClick={() => inputRef.current?.click()}
-            className={`rounded-md border border-dashed px-2.5 py-1 text-[10px] font-semibold transition ${
-              dark ? 'border-white/30 text-white/60 hover:border-white/60' : 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
-            }`}
-          >
-            {busy ? 'Reading…' : logo ? 'Replace client logo' : '+ Add client logo'}
-          </button>
+          {!logo && (
+            <button
+              onClick={() => inputRef.current?.click()}
+              className={`rounded-md border border-dashed px-2.5 py-1 text-[10px] font-semibold transition ${
+                dark ? 'border-white/30 text-white/60 hover:border-white/60' : 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+              }`}
+            >
+              {busy ? 'Reading…' : '+ Add client logo'}
+            </button>
+          )}
         </>
       )}
     </div>
@@ -322,7 +400,12 @@ function BrandFooter({ slide, dark }: { slide: Slide; dark: boolean }) {
           // white chip on dark styles for the same reason SKV needs one.
           <span className={`inline-flex items-center rounded ${dark ? 'bg-white/90 px-1.5 py-1' : ''}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={project.clientLogo} alt={project.client ? `${project.client} logo` : 'Client logo'} className="h-4 w-auto object-contain" />
+            <img
+              src={project.clientLogo}
+              alt={project.client ? `${project.client} logo` : 'Client logo'}
+              style={imageStyle(project.clientLogoTransform)}
+              className="h-4 w-auto object-contain"
+            />
           </span>
         )}
       </span>
@@ -644,6 +727,9 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           kind={active.kind === 'walkthrough' ? 'video' : 'image'}
           editable={editable}
           onChangeUrl={(url) => setView(active.id, { url })}
+          transform={active.transform}
+          onChangeTransform={(t) => setView(active.id, { transform: t })}
+          allowAdjust={tool === null}
           className="h-full w-full"
           mediaRef={active.kind === 'walkthrough' ? videoRef : undefined}
         />
@@ -1178,6 +1264,8 @@ function ConceptBody({ slide, editable, animate, dark }: SlideRendererProps & { 
             kind="image"
             editable={editable}
             onChangeUrl={(url) => updateField('imageUrl', url)}
+            transform={slide.fields.imageTransform}
+            onChangeTransform={(t) => updateField('imageTransform', t)}
             className="aspect-[4/3] w-full"
           />
           {editable && !slide.fields.imageUrl && (
@@ -1366,6 +1454,8 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
               kind="image"
               editable={editable}
               onChangeUrl={(url) => updateField('imageUrl', url)}
+              transform={slide.fields.imageTransform}
+              onChangeTransform={(t) => updateField('imageTransform', t)}
               className="mt-6 aspect-video w-full max-w-xl"
             />
           )}

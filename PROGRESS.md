@@ -32,6 +32,59 @@ or re-explain anything.
 
 ---
 
+## 2026-09-17 (cont'd 4)
+
+**Context:** user has an internal stakeholder review tomorrow (2026-09-18) —
+main USPs to demo: the linked-views hotspot system, the occupancy chart +
+Excel linking, and overall visual polish. Did a cross-feature verification
+pass rather than more new building, prioritizing "a few things work
+flawlessly" per the user's own call.
+
+**Done:**
+- **Ran the cross-feature regression that was never done**: hover + gallery
+  + stages + zoom/pan all enabled together on one linked-views slide in
+  Presenter mode. Confirmed: two-way hover (verified via `fill-opacity`
+  actually increasing on the hovered path), gallery/lightbox opens on click,
+  wheel-zoom + drag-pan both work, all simultaneously, zero new console
+  errors (only the pre-existing migration-column 400s).
+- **Found and fixed a real, previously-unverified bug**: clicking a hotspot
+  linked to an occupancy-chart zone did navigate correctly, but the
+  "highlight this bar for a moment" effect **never actually appeared** — the
+  transient `focusZoneId` was being cleared via `queueMicrotask` from inside
+  the component's render body, and microtasks flush *before* the browser
+  paints, so the highlighted frame was cleared before anyone could ever see
+  it. This would have been a visibly broken moment in tomorrow's demo (click
+  hotspot → nothing visibly happens on the chart). Fixed in
+  [OccupancyChart.tsx](src/components/OccupancyChart.tsx): replaced the
+  microtask clear with a real `useEffect` + `setTimeout(2200ms)`, so the
+  highlight is now guaranteed to actually render before it clears. Also
+  added a `ring-2` outline on the highlighted bar's track (previously the
+  only highlight signal was a color change, which was invisible on an
+  over-capacity bar since red already overrides the accent color) — now the
+  ring shows regardless of the bar's color state.
+  - Verified live: dispatched the click and checked the DOM ~100ms later —
+    ring + "25 / 20 occupants" tooltip both present; re-checked ~2.5s later
+    — cleared correctly. This is now safe to demo.
+- Re-verified end-to-end with a hotspot that has **only** a zone link (no
+  gallery) — the earlier session's test was inconclusive because the one
+  hotspot available had both a gallery and a zone link, and gallery
+  correctly takes click priority, masking whether the zone-jump path worked
+  at all. Confirmed it independently this time.
+
+**Left off / next up:**
+- Did not get to a fresh visual A/B look at the `section-starter`/`design`
+  dark-gradient polish in this pass (spot-checked only `standard`/`concept`
+  slides) — worth one more look before the meeting if there's time, though
+  it was already verified once when Part D was originally built.
+- Consider giving the "Linking Test" project (or a copy of it) more
+  presentable content/naming before the actual meeting — it currently has
+  scratch-test artifacts (a "cdcd" hotspot, a few unlabeled ones, generic
+  "Zone 1/2/3" placeholders in the occupancy chart) mixed in with the real
+  demo-worthy content. Fine for verification, less fine to present live.
+- Nothing from this pass is committed yet.
+
+---
+
 ## 2026-09-17 (cont'd 3)
 
 **Done:**

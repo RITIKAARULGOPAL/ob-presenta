@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { EditableText } from './EditableText';
 import { useEditorStore } from '@/lib/editorStore';
 import { parseOccupancyWorkbook } from '@/lib/importExcel';
@@ -47,7 +47,11 @@ function Bar({
       onMouseLeave={() => onHover(null)}
     >
       <div className="relative flex h-40 w-full items-end justify-center">
-        <div className="relative h-full w-10 overflow-hidden rounded-[var(--radius-sm)] bg-[var(--surface-2)]">
+        <div
+          className={`relative h-full w-10 overflow-hidden rounded-[var(--radius-sm)] bg-[var(--surface-2)] transition-shadow ${
+            highlighted ? 'ring-2 ring-[var(--accent)] ring-offset-2' : ''
+          }`}
+        >
           <div
             className={`absolute bottom-0 left-0 w-full rounded-[var(--radius-sm)] transition-[height] duration-300 ease-out ${
               overCapacity ? 'bg-red-500' : highlighted ? 'bg-[var(--accent)]' : 'bg-[var(--accent-soft-line)]'
@@ -127,12 +131,17 @@ export function OccupancyChart({ slide, editable }: { slide: Slide; editable: bo
   const unit = slide.fields.occupancyUnit?.trim() || 'occupants';
   const maxValue = Math.max(1, ...zones.map((z) => z.value));
 
-  // Clear the transient "arrived via hotspot click" highlight once shown.
-  if (focusZoneId && zones.some((z) => z.id === focusZoneId) && hoveredZoneId !== focusZoneId) {
-    // Deferred to avoid setState-during-render; a microtask is enough since
-    // this only needs to happen once per navigation, not every render.
-    queueMicrotask(() => setFocusZoneId(null));
-  }
+  // Clear the transient "arrived via hotspot click" highlight after it's
+  // had a moment to actually be seen. A microtask here would clear it
+  // before the browser ever paints the highlighted frame — microtasks flush
+  // before paint, so the bar would highlight and un-highlight within the
+  // same frame, invisibly. A short real delay is what makes this land as a
+  // noticeable "arrived here" cue instead of a no-op.
+  useEffect(() => {
+    if (!focusZoneId) return;
+    const timer = setTimeout(() => setFocusZoneId(null), 2200);
+    return () => clearTimeout(timer);
+  }, [focusZoneId, setFocusZoneId]);
 
   function setZone(id: string, patch: Partial<OccupancyZone>) {
     updateField('occupancyZones', zones.map((z) => (z.id === id ? { ...z, ...patch } : z)));

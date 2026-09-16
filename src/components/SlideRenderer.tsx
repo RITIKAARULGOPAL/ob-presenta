@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { EditableText } from './EditableText';
 import { useEditorStore } from '@/lib/editorStore';
-import { tintWithWhite } from '@/lib/color';
+import { shadeWithBlack, tintWithWhite } from '@/lib/color';
 import { resolveTypography, headlineStyle } from '@/lib/fonts';
 import { dataUrlBytes, fileToDataUrl, fileToSlideImage } from '@/lib/imageFile';
 import {
@@ -25,6 +25,7 @@ import { Lightbox } from './Lightbox';
 import { OrbitDiagram } from './OrbitDiagram';
 import { SiteLocusDiagram } from './SiteLocusDiagram';
 import { MaterialCompare } from './MaterialCompare';
+import { OccupancyChart } from './OccupancyChart';
 import { ImageAdjustOverlay } from './ImageAdjustOverlay';
 import { LogoAdjustOverlay } from './LogoAdjustOverlay';
 import { clamp, imageStyle, maxPan, MAX_ZOOM, MIN_ZOOM } from '@/lib/imageTransform';
@@ -66,6 +67,7 @@ function MediaBox({
   allowAdjust = true,
   className,
   mediaRef,
+  elevated = false,
 }: {
   url: string;
   kind: 'image' | 'video';
@@ -76,6 +78,9 @@ function MediaBox({
   allowAdjust?: boolean;
   className?: string;
   mediaRef?: React.Ref<HTMLVideoElement>;
+  /** A larger radius + a real soft shadow instead of the plain frame — for a
+   *  slide's one hero image (the `design` style), not every MediaBox use. */
+  elevated?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -117,7 +122,7 @@ function MediaBox({
     <div className={`relative ${className ?? ''}`}>
       <div
         ref={frameRef}
-        className={`relative h-full w-full overflow-hidden rounded-lg bg-black/30 ${dragging ? 'ring-2 ring-[var(--accent)]' : ''} ${
+        className={`relative h-full w-full overflow-hidden bg-black/30 ${elevated ? 'rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)]' : 'rounded-lg'} ${dragging ? 'ring-2 ring-[var(--accent)]' : ''} ${
           canAdjust && url && !adjusting ? 'cursor-pointer' : ''
         }`}
         onClick={canAdjust && url && !adjusting ? () => setAdjusting(true) : undefined}
@@ -566,6 +571,10 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   /** Which stages the hotspot being drawn/edited is active on. Empty = every
    *  stage (matches `stageIds` being unset on save). */
   const [pendingStageIds, setPendingStageIds] = useState<string[]>([]);
+  /** Which occupancy-chart zone this hotspot jumps to, when the chosen target
+   *  is an occupancy-chart slide. */
+  const [pendingZoneId, setPendingZoneId] = useState('');
+  const setFocusZoneId = useEditorStore((s) => s.setFocusZoneId);
   /** Transient viewer-only zoom/pan — never written to `ImageTransform` or the
    *  project, just a magnifier over the authored crop. Reset whenever the
    *  shown view/stage changes so it never looks "stuck" on a new image. */
@@ -651,8 +660,9 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   // Concept and design slides are the meaningful cross-slide destinations: a
   // zone on a plan should be able to point at the principle behind it.
   const linkableSlides = (project?.slides ?? []).filter(
-    (s) => s.id !== slide.id && (s.conceptOrigin || s.style === 'design' || s.layout === 'linked-views'),
+    (s) => s.id !== slide.id && (s.conceptOrigin || s.style === 'design' || s.layout === 'linked-views' || s.layout === 'occupancy-chart'),
   );
+  const targetOccupancySlide = linkableSlides.find((s) => `slide:${s.id}` === pendingTarget && s.layout === 'occupancy-chart');
 
   const drawing = tool !== null;
   /** Cursor is within snapping distance of the first vertex, so a click closes
@@ -860,6 +870,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     setPendingListDescription(h?.listEntry?.description ?? '');
     setPendingGallery(h?.gallery ?? []);
     setPendingStageIds(h?.stageIds ?? []);
+    setPendingZoneId(h?.targetZoneId ?? '');
   }
 
   function startPickingTarget(points: Point[] = drawingPoints ?? []) {
@@ -906,6 +917,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
       listEntry: buildListEntry(),
       gallery: pendingGallery.length ? pendingGallery : undefined,
       stageIds: pendingStageIds.length ? pendingStageIds : undefined,
+      targetZoneId: kind === 'slide' && pendingZoneId ? pendingZoneId : undefined,
     };
     setView(active.id, { hotspots: [...allHotspots, hotspot] });
     // Stay on the tool rather than dropping out after every single region.
@@ -931,6 +943,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               listEntry: buildListEntry(h.listEntry?.id),
               gallery: pendingGallery.length ? pendingGallery : undefined,
               stageIds: pendingStageIds.length ? pendingStageIds : undefined,
+              targetZoneId: kind === 'slide' && pendingZoneId ? pendingZoneId : undefined,
             }
           : h,
       ),
@@ -950,6 +963,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     }
     if (hotspot.targetSlideId) {
       selectSlide(hotspot.targetSlideId);
+      if (hotspot.targetZoneId) setFocusZoneId(hotspot.targetZoneId);
       return;
     }
     if (!hotspot.targetViewId) return;
@@ -1281,6 +1295,20 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
                 </optgroup>
               )}
             </select>
+            {targetOccupancySlide && (
+              <select
+                value={pendingZoneId}
+                onChange={(e) => setPendingZoneId(e.target.value)}
+                className="mb-2 w-full rounded-md border border-[var(--line)] px-2 py-1.5 text-xs outline-none"
+              >
+                <option value="">Jump to slide (no specific zone)</option>
+                {(targetOccupancySlide.fields.occupancyZones ?? []).map((z) => (
+                  <option key={z.id} value={z.id}>
+                    Highlight: {z.label}
+                  </option>
+                ))}
+              </select>
+            )}
             {targetView?.kind === 'walkthrough' && (
               <input
                 value={pendingTime}
@@ -1556,11 +1584,19 @@ function StatsRow({ slide, editable }: SlideRendererProps) {
 
   if (!editable && shownStats.length === 0) return null;
 
+  const tinted = slide.style === 'company';
+
   return (
     <div className="mt-8">
-      <div className="grid gap-px overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--line)]" style={{ gridTemplateColumns: `repeat(${Math.min(shownStats.length, 4) || 1}, 1fr)` }}>
+      <div
+        className="grid gap-3"
+        style={{ gridTemplateColumns: `repeat(${Math.min(shownStats.length, 4) || 1}, 1fr)` }}
+      >
         {shownStats.map((st) => (
-          <div key={st.id} className="bg-white p-5">
+          <div
+            key={st.id}
+            className={`rounded-[var(--radius-md)] p-5 shadow-[var(--shadow-sm)] ${tinted ? 'bg-[var(--accent-wash)]' : 'bg-white border border-[var(--line)]'}`}
+          >
             <EditableText
               editable={editable}
               value={st.value}
@@ -1841,7 +1877,7 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
 
   const base = (
     <div
-      className={`relative flex min-h-full w-full flex-col justify-center px-16 pb-14 pt-10 ${animClass} ${dark ? 'bg-[var(--ink)]' : 'bg-white'}`}
+      className={`relative flex min-h-full w-full flex-col justify-center px-16 pb-14 pt-10 ${animClass} ${dark ? 'bg-[var(--ink)] [background-image:radial-gradient(120%_90%_at_15%_-10%,var(--dark-veil-1),var(--dark-veil-2)_60%)]' : 'bg-white'}`}
       style={
         {
           '--slide-anim-duration': `${slide.animation?.duration ?? 600}ms`,
@@ -1851,6 +1887,15 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
           '--accent': accentColor,
           '--accent-soft': tintWithWhite(accentColor, 0.9),
           '--accent-soft-line': tintWithWhite(accentColor, 0.78),
+          // Lighter than --accent-soft, for larger surface fills (a whole
+          // card) rather than small chip-sized tints.
+          '--accent-wash': tintWithWhite(accentColor, 0.96),
+          '--accent-line-strong': tintWithWhite(accentColor, 0.55),
+          // Dark-style backgrounds (section-starter/design) read as a radial
+          // gradient tied to the deck's own accent instead of flat ink, so
+          // every deck's dark slides feel designed for that deck specifically.
+          '--dark-veil-1': shadeWithBlack(accentColor, 0.55),
+          '--dark-veil-2': '#141a2b',
           // Tailwind's font-display utility resolves --font-display, which
           // globals.css points at --font-archivo — redeclaring it here, at the
           // slide's own scope, is what lets a project's font choice reach every
@@ -1953,6 +1998,7 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
           {slide.layout === 'orbit' && <OrbitDiagram slide={slide} editable={editable} />}
           {slide.layout === 'site-locus' && <SiteLocusDiagram slide={slide} editable={editable} />}
           {slide.layout === 'material-compare' && <MaterialCompare slide={slide} editable={editable} />}
+          {slide.layout === 'occupancy-chart' && <OccupancyChart slide={slide} editable={editable} />}
           {slide.style === 'design' && (
             <MediaBox
               url={slide.fields.imageUrl ?? ''}
@@ -1962,6 +2008,7 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
               transform={slide.fields.imageTransform}
               onChangeTransform={(t) => updateField('imageTransform', t)}
               className="mt-6 aspect-video w-full max-w-xl"
+              elevated
             />
           )}
         </>

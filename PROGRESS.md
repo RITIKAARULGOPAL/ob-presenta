@@ -32,6 +32,98 @@ or re-explain anything.
 
 ---
 
+## 2026-09-17
+
+**Done:** (plan: Parts C & D of `C:\Users\Ritika\.claude\plans\ok-lets-no-do-giggly-snowglobe.md`)
+- **Part D (visual polish pass)**: added a shadow/radius token scale to
+  [globals.css](src/app/globals.css) (`--radius-sm/md/lg`, `--shadow-sm/md/lg`,
+  ink-tinted); added accent-derived `--accent-wash`/`--accent-line-strong`
+  and dark-style `--dark-veil-1/2` gradient stops to
+  [SlideRenderer.tsx](src/components/SlideRenderer.tsx)'s existing per-slide
+  style block. Dark slides (`section-starter`/`design`) now render a radial
+  gradient tied to the deck's own accent instead of flat ink.
+  `StatsRow`/company-style stat cells get the new shadow scale (+ accent-wash
+  fill for `company`); the `design` style's hero `MediaBox` gets a new
+  `elevated` prop (larger radius + real shadow) via a small, scoped addition
+  rather than changing `MediaBox` globally.
+- **Part C (occupancy chart + hotspot linking + Excel import)**, all steps:
+  - Data model: `OccupancyZone`, `SlideFields.occupancyZones/occupancyUnit/
+    linkedViewSlideId`, `ViewHotspot.targetZoneId`, new `'occupancy-chart'`
+    `SlideLayout` — all in [slide.ts](src/types/slide.ts).
+  - New [OccupancyChart.tsx](src/components/OccupancyChart.tsx): a bar-per-zone
+    chart (plain divs, not SVG — no shared coordinate space needed), hover
+    highlight + tooltip, inline label/value/capacity editing, add/remove zone.
+    Bar rule: `value/capacity` when capacity is set (over-capacity turns the
+    bar red), else scaled against the slide's own max value.
+  - Cross-slide linking: the hotspot edit popup gains a zone-picker
+    (`targetZoneId`) when its "Jump to" target is an occupancy-chart slide;
+    clicking such a hotspot navigates *and* sets a new transient
+    (never-persisted) `focusZoneId` in the store so the matching bar
+    highlights for a moment on arrival. This is click-to-jump, not live
+    two-way hover — confirmed as the right simplification since the editor
+    only ever mounts one slide at a time.
+  - Excel import: added `xlsx` (SheetJS) as a dependency; new
+    [importExcel.ts](src/lib/importExcel.ts) parses a workbook fully
+    client-side (header-detects Zone/Capacity/Occupied columns, falls back to
+    column order). New store action `importOccupancyData` (in
+    [editorStore.ts](src/lib/editorStore.ts)) upserts the chart's zones by
+    label match and patches every same-labeled hotspot on a paired
+    `linked-views` slide (`linkedViewSlideId`, set once and reused) — one
+    upload updates both. Reports back `{added, updated, hotspotsUpdated,
+    unmatched}`, shown as a summary banner.
+- **Verified in-browser** on "Linking Test": created an occupancy-chart slide,
+  confirmed bar height math (value/capacity, over-capacity → red, no-capacity
+  → scaled-to-max) via direct DOM inspection of computed styles; confirmed
+  the Excel-import picker/summary UI end-to-end using a hand-built CSV
+  through the same file input (real `.xlsx` byte transfer into the browser
+  tool proved unreliable for a file this size — see Watch out for below —
+  but the parser's core `XLSX.read`/`sheet_to_json` logic was independently
+  verified correct via a Node script using the real `xlsx` package against a
+  generated `.xlsx` file with the exact expected header/column shape).
+  Confirmed the import summary correctly reported "3 zones added, 1 hotspot
+  updated, 2 unmatched" and that the matched hotspot's side-list value
+  updated to "7 / 10". **Not directly verified**: the click-to-jump +
+  highlight behavior itself, because the one hotspot available to test with
+  already had a gallery attached from earlier testing, and `jumpTo` correctly
+  prioritizes gallery over zone-jump (pre-existing, intentional precedence,
+  not something introduced here) — the wiring was reviewed instead of
+  visually confirmed. `npx tsc --noEmit -p .` clean throughout (same 2
+  pre-existing unrelated `pdfjs-dist` errors, nothing new).
+
+**Left off / next up:**
+- The click-to-jump-and-highlight path (a hotspot with *only* a zone link, no
+  gallery) should get a real visual check next session — draw a fresh
+  hotspot with no gallery, link it to a zone, confirm the bar highlights on
+  arrival in Presenter mode.
+- **Security note on the `xlsx` dependency**: `npm audit` flags the npm
+  registry's `xlsx@0.18.5` with two known high-severity issues (prototype
+  pollution, ReDoS) with "no fix available" via npm — SheetJS stopped
+  publishing patched releases to the npm registry and now only distributes
+  fixed builds via their own CDN (`cdn.sheetjs.com`). Installing directly
+  from that CDN was blocked by this session's sandbox (untrusted-code-source
+  restriction on non-registry package installs). Currently running the
+  known-vulnerable npm build. Since parsing is fully client-side and only
+  ever processes a file the deck's own author chooses to upload, the
+  practical risk is low, but worth a deliberate call: either accept it, or
+  have someone install the patched CDN build by hand
+  (`npm install https://cdn.sheetjs.com/xlsx-<version>/xlsx-<version>.tgz`,
+  version per sheetjs.com's own downloads page).
+- Nothing from today is committed yet.
+
+**Watch out for:**
+- Transferring a real binary `.xlsx` file into the browser-automation tool by
+  hand-copying its base64 encoding is unreliable at this size (~16KB) — a
+  transcription/truncation error produced a corrupted ZIP the app correctly
+  rejected with "Could not read that spreadsheet" (which did at least prove
+  the error-handling path works). A plain-text CSV through the same input
+  worked fine and is what actually exercised the success path end-to-end.
+  For a future full `.xlsx` upload test, look for a more reliable transfer
+  path than manual base64 copy-paste (a local static file server the browser
+  tool can actually reach turned out to be blocked here too — investigate
+  why before assuming it'll work next time).
+
+---
+
 ## 2026-09-16 (cont'd 4)
 
 **Done:**

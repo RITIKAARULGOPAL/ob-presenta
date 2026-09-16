@@ -3,6 +3,16 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Deck-wide radius/shadow scale — a designer-deck polish pass, not a new
+     theme system. Ink-tinted rather than pure black so shadows read as soft
+     depth instead of a default browser drop-shadow. */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --shadow-sm: 0 1px 2px rgba(20, 26, 43, 0.06), 0 1px 1px rgba(20, 26, 43, 0.04);
+  --shadow-md: 0 6px 16px rgba(20, 26, 43, 0.08), 0 2px 6px rgba(20, 26, 43, 0.05);
+  --shadow-lg: 0 20px 48px rgba(20, 26, 43, 0.14), 0 6px 16px rgba(20, 26, 43, 0.08);
 }
 
 @theme inline {

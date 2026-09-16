@@ -17,7 +17,8 @@ export type SlideLayout =
   | 'linked-views'
   | 'site-locus'
   | 'material-compare'
-  | 'orbit';
+  | 'orbit'
+  | 'occupancy-chart';
 
 export type SlideStyleKind = 'standard' | 'section-starter' | 'company' | 'design';
 
@@ -36,6 +37,16 @@ export interface MergeItem {
  *  reference pattern's nodes are photo-filled circles, not plain text chips. */
 export interface OrbitNode extends MergeItem {
   imageUrl?: string;
+}
+
+/** occupancy-chart layout: one bar. `value` out of `capacity` when given
+ *  (percentage-filled bar); just `value` scaled against the slide's own max
+ *  when `capacity` is absent. */
+export interface OccupancyZone {
+  id: string;
+  label: string;
+  value: number;
+  capacity?: number;
 }
 
 export type LinkedViewKind = 'layout' | 'render' | 'walkthrough' | 'axo';
@@ -102,6 +113,10 @@ export interface ViewHotspot {
    *  needs setting to override the default: 'gallery' if one is present,
    *  else 'navigate'. */
   clickAction?: 'navigate' | 'gallery';
+  /** An occupancy-chart zone this hotspot represents — only meaningful
+   *  alongside targetSlideId when that slide's layout is 'occupancy-chart'.
+   *  Lets a click jump to the chart slide and highlight the matching bar. */
+  targetZoneId?: string;
 }
 
 /** A named mode a linked view can be switched between while editing/viewing
@@ -216,6 +231,15 @@ export interface SlideFields {
   orbitNodes?: OrbitNode[];
   orbitCoreTitle?: string;
   orbitCoreBody?: string;
+
+  /** occupancy-chart layout: one bar per zone, and the unit shown in bar
+   *  labels (e.g. "people") — defaults to "occupants" when unset. */
+  occupancyZones?: OccupancyZone[];
+  occupancyUnit?: string;
+  /** Which linked-views slide this chart's zones map to by hotspot label —
+   *  set once (on first Excel import) so re-imports don't need re-picking.
+   *  May go stale if that slide is deleted; tolerate a miss. */
+  linkedViewSlideId?: string;
 }
 
 /** Set on slides generated from the concept library, so the UI can show what a

@@ -1,5 +1,5 @@
 import { makeId } from './id';
-import type { Slide, SlideLayout, SlideStyleKind, StatItem, MergeItem, OrbitNode, LinkedView } from '@/types/slide';
+import type { Slide, SlideLayout, SlideStyleKind, StatItem, MergeItem, OrbitNode, LinkedView, OccupancyZone } from '@/types/slide';
 
 const defaultAnimation = () => ({ entry: 'none' as const, duration: 600, delay: 0 });
 
@@ -11,6 +11,9 @@ function makeItem(): MergeItem {
 }
 export function makeOrbitNode(): OrbitNode {
   return { id: makeId('orbit'), label: '' };
+}
+export function makeOccupancyZone(label = ''): OccupancyZone {
+  return { id: makeId('zone'), label, value: 0 };
 }
 function makeLinkedViews(): LinkedView[] {
   // The labels here name the kind of view a slot holds, so they're structure
@@ -123,6 +126,14 @@ export function defaultFieldsForLayout(layout: SlideLayout) {
         orbitCoreBody: '',
         orbitNodes: [makeOrbitNode(), makeOrbitNode(), makeOrbitNode()],
       };
+    case 'occupancy-chart':
+      return {
+        kickerEyebrow: '',
+        kickerLabel: '',
+        title: '',
+        occupancyUnit: '',
+        occupancyZones: [makeOccupancyZone('Zone 1'), makeOccupancyZone('Zone 2'), makeOccupancyZone('Zone 3')],
+      };
     default:
       return {};
   }
@@ -181,6 +192,7 @@ export const LAYOUT_LABELS: Record<SlideLayout, string> = {
   'site-locus': 'Site Location',
   'material-compare': 'Materials Compare',
   orbit: 'Orbit Diagram',
+  'occupancy-chart': 'Occupancy Chart',
 };
 
 export const STYLE_LABELS: Record<SlideStyleKind, string> = {

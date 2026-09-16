@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { createSlide, createStyledSlide, defaultFieldsForLayout, defaultFieldsForStyle } from './slideDefaults';
 import { optionalColumnsMissing, saveProject } from './data';
 import { makeId } from './id';
-import type { Brand, FontPairing, ImageTransform, Project, Slide, SlideFields, SlideLayout, SlideStyleKind, TypographySettings } from '@/types/slide';
+import type { Brand, FontPairing, ImageTransform, OccupancyZone, Project, Slide, SlideFields, SlideLayout, SlideStyleKind, TypographySettings } from '@/types/slide';
 
 type Mode = 'editor' | 'presenter';
 
@@ -13,6 +13,11 @@ interface EditorState {
   saving: boolean;
   saveError?: string;
   logoSaveUnavailable: boolean;
+  /** Transient, never persisted: which occupancy-chart zone to highlight for
+   *  a moment right after a hotspot click navigates to its slide. Cleared by
+   *  the chart once shown. */
+  focusZoneId: string | null;
+  setFocusZoneId: (zoneId: string | null) => void;
 
   loadProject: (project: Project) => void;
   setMode: (mode: Mode) => void;
@@ -52,6 +57,17 @@ interface EditorState {
   removePoint: (pointId: string) => void;
   addOrbitNode: () => void;
   removeOrbitNode: (nodeId: string) => void;
+  addOccupancyZone: () => void;
+  removeOccupancyZone: (zoneId: string) => void;
+  /** Excel import: upserts zones on `chartSlideId` by label match, and — when
+   *  `linkedViewSlideId` is given — patches every hotspot on that slide whose
+   *  `label` case-insensitively matches a row. One atomic persist covering
+   *  both slides. Returns a summary for the upload UI to show. */
+  importOccupancyData: (params: {
+    chartSlideId: string;
+    linkedViewSlideId?: string;
+    zones: { label: string; value: number; capacity?: number }[];
+  }) => { added: number; updated: number; hotspotsUpdated: number; unmatched: string[] };
 
   currentSlide: () => Slide | null;
   currentIndex: () => number;
@@ -110,6 +126,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   saving: false,
   saveError: undefined,
   logoSaveUnavailable: false,
+  focusZoneId: null,
+  setFocusZoneId: (zoneId) => set({ focusZoneId: zoneId }),
 
   loadProject: (project) => set({ project, currentSlideId: project.slides[0]?.id ?? null, mode: 'editor' }),
 
@@ -432,6 +450,114 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const next = { ...project, slides };
     set({ project: next });
     persist(next);
+  },
+
+  addOccupancyZone: () => {
+    const { project, currentSlideId } = get();
+    if (!project || !currentSlideId) return;
+    const slides = project.slides.map((sl) =>
+      sl.id === currentSlideId
+        ? { ...sl, fields: { ...sl.fields, occupancyZones: [...(sl.fields.occupancyZones ?? []), { id: makeId('zone'), label: 'New zone', value: 0 }] } }
+        : sl,
+    );
+    const next = { ...project, slides };
+    set({ project: next });
+    persist(next);
+  },
+
+  removeOccupancyZone: (zoneId) => {
+    const { project, currentSlideId } = get();
+    if (!project || !currentSlideId) return;
+    const slides = project.slides.map((sl) =>
+      sl.id === currentSlideId
+        ? { ...sl, fields: { ...sl.fields, occupancyZones: (sl.fields.occupancyZones ?? []).filter((z) => z.id !== zoneId) } }
+        : sl,
+    );
+    const next = { ...project, slides };
+    set({ project: next });
+    persist(next);
+  },
+
+  importOccupancyData: ({ chartSlideId, linkedViewSlideId, zones }) => {
+    const { project } = get();
+    const empty = { added: 0, updated: 0, hotspotsUpdated: 0, unmatched: [] as string[] };
+    if (!project) return empty;
+
+    const matchesLabel = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+    let added = 0;
+    let updated = 0;
+    let hotspotsUpdated = 0;
+    const unmatched: string[] = [];
+
+    const chartSlide = project.slides.find((s) => s.id === chartSlideId);
+    const linkedSlide = linkedViewSlideId ? project.slides.find((s) => s.id === linkedViewSlideId) : undefined;
+    const allHotspotLabels = new Set(
+      (linkedSlide?.fields.views ?? []).flatMap((v) => (v.hotspots ?? []).map((h) => (h.label ?? '').trim().toLowerCase())),
+    );
+
+    const existingZones = chartSlide?.fields.occupancyZones ?? [];
+    const nextZones: OccupancyZone[] = [...existingZones];
+    const zoneIdByLabel = new Map<string, string>();
+    for (const z of nextZones) zoneIdByLabel.set(z.label.trim().toLowerCase(), z.id);
+
+    for (const row of zones) {
+      const label = row.label.trim();
+      if (!label) continue;
+      const key = label.toLowerCase();
+      const idx = nextZones.findIndex((z) => matchesLabel(z.label, label));
+      if (idx >= 0) {
+        nextZones[idx] = { ...nextZones[idx], label, value: row.value, capacity: row.capacity };
+        updated += 1;
+      } else {
+        const zone: OccupancyZone = { id: makeId('zone'), label, value: row.value, capacity: row.capacity };
+        nextZones.push(zone);
+        zoneIdByLabel.set(key, zone.id);
+        added += 1;
+      }
+      if (!allHotspotLabels.has(key)) unmatched.push(label);
+    }
+    for (const z of nextZones) zoneIdByLabel.set(z.label.trim().toLowerCase(), z.id);
+
+    const slides = project.slides.map((sl) => {
+      if (sl.id === chartSlideId) {
+        return { ...sl, fields: { ...sl.fields, occupancyZones: nextZones, linkedViewSlideId: linkedViewSlideId ?? sl.fields.linkedViewSlideId } };
+      }
+      if (linkedSlide && sl.id === linkedSlide.id) {
+        const views = (sl.fields.views ?? []).map((v) => {
+          if (!v.hotspots?.length) return v;
+          let changed = false;
+          const hotspots = v.hotspots.map((h) => {
+            const key = (h.label ?? '').trim().toLowerCase();
+            const row = zones.find((r) => matchesLabel(r.label, h.label ?? ''));
+            if (!row || !key) return h;
+            changed = true;
+            hotspotsUpdated += 1;
+            const zoneId = zoneIdByLabel.get(key);
+            return {
+              ...h,
+              listEntry: {
+                id: h.listEntry?.id ?? makeId('list'),
+                label: h.label ?? row.label,
+                value: row.capacity != null ? `${row.value} / ${row.capacity}` : String(row.value),
+                description: h.listEntry?.description,
+              },
+              targetSlideId: chartSlideId,
+              targetViewId: undefined,
+              targetZoneId: zoneId,
+            };
+          });
+          return changed ? { ...v, hotspots } : v;
+        });
+        return { ...sl, fields: { ...sl.fields, views } };
+      }
+      return sl;
+    });
+
+    const next = { ...project, slides };
+    set({ project: next });
+    persist(next);
+    return { added, updated, hotspotsUpdated, unmatched };
   },
 
   currentSlide: () => {

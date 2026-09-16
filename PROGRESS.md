@@ -32,6 +32,62 @@ or re-explain anything.
 
 ---
 
+## 2026-09-17 (cont'd 5)
+
+**Done:**
+- **Added "as is" image slides to the concept library**, per the user's
+  request ahead of tomorrow's meeting: 3 slides from a real client deck
+  (`Copy of Copy of 19.02.25 _ E-COM EXPRESS_Design Deck_Officebanao.pptx`)
+  now show up as a new pillar ("13 · E-Com Express — Reference Deck") in the
+  existing Concept Library gallery (`+ Add slide` → `Concept library…`),
+  exactly like every other pillar — pick it, click a thumbnail, it's added.
+  - Rendered each PPTX slide to a PNG via PowerPoint COM automation
+    (`Presentation.Open` + `Slide.Export(..., 'PNG', 1920, 1080)` — no
+    existing PPTX-rendering library in this codebase or its dependencies;
+    `pptxgenjs` is export-only). Saved as static assets under
+    `public/concept-library/ecom-express/slide-{1,2,3}.png`.
+  - Extended `DesignConcept` ([conceptLibrary.ts](src/lib/conceptLibrary.ts))
+    with an optional `imageUrl` — when set, `conceptSlide()`
+    ([conceptSlides.ts](src/lib/conceptSlides.ts)) returns a plain `'blank'`-
+    layout slide with just that image, instead of the usual lead/points
+    composition. No changes needed to `ConceptLibraryDropdown.tsx` at all —
+    the existing gallery UI, thumbnails, and "already in deck" tracking all
+    just work, since they're driven generically by whatever `conceptSlide()`
+    returns.
+  - Added full-bleed image rendering to the `'blank'` layout branch in
+    [SlideRenderer.tsx](src/components/SlideRenderer.tsx): an `<img>` with
+    `className="absolute inset-0 h-full w-full object-cover"` — deliberately
+    escapes the slide wrapper's own padding (an absolutely positioned
+    element's containing block is the relative ancestor's *padding* edge,
+    not inside it), so the imported slide shows edge-to-edge with zero added
+    chrome, genuinely "as is."
+  - Verified live: all 3 slides added from the library, render pixel-correct
+    full-bleed (checked against the original PPTX renders), `tsc` clean, no
+    new console errors (a batch of 404s were from before the images were
+    actually in place — confirmed stale by checking fresh requests all
+    return 200 after the fix).
+
+**Left off / next up:**
+- Nothing outstanding on this feature. If more "as is" reference decks are
+  wanted later, the pattern is: render slides to images (PowerPoint COM if
+  on a Windows box with Office installed — proved reliable here, no other
+  PPTX-rendering tool was available), drop them under
+  `public/concept-library/<name>/`, add one pillar entry with one
+  `imageUrl`-bearing concept per slide.
+- **Environment note for future sessions**: writes made via the Bash/Write
+  tools were, at least twice this session, not immediately visible to
+  PowerShell-invoked processes (a `.ps1` file wr itten via Bash/Write read as
+  "does not exist" when PowerShell tried to run it; conversely, a PowerShell
+  `Copy-Item` into `public/` wasn't visible to Bash/curl/the dev server
+  until copied again via `cp` from Bash directly). Apparent eventual-
+  consistency lag between whatever backs each tool, not a permissions
+  issue. If a file written by one tool "doesn't exist" to another, don't
+  assume something is wrong with the file — try writing/copying it again
+  from the tool whose view actually matters for the next step.
+- Nothing from this batch is committed yet.
+
+---
+
 ## 2026-09-17 (cont'd 4)
 
 **Context:** user has an internal stakeholder review tomorrow (2026-09-18) —

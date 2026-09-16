@@ -1995,7 +1995,17 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
             <ClientLogo editable={editable} dark={dark || !!slide.fields.heroVideoUrl} />
           </div>
         </div>
-      ) : slide.layout === 'blank' ? null : slide.layout === 'concept' ? (
+      ) : slide.layout === 'blank' ? (
+        slide.fields.imageUrl ? (
+          // Full-bleed, edge-to-edge — deliberately escapes the base
+          // wrapper's own px-16/py padding (an absolutely positioned
+          // element's containing block is its relative ancestor's padding
+          // edge, not inside it) so an "as is" imported slide image shows
+          // with no added chrome around it.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={slide.fields.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        ) : null
+      ) : slide.layout === 'concept' ? (
         <ConceptBody slide={slide} editable={editable} animate={animate} dark={dark} />
       ) : (
         <>

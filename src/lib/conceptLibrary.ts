@@ -13,6 +13,11 @@ export interface DesignConcept {
   id: string;
   title: string;
   description: string;
+  /** When set, this concept is a straight image slide (e.g. a real deck
+   *  page imported "as is") instead of the usual lead/points composition —
+   *  see conceptSlide() in conceptSlides.ts for the branch. Path under
+   *  /public, e.g. "/concept-library/ecom-express/slide-1.png". */
+  imageUrl?: string;
 }
 
 export interface DesignPillar {
@@ -486,6 +491,32 @@ export const DESIGN_PILLARS: DesignPillar[] = [
         title: 'Operational Efficiency',
         description:
           'Design support spaces, cleaning routes, storage and services so the workplace remains easy to operate.',
+      },
+    ],
+  },
+  {
+    id: 'ecom-express',
+    numeral: '13',
+    title: 'E-Com Express — Reference Deck',
+    question: 'A real client deck, shown exactly as delivered.',
+    concepts: [
+      {
+        id: 'ecom-workplace-aspirations',
+        title: 'Workplace Aspirations',
+        description: 'What do you aspire for at your workplace?',
+        imageUrl: '/concept-library/ecom-express/slide-1.png',
+      },
+      {
+        id: 'ecom-brand-landscape',
+        title: 'Brand Landscape',
+        description: 'Understanding the ECOM brand a notch better.',
+        imageUrl: '/concept-library/ecom-express/slide-2.png',
+      },
+      {
+        id: 'ecom-design-cues',
+        title: 'Design Cues',
+        description: 'Bringing the Workplace Aspiration & Brand Landscape together.',
+        imageUrl: '/concept-library/ecom-express/slide-3.png',
       },
     ],
   },

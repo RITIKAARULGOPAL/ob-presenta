@@ -29,8 +29,26 @@ export function pillarSectionSlide(pillar: DesignPillar): Slide {
 
 /** One concept, one composed slide: a lead line, scannable point cards, and an
  *  empty image slot for the project's own plan or render. Falls back to the
- *  library description when a concept has no authored presentation copy. */
+ *  library description when a concept has no authored presentation copy.
+ *
+ *  A concept with `imageUrl` set (an external slide imported "as is" rather
+ *  than one of this framework's own templates) skips all of that and
+ *  becomes a plain full-bleed image slide instead — see the 'blank' layout
+ *  branch in SlideRenderer.tsx, which renders `fields.imageUrl` edge-to-edge
+ *  with no title/kicker chrome overlaid, so the original design shows
+ *  untouched. */
 export function conceptSlide(pillar: DesignPillar, concept: DesignConcept): Slide {
+  if (concept.imageUrl) {
+    return {
+      id: makeId('slide'),
+      layout: 'blank',
+      style: 'standard',
+      fields: { imageUrl: concept.imageUrl },
+      animation: animation(),
+      conceptOrigin: { pillarId: pillar.id, conceptId: concept.id },
+    };
+  }
+
   const detail = CONCEPT_DETAIL[concept.id];
   return {
     id: makeId('slide'),

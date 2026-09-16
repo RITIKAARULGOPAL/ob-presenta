@@ -14,7 +14,10 @@ export type SlideLayout =
   | 'merge-diagram'
   | 'stat-hero'
   | 'concept'
-  | 'linked-views';
+  | 'linked-views'
+  | 'site-locus'
+  | 'material-compare'
+  | 'orbit';
 
 export type SlideStyleKind = 'standard' | 'section-starter' | 'company' | 'design';
 
@@ -29,7 +32,32 @@ export interface MergeItem {
   label: string;
 }
 
+/** An orbit-diagram node — a MergeItem plus an optional photo, since the
+ *  reference pattern's nodes are photo-filled circles, not plain text chips. */
+export interface OrbitNode extends MergeItem {
+  imageUrl?: string;
+}
+
 export type LinkedViewKind = 'layout' | 'render' | 'walkthrough' | 'axo';
+
+/** A structured row shown in a hotspot's side list, and/or as its caption in
+ *  a gallery. Presence of a `listEntry` anywhere on a view is what turns on
+ *  that view's side-list UI — see LinkedView.showHotspotList. */
+export interface HotspotListEntry {
+  id: string;
+  label: string;
+  /** Short figure shown next to the label, e.g. "24 sqm" or "Seats 8". */
+  value?: string;
+  description?: string;
+}
+
+/** One image in a hotspot's own gallery — a lightweight lightbox, not the
+ *  full crop/rotate ImageTransform editor every other image slot gets. */
+export interface HotspotGalleryImage {
+  id: string;
+  url: string;
+  caption?: string;
+}
 
 export interface ViewHotspot {
   id: string;
@@ -53,6 +81,39 @@ export interface ViewHotspot {
   fillOpacity?: number;
   strokeColor?: string;
   strokeWidth?: number;
+  /** Name shown in this hotspot's side-list row and gallery/lightbox title.
+   *  Unset on every hotspot drawn before this existed — those keep working as
+   *  plain click-to-navigate regions with no label anywhere. */
+  label?: string;
+  /** Turns this hotspot into a row in its view's side list (see
+   *  LinkedView.showHotspotList). Lives on the hotspot itself, not a parallel
+   *  array, so there's nothing to keep in sync by id. */
+  listEntry?: HotspotListEntry;
+  /** A mini image set opened on click — the axo-style "zone gallery". */
+  gallery?: HotspotGalleryImage[];
+  /** Small cropped orientation thumbnail shown in the gallery/lightbox corner
+   *  (a key-plan crop with a camera-direction arrow). */
+  keyPlanImage?: { url: string; arrowDeg?: number };
+  /** Which of the view's stages this hotspot is active on. Absent = every
+   *  stage — the correct default both for hotspots drawn before stages
+   *  existed and for a view that never defines any. */
+  stageIds?: string[];
+  /** What a click does when both a gallery and a nav target are set. Only
+   *  needs setting to override the default: 'gallery' if one is present,
+   *  else 'navigate'. */
+  clickAction?: 'navigate' | 'gallery';
+}
+
+/** A named mode a linked view can be switched between while editing/viewing
+ *  — e.g. "Zoning" vs "Layout" — gating which hotspots are interactive and
+ *  optionally swapping the shown image. Absent/empty on a view = the single
+ *  implicit stage every view had before this existed. */
+export interface LinkedViewStage {
+  id: string;
+  label: string;
+  /** Swaps the view's own image for this stage. Absent = reuse the view's url/transform. */
+  url?: string;
+  transform?: ImageTransform;
 }
 
 export interface LinkedView {
@@ -63,6 +124,15 @@ export interface LinkedView {
   hotspots?: ViewHotspot[];
   /** How this view's own image sits inside its frame — zoom/pan/rotate/opacity. */
   transform?: ImageTransform;
+  /** Named modes hotspots/side-panel content can be gated to. */
+  stages?: LinkedViewStage[];
+  /** Lets the viewer wheel-zoom/drag-pan the image itself, independent of the
+   *  authored `transform` crop. A viewer aid, never persisted back onto it. */
+  zoomPanEnabled?: boolean;
+  /** Whether to show the hotspot side list at all. Unset = show it exactly
+   *  when at least one hotspot has a listEntry — compute that default with
+   *  one shared helper wherever this is read, rather than re-deriving it. */
+  showHotspotList?: boolean;
 }
 
 /** How an image sits inside its own frame — the frame itself (position and
@@ -116,6 +186,36 @@ export interface SlideFields {
    *  design slide that demonstrates it. Ids may go stale if a slide is deleted,
    *  so every reader must tolerate a miss. */
   linkedSlideIds?: string[];
+
+  /** title-slide only: an optional full-bleed looping background video behind
+   *  the cover title/subtitle/logo. URL only, like a linked-views walkthrough
+   *  — a base64 video would be tens of megabytes in the project row. */
+  heroVideoUrl?: string;
+
+  /** site-locus layout: the reveal photo shown when the locus map (imageUrl)
+   *  is hovered/tapped. */
+  revealImageUrl?: string;
+  revealImageTransform?: ImageTransform;
+  /** e.g. "10th Floor" — the caption band on the reveal photo. */
+  revealLabel?: string;
+  /** Site address, shown under the reveal photo. */
+  address?: string;
+  /** The sun-path/compass diagram shown beside the locus map. */
+  compassImageUrl?: string;
+
+  /** material-compare layout: the two images the slider reveals between. */
+  compareBeforeUrl?: string;
+  compareBeforeTransform?: ImageTransform;
+  compareBeforeLabel?: string;
+  compareAfterUrl?: string;
+  compareAfterTransform?: ImageTransform;
+  compareAfterLabel?: string;
+
+  /** orbit layout: nodes orbiting the core, and the core's own default text
+   *  (shown until a node is hovered, which swaps it to that node's own copy). */
+  orbitNodes?: OrbitNode[];
+  orbitCoreTitle?: string;
+  orbitCoreBody?: string;
 }
 
 /** Set on slides generated from the concept library, so the UI can show what a

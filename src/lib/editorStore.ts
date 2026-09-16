@@ -50,6 +50,8 @@ interface EditorState {
   removeMergeItem: (itemId: string) => void;
   addPoint: () => void;
   removePoint: (pointId: string) => void;
+  addOrbitNode: () => void;
+  removeOrbitNode: (nodeId: string) => void;
 
   currentSlide: () => Slide | null;
   currentIndex: () => number;
@@ -399,6 +401,32 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const slides = project.slides.map((sl) =>
       sl.id === currentSlideId
         ? { ...sl, fields: { ...sl.fields, points: (sl.fields.points ?? []).filter((pt) => pt.id !== pointId) } }
+        : sl,
+    );
+    const next = { ...project, slides };
+    set({ project: next });
+    persist(next);
+  },
+
+  addOrbitNode: () => {
+    const { project, currentSlideId } = get();
+    if (!project || !currentSlideId) return;
+    const slides = project.slides.map((sl) =>
+      sl.id === currentSlideId
+        ? { ...sl, fields: { ...sl.fields, orbitNodes: [...(sl.fields.orbitNodes ?? []), { id: makeId('orbit'), label: 'New node' }] } }
+        : sl,
+    );
+    const next = { ...project, slides };
+    set({ project: next });
+    persist(next);
+  },
+
+  removeOrbitNode: (nodeId) => {
+    const { project, currentSlideId } = get();
+    if (!project || !currentSlideId) return;
+    const slides = project.slides.map((sl) =>
+      sl.id === currentSlideId
+        ? { ...sl, fields: { ...sl.fields, orbitNodes: (sl.fields.orbitNodes ?? []).filter((n) => n.id !== nodeId) } }
         : sl,
     );
     const next = { ...project, slides };

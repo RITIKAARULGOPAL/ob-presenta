@@ -32,6 +32,200 @@ or re-explain anything.
 
 ---
 
+## 2026-09-16 (cont'd 3)
+
+**Done:**
+- Built Part A step 4 of the linked-views hotspot upgrade: stages. A view can
+  now have named "stages" (e.g. Zoning vs Layout) — a stage switcher row
+  appears under the view tabs (`LinkedViewsExplorer` in
+  [SlideRenderer.tsx](src/components/SlideRenderer.tsx)) with a "+ Stage"
+  button in edit mode. Switching stages can swap the view's image (a stage
+  gets its own `url`/`transform` the first time you replace/adjust the image
+  while it's active; until then it just shows the view's own image) and
+  filters which hotspots are visible/interactive (`stageIds` on the hotspot —
+  absent = every stage, so nothing authored before this needs migrating). The
+  hotspot popup has a new "Active on" checkbox row (only shown once a view
+  has stages) to gate a hotspot to specific stages.
+- Verified in-browser on "Linking Test": added a stage ("Stage 1"), confirmed
+  it appears as a selectable pill next to "+ Stage", confirmed the existing
+  hotspot (no `stageIds` set) still shows on it (correct default-to-all
+  behavior). `tsc --noEmit` clean (same pre-existing unrelated `pdfjs-dist`
+  errors only); console shows only the pre-existing 400s.
+- **Not fully exercised**: only tested with one stage and the default-visible
+  case — didn't verify a hotspot actually disappearing when unchecked from a
+  specific stage's "Active on" list, or a stage with its own overridden
+  image. Worth a closer look before calling step 4 fully done.
+
+**Left off / next up:**
+- **Part A step 5 (zoom/pan) has not been started** — deliberately stopped
+  here (steps 1–4 done) ahead of a 5pm deadline rather than rush the riskiest
+  step (pointer-handler conflicts with the existing draw/hover/click
+  handlers) without time to verify it. Next session: pick up step 5 per the
+  plan (`C:\Users\Ritika\.claude\plans\ok-lets-no-do-giggly-snowglobe.md`) —
+  transient viewport zoom/pan, gated on `tool === null`, never persisted.
+  Also worth circling back to more thoroughly test stages (see above) before
+  starting zoom/pan on top of them.
+- Still unconfirmed by the user: the file-input fix resolving their real
+  "Choose a file" symptom in their own environment.
+- Nothing from today is committed — four batches of uncommitted work now
+  (quick-wins layouts+nav bar, side-list+hover, gallery/lightbox, stages).
+  Strongly consider committing before ending this session.
+
+---
+
+## 2026-09-16 (cont'd 2)
+
+**Done:**
+- Built Part A step 3 of the linked-views hotspot upgrade: gallery/lightbox.
+  New [Lightbox.tsx](src/components/Lightbox.tsx) (prev/next viewer, caption,
+  optional key-plan thumbnail, Escape/backdrop/close-button dismiss). The
+  hotspot edit/create popup in `LinkedViewsExplorer`
+  ([SlideRenderer.tsx](src/components/SlideRenderer.tsx)) now has a "Gallery
+  images" section — add via file picker (reuses the same fixed file-input
+  pattern), thumbnail grid with per-image remove. In view/Presenter mode,
+  clicking a hotspot that has a gallery opens the Lightbox instead of
+  navigating (a hotspot with both a gallery and a target link currently
+  always prefers the gallery — no explicit `clickAction` override wired yet,
+  the plan's optional field for that is unused since the default rule covers
+  the common case).
+- Verified in-browser end-to-end on the "Linking Test" project: added a
+  gallery image to the existing hotspot via the popup, saved, opened
+  Presenter mode, clicked the hotspot, confirmed the Lightbox opens with that
+  image and closes cleanly. `npx tsc --noEmit -p .` clean (the only errors
+  are pre-existing/unrelated: `pdfjs-dist` missing types in
+  `src/lib/importDeck.ts`, nothing to do with this work). Console shows only
+  the pre-existing migration-column 400s, no new errors.
+
+**Left off / next up:**
+- Next per the plan's build order: step 4 (stages — gates hotspot visibility
+  per named stage, needs a stage switcher UI), then step 5 (zoom/pan, last
+  and riskiest for pointer-handler conflicts).
+- Still unconfirmed by the user: the file-input fix (reported bug) actually
+  resolving their real "Choose a file" symptom in their own environment.
+- Nothing from today is committed yet — this is now three batches of
+  uncommitted work (quick-wins layouts+nav bar, side-list+hover, this
+  gallery/lightbox slice).
+
+---
+
+## 2026-09-16 (cont'd)
+
+**Done:**
+- Fixed the "Unable to add image, nothing happens at all" bug reported by the
+  user: every hidden `<input type="file">` triggered via `ref.current?.click()`
+  used the `hidden` attribute (`display:none`), which some browser/webview
+  environments silently refuse to open a native picker for. Switched all four
+  occurrences (`MediaBox` and `ClientLogo` in
+  [SlideRenderer.tsx](src/components/SlideRenderer.tsx), `OrbitNodeDot` in
+  [OrbitDiagram.tsx](src/components/OrbitDiagram.tsx), the client-logo input on
+  [page.tsx](src/app/page.tsx)) to a visually-hidden-but-rendered pattern
+  (`className="absolute h-px w-px overflow-hidden opacity-0"`). **Not yet
+  confirmed by the user in their real environment** — Claude's browser tool
+  can't drive a native OS file dialog, so this needs their own hands-on check.
+- Built Part A step 2 of the linked-views hotspot upgrade (plan at
+  `C:\Users\Ritika\.claude\plans\ok-lets-no-do-giggly-snowglobe.md`): side list
+  + two-way hover, in `LinkedViewsExplorer`
+  ([SlideRenderer.tsx](src/components/SlideRenderer.tsx)) +
+  [HotspotSidePanel.tsx](src/components/HotspotSidePanel.tsx). Drawing a
+  hotspot now has a Label field and an "Add to side list" checkbox
+  (value/description); listed hotspots show in a side panel next to the image;
+  hovering either side highlights the other; clicking an existing hotspot in
+  edit mode now opens an "Edit hotspot" popup (prefilled, Save/Remove/Cancel)
+  instead of instantly deleting it.
+- Verified in-browser: created a hotspot with a list entry, confirmed it shows
+  in the side panel, confirmed two-way hover in both directions, confirmed
+  edit-and-save on an existing hotspot. Chased down a console parse error
+  (`SlideRenderer.tsx:1203`) that appeared after a Save click — confirmed
+  stale/spurious (current file content at that line doesn't match the quoted
+  error, `tsc --noEmit` is clean, and the UI keeps rendering/working
+  correctly) rather than a real bug from these edits.
+
+**Left off / next up:**
+- Next per the plan's build order: step 3 (gallery/lightbox — new
+  `Lightbox.tsx`, `gallery`/`keyPlanImage` fields, authoring UI in the hotspot
+  popup), then step 4 (stages), then step 5 (zoom/pan, last/riskiest).
+- The "Linking Test" scratch project (has a real hotspot + side-list entry) is
+  being kept around intentionally to keep testing later Part A steps against
+  it — clean it up once Part A is fully done, not before.
+- Ask the user to confirm the file-input fix actually resolves their reported
+  symptom in their own environment.
+- Nothing from this batch is committed yet.
+
+---
+
+## 2026-09-16
+
+**Done:**
+- Imported the Qualcomm/Damascus II PDF bid deck into Presenta as a real
+  project (163 slides, split across parallel transcription agents) — see the
+  `2026-09-15` entry below for the fuller writeup; this just confirms it
+  landed and stayed in Supabase (`proj_slrz9354mu3pc5mz`, name "Qualcomm ·
+  Project Damascus II — QC Technical Bid").
+- Built the first slice of generalizing `D:\Claude\sidvin-design-deck\index3.html`'s
+  interaction patterns into Presenta (full plan at
+  `C:\Users\Ritika\.claude\plans\ok-lets-no-do-giggly-snowglobe.md` — read that
+  before continuing this work, it has the complete design for everything
+  including what's not built yet):
+  - Three new slide layouts, each a real `SlideLayout` + fields + renderer,
+    not a one-off: `orbit` ([OrbitDiagram.tsx](src/components/OrbitDiagram.tsx),
+    a rotating persona diagram with photo/label nodes — CSS-only rotation +
+    counter-rotation, reuses `ConceptDiagram.tsx`'s radial-angle math),
+    `site-locus` ([SiteLocusDiagram.tsx](src/components/SiteLocusDiagram.tsx),
+    hover/tap-reveal card + a CSS sun-orbit compass diagram), and
+    `material-compare` ([MaterialCompare.tsx](src/components/MaterialCompare.tsx),
+    a draggable before/after slider — the reference's own version turned out
+    to have no audio-reactive behavior at all despite the "resonance"/"pulse"
+    naming, just a button-triggered sweep between two labeled images; ours
+    adds a real drag handle plus keeps the sweep button for parity).
+  - Hero video on the title slide (`heroVideoUrl`, URL-only like the
+    linked-views walkthrough video) — see `HeroVideo` in
+    [SlideRenderer.tsx](src/components/SlideRenderer.tsx).
+  - A Presenter-mode navigation bar — step counter, current slide's
+    kicker/title as a hint, and clickable dots to jump slides — in
+    [present/page.tsx](src/app/p/[id]/present/page.tsx). Pure UI, no data
+    model changes.
+  - Data model groundwork for the bigger piece (Part A in the plan —
+    upgrading `linked-views` hotspots to support a two-way-hover side list,
+    per-hotspot image galleries, named "stages," and image zoom/pan): the
+    types (`HotspotListEntry`, `HotspotGalleryImage`, `LinkedViewStage`, and
+    the new optional fields on `ViewHotspot`/`LinkedView`) are in
+    [slide.ts](src/types/slide.ts) now, but **none of it is wired into
+    `LinkedViewsExplorer` yet** — the types exist, nothing reads or writes
+    them.
+- Verified: all three new layouts render cleanly in the browser with no
+  console errors beyond the pre-existing migration-column 400s; the
+  Presenter nav bar's counter/dots/jump-to-slide all work; an existing
+  `linked-views` slide still renders and accepts a new hotspot draw exactly
+  as before (confirms the additive type changes didn't disturb anything).
+
+**Left off / next up:**
+- **Part A (the linked-views hotspot upgrade) is not started** — data model
+  only. Next: wire the side list + two-way hover into `LinkedViewsExplorer`
+  (smallest end-to-end slice per the plan), then gallery/lightbox, then
+  stages, then zoom/pan last. The plan file has the full component-level
+  design already worked out — follow it rather than re-planning.
+- **Accidentally wiped one slide's content** on the "zzz" test project while
+  verifying linked-views still works: switching a slide's layout resets its
+  `fields` to that layout's defaults (correct, pre-existing behavior in
+  `changeLayout` — I just hadn't accounted for it), so the "PEOPLE & USER
+  NEEDS / User Profiles" concept slide lost its title/lead/points text. Left
+  as-is since it's disposable QA test data (same pattern as every other
+  `xx`/`zzz` entry in that list), but didn't restore it — worth knowing if
+  that specific slide is ever needed again, it isn't recoverable from here.
+- Nothing from today is committed yet.
+
+**Watch out for:**
+- Browser-pane click coordinates in this environment don't always match
+  1:1 with screenshot pixels when the pane is very short/cropped — if a
+  click seems to land on the wrong element, re-derive the target's real
+  `getBoundingClientRect()` via `javascript_tool` rather than eyeballing a
+  screenshot, and prefer `find`/ref-based clicks over raw coordinates where
+  the element is actually visible to the accessibility-tree reader (it
+  wasn't, for the Properties panel's off-screen-but-scrollable content,
+  which is why this took more back-and-forth than it should have).
+
+---
+
 ## 2026-09-15
 
 **Done:**

@@ -222,7 +222,7 @@ export default function HomePage() {
               </div>
               <div className="block">
                 <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Client logo (optional)</span>
-                <input ref={logoInputRef} type="file" accept="image/*" onChange={handleClientLogoPick} className="hidden" />
+                <input ref={logoInputRef} type="file" accept="image/*" onChange={handleClientLogoPick} className="absolute h-px w-px overflow-hidden opacity-0" />
                 <div className="flex items-center gap-3">
                   {clientLogo ? (
                     // eslint-disable-next-line @next/next/no-img-element

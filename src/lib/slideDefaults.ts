@@ -1,5 +1,5 @@
 import { makeId } from './id';
-import type { Slide, SlideLayout, SlideStyleKind, StatItem, MergeItem, LinkedView } from '@/types/slide';
+import type { Slide, SlideLayout, SlideStyleKind, StatItem, MergeItem, OrbitNode, LinkedView } from '@/types/slide';
 
 const defaultAnimation = () => ({ entry: 'none' as const, duration: 600, delay: 0 });
 
@@ -8,6 +8,9 @@ function makeStat(): StatItem {
 }
 function makeItem(): MergeItem {
   return { id: makeId('item'), label: '' };
+}
+export function makeOrbitNode(): OrbitNode {
+  return { id: makeId('orbit'), label: '' };
 }
 function makeLinkedViews(): LinkedView[] {
   // The labels here name the kind of view a slot holds, so they're structure
@@ -56,7 +59,7 @@ export function defaultFieldsForLayout(layout: SlideLayout) {
         rightColumn: '',
       };
     case 'title-slide':
-      return { kickerEyebrow: '', title: '', subtitle: '' };
+      return { kickerEyebrow: '', title: '', subtitle: '', heroVideoUrl: '' };
     case 'merge-diagram':
       return {
         kickerEyebrow: '',
@@ -89,6 +92,36 @@ export function defaultFieldsForLayout(layout: SlideLayout) {
         kickerLabel: '',
         title: '',
         views: makeLinkedViews(),
+      };
+    case 'site-locus':
+      return {
+        kickerEyebrow: '',
+        kickerLabel: '',
+        title: '',
+        imageUrl: '',
+        revealImageUrl: '',
+        revealLabel: '',
+        address: '',
+        compassImageUrl: '',
+      };
+    case 'material-compare':
+      return {
+        kickerEyebrow: '',
+        kickerLabel: '',
+        title: '',
+        compareBeforeUrl: '',
+        compareBeforeLabel: '',
+        compareAfterUrl: '',
+        compareAfterLabel: '',
+      };
+    case 'orbit':
+      return {
+        kickerEyebrow: '',
+        kickerLabel: '',
+        title: '',
+        orbitCoreTitle: '',
+        orbitCoreBody: '',
+        orbitNodes: [makeOrbitNode(), makeOrbitNode(), makeOrbitNode()],
       };
     default:
       return {};
@@ -145,6 +178,9 @@ export const LAYOUT_LABELS: Record<SlideLayout, string> = {
   'stat-hero': 'Stat Hero',
   concept: 'Concept',
   'linked-views': 'Linked Views',
+  'site-locus': 'Site Location',
+  'material-compare': 'Materials Compare',
+  orbit: 'Orbit Diagram',
 };
 
 export const STYLE_LABELS: Record<SlideStyleKind, string> = {

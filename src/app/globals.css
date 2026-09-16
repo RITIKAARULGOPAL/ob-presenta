@@ -90,6 +90,51 @@ body {
   .cd-draw { stroke-dasharray: none; stroke-dashoffset: 0; }
 }
 
+/* ---- Orbit diagram --------------------------------------------------------
+   The ring rotates a full turn; each node counter-rotates at the exact same
+   duration so its label stays upright while it travels around the ring —
+   two keyframes sharing one duration, not one clever transform. */
+@keyframes orbit-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes orbit-spin-reverse { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
+
+.orbit-ring { animation: orbit-spin 70s linear infinite; }
+.orbit-ring.paused { animation-play-state: paused; }
+.orbit-node-counter { animation: orbit-spin-reverse 70s linear infinite; }
+.orbit-ring.paused .orbit-node-counter { animation-play-state: paused; }
+
+@media (prefers-reduced-motion: reduce) {
+  .orbit-ring, .orbit-node-counter { animation: none !important; }
+}
+
+/* ---- Site-location reveal --------------------------------------------- */
+@keyframes site-shimmer-sweep { from { transform: translateX(-120%); } to { transform: translateX(120%); } }
+.site-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 40%, rgba(255, 255, 255, 0.35) 50%, transparent 60%);
+  animation: site-shimmer-sweep 2.5s ease-in-out infinite;
+}
+
+.site-sun-orbit { animation: orbit-spin 12s linear infinite; }
+.site-sun {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: #fdb813;
+  transform: translate(90px, -50%);
+  box-shadow: 0 0 6px 2px rgba(253, 184, 19, 0.5);
+  transition: box-shadow 0.4s ease;
+}
+.site-sun.glow { box-shadow: 0 0 18px 7px rgba(253, 184, 19, 0.9); }
+
+@media (prefers-reduced-motion: reduce) {
+  .site-shimmer::after, .site-sun-orbit { animation: none !important; }
+}
+
 /* ---- Empty-field hints ----------------------------------------------------
    A fresh slide starts with every text field empty (see slideDefaults.ts), so
    each field names itself until someone types into it. EditableText only emits

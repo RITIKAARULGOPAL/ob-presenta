@@ -95,6 +95,35 @@ export default function PresenterPage({ params }: { params: Promise<{ id: string
       <div className="absolute bottom-6 right-6 rounded-full bg-black/40 px-3 py-1.5 text-xs text-white shadow-lg backdrop-blur-sm">
         Press Esc to exit Presenter mode
       </div>
+
+      {/* Progress rail: step count + a one-line hint, and a row of clickable
+          dots for jump-to-slide — the deck's own navigation chrome, not part
+          of any one slide's content. */}
+      <div className="absolute bottom-6 left-1/2 flex max-w-[70vw] -translate-x-1/2 flex-col items-center gap-2">
+        <div className="flex items-center gap-3 rounded-full bg-black/40 px-4 py-1.5 text-xs text-white shadow-lg backdrop-blur-sm">
+          <span className="font-semibold tabular-nums">
+            {shownIndex + 1} / {shown.length}
+          </span>
+          {(currentSlide?.fields.kickerLabel || currentSlide?.fields.title) && (
+            <span className="max-w-[40vw] truncate text-white/70">
+              {currentSlide?.fields.kickerLabel || currentSlide?.fields.title}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-full bg-black/40 px-3 py-2 shadow-lg backdrop-blur-sm">
+          {shown.map((s, i) => (
+            <button
+              key={s.id}
+              onClick={() => selectSlide(s.id)}
+              aria-label={`Go to slide ${i + 1}`}
+              aria-current={i === shownIndex}
+              className={`h-1.5 rounded-full transition-all ${
+                i === shownIndex ? 'w-5 bg-white' : 'w-1.5 bg-white/35 hover:bg-white/60'
+              }`}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

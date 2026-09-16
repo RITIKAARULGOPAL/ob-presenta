@@ -20,11 +20,16 @@ import {
   type ShapeKind,
 } from '@/lib/hotspotShape';
 import { ConceptDiagram } from './ConceptDiagram';
+import { HotspotSidePanel } from './HotspotSidePanel';
+import { Lightbox } from './Lightbox';
+import { OrbitDiagram } from './OrbitDiagram';
+import { SiteLocusDiagram } from './SiteLocusDiagram';
+import { MaterialCompare } from './MaterialCompare';
 import { ImageAdjustOverlay } from './ImageAdjustOverlay';
 import { LogoAdjustOverlay } from './LogoAdjustOverlay';
 import { imageStyle } from '@/lib/imageTransform';
 import { makeId } from '@/lib/id';
-import type { Brand, ImageTransform, LinkedView, Slide, ViewHotspot } from '@/types/slide';
+import type { Brand, HotspotGalleryImage, ImageTransform, LinkedView, Slide, ViewHotspot } from '@/types/slide';
 import type { Point } from '@/lib/hotspotShape';
 
 interface SlideRendererProps {
@@ -159,7 +164,7 @@ function MediaBox({
             ref={fileRef}
             type="file"
             accept="image/*"
-            hidden
+            className="absolute h-px w-px overflow-hidden opacity-0"
             onChange={(e) => {
               const file = e.target.files?.[0];
               e.target.value = '';
@@ -324,7 +329,7 @@ function ClientLogo({ editable, dark }: { editable: boolean; dark: boolean }) {
       ) : null}
       {editable && (
         <>
-          <input ref={inputRef} type="file" accept="image/*" onChange={handlePick} className="hidden" />
+          <input ref={inputRef} type="file" accept="image/*" onChange={handlePick} className="absolute h-px w-px overflow-hidden opacity-0" />
           {!logo && (
             <button
               onClick={() => inputRef.current?.click()}
@@ -338,6 +343,89 @@ function ClientLogo({ editable, dark }: { editable: boolean; dark: boolean }) {
         </>
       )}
     </div>
+  );
+}
+
+/** The title slide's optional full-bleed looping background video. URL-only
+ *  (like a linked-views walkthrough) — a base64 video would be tens of
+ *  megabytes in the project row. Renders nothing at all in Presenter/export
+ *  when unset, rather than an empty placeholder box, since a title slide
+ *  with no video should look exactly like it always has. */
+function HeroVideo({ url, editable, onChangeUrl }: { url?: string; editable: boolean; onChangeUrl: (url: string) => void }) {
+  const [editingUrl, setEditingUrl] = useState(false);
+  const [draft, setDraft] = useState(url ?? '');
+
+  if (!url && !editable) return null;
+
+  return (
+    <>
+      {url && (
+        <>
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <video
+            src={url}
+            autoPlay
+            muted
+            loop
+            playsInline
+            className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover"
+          />
+          <div className="pointer-events-none absolute inset-0 -z-10 bg-black/45" />
+        </>
+      )}
+      {editable && (
+        <div className="absolute inset-x-0 -top-8 flex justify-center">
+          {editingUrl ? (
+            <div className="flex items-center gap-1.5 rounded-md border border-[var(--line)] bg-white px-2 py-1 shadow-lg">
+              <input
+                autoFocus
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    onChangeUrl(draft.trim());
+                    setEditingUrl(false);
+                  } else if (e.key === 'Escape') {
+                    setEditingUrl(false);
+                  }
+                }}
+                placeholder="Paste video URL…"
+                className="w-56 text-xs text-[var(--ink)] outline-none"
+              />
+              <button
+                onClick={() => {
+                  onChangeUrl(draft.trim());
+                  setEditingUrl(false);
+                }}
+                className="shrink-0 rounded bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold text-white"
+              >
+                Set
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                setDraft(url ?? '');
+                setEditingUrl(true);
+              }}
+              className={`rounded-md border border-dashed px-2.5 py-1 text-[10px] font-semibold transition ${
+                url ? 'border-white/30 text-white/70 hover:border-white/60' : 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+              }`}
+            >
+              {url ? 'Replace hero video' : '+ Add hero video'}
+            </button>
+          )}
+          {url && !editingUrl && (
+            <button
+              onClick={() => onChangeUrl('')}
+              className="ml-1.5 rounded-md border border-dashed border-white/30 px-2 py-1 text-[10px] font-semibold text-white/70 hover:border-red-400 hover:text-red-300"
+            >
+              Remove
+            </button>
+          )}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -457,8 +545,30 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   const [pendingFillOpacity, setPendingFillOpacity] = useState(DEFAULT_FILL_OPACITY);
   const [pendingStroke, setPendingStroke] = useState(DEFAULT_STROKE);
   const [pendingStrokeWidth, setPendingStrokeWidth] = useState(DEFAULT_STROKE_WIDTH);
+  const [pendingLabel, setPendingLabel] = useState('');
+  const [pendingListOn, setPendingListOn] = useState(false);
+  const [pendingListValue, setPendingListValue] = useState('');
+  const [pendingListDescription, setPendingListDescription] = useState('');
+  const [pendingGallery, setPendingGallery] = useState<HotspotGalleryImage[]>([]);
+  const [galleryBusy, setGalleryBusy] = useState(false);
+  const galleryFileRef = useRef<HTMLInputElement>(null);
+  /** Set while editing an existing hotspot's label/list/style rather than
+   *  drawing a new one — the popup is shared between both flows. */
+  const [editingHotspotId, setEditingHotspotId] = useState<string | null>(null);
+  /** One id, read by both the hotspot <path> and the side-list row it
+   *  matches, so highlighting the two can never drift out of sync. */
+  const [hoveredHotspotId, setHoveredHotspotId] = useState<string | null>(null);
+  /** The hotspot whose gallery is open in the lightbox (view mode only). */
+  const [lightboxHotspotId, setLightboxHotspotId] = useState<string | null>(null);
+  /** Which named stage is active — undefined means "no stages defined" or
+   *  "first one," both of which fall back to the view's own url/transform. */
+  const [activeStageId, setActiveStageId] = useState<string | undefined>(undefined);
+  /** Which stages the hotspot being drawn/edited is active on. Empty = every
+   *  stage (matches `stageIds` being unset on save). */
+  const [pendingStageIds, setPendingStageIds] = useState<string[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const active = views.find((v) => v.id === activeId) ?? views[0];
+  const activeStage = active?.stages?.find((s) => s.id === activeStageId) ?? active?.stages?.[0];
 
   function setView(id: string, patch: Partial<LinkedView>) {
     updateField('views', views.map((v) => (v.id === id ? { ...v, ...patch } : v)));
@@ -490,10 +600,34 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     return () => window.removeEventListener('keydown', onKey);
   }, [tool]);
 
+  // Separate from the drawing-tool effect above: editing an existing
+  // hotspot's label/list/style needs no tool selected at all, so it needs its
+  // own Escape handling rather than piggy-backing on the one gated by `tool`.
+  useEffect(() => {
+    if (!editingHotspotId) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setEditingHotspotId(null);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [editingHotspotId]);
+
   if (!active) return null;
 
   const otherViews = views.filter((v) => v.id !== active.id);
-  const hotspots = active.hotspots ?? [];
+  const allHotspots = active.hotspots ?? [];
+  // Unset stageIds = active on every stage — matters both for hotspots drawn
+  // before stages existed and for a view that never defines any.
+  const hotspots = activeStage ? allHotspots.filter((h) => !h.stageIds || h.stageIds.includes(activeStage.id)) : allHotspots;
+  const stageUrl = activeStage?.url ?? active.url;
+  const stageTransform = activeStage?.url ? activeStage.transform : active.transform;
+  // Unset means "show it exactly when something would appear in it" — computed
+  // here, once, rather than re-derived wherever it's read.
+  const showHotspotList = active.showHotspotList ?? hotspots.some((h) => h.listEntry);
+  const editingHotspot = hotspots.find((h) => h.id === editingHotspotId) ?? null;
   const targetView = otherViews.find((v) => `view:${v.id}` === pendingTarget);
   // Concept and design slides are the meaningful cross-slide destinations: a
   // zone on a plan should be able to point at the principle behind it.
@@ -617,6 +751,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     setCursor(null);
     setDragging(false);
     setOrtho(false);
+    setEditingHotspotId(null);
   }
 
   function selectView(id: string) {
@@ -624,15 +759,47 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     cancelDrawing();
   }
 
+  /** Shared by both the create-a-new-hotspot flow and the edit-an-existing-one
+   *  flow — the popup's fields are identical, only what happens on confirm
+   *  differs. */
+  function loadPendingFrom(h?: ViewHotspot) {
+    setPendingTarget(h?.targetSlideId ? `slide:${h.targetSlideId}` : h?.targetViewId ? `view:${h.targetViewId}` : otherViews[0] ? `view:${otherViews[0].id}` : linkableSlides[0] ? `slide:${linkableSlides[0].id}` : '');
+    setPendingTime(h?.targetTime != null ? String(h.targetTime) : '');
+    setPendingFill(h?.fillColor ?? DEFAULT_FILL);
+    setPendingFillOpacity(h?.fillOpacity ?? DEFAULT_FILL_OPACITY);
+    setPendingStroke(h?.strokeColor ?? DEFAULT_STROKE);
+    setPendingStrokeWidth(h?.strokeWidth ?? DEFAULT_STROKE_WIDTH);
+    setPendingLabel(h?.label ?? '');
+    setPendingListOn(!!h?.listEntry);
+    setPendingListValue(h?.listEntry?.value ?? '');
+    setPendingListDescription(h?.listEntry?.description ?? '');
+    setPendingGallery(h?.gallery ?? []);
+    setPendingStageIds(h?.stageIds ?? []);
+  }
+
   function startPickingTarget(points: Point[] = drawingPoints ?? []) {
     if (!hasEnoughPoints(points, tool ? shapeForTool(tool) : 'polygon')) return;
-    setPendingTarget(otherViews[0] ? `view:${otherViews[0].id}` : (linkableSlides[0] ? `slide:${linkableSlides[0].id}` : ''));
-    setPendingTime('');
-    setPendingFill(DEFAULT_FILL);
-    setPendingFillOpacity(DEFAULT_FILL_OPACITY);
-    setPendingStroke(DEFAULT_STROKE);
-    setPendingStrokeWidth(DEFAULT_STROKE_WIDTH);
+    loadPendingFrom();
     setPickingTarget(true);
+  }
+
+  /** Opens the same popup used to configure a just-drawn hotspot, but bound
+   *  to an existing one instead — this is the only way to add a label/side-
+   *  list entry to a hotspot after the fact, so clicking a hotspot no longer
+   *  deletes it outright (see the Remove button in the popup instead). */
+  function startEditingHotspot(h: ViewHotspot) {
+    loadPendingFrom(h);
+    setEditingHotspotId(h.id);
+  }
+
+  function buildListEntry(existingId?: string): ViewHotspot['listEntry'] {
+    if (!pendingListOn) return undefined;
+    return {
+      id: existingId ?? makeId('list'),
+      label: pendingLabel.trim() || 'Untitled',
+      value: pendingListValue.trim() || undefined,
+      description: pendingListDescription.trim() || undefined,
+    };
   }
 
   function confirmRegion() {
@@ -650,17 +817,52 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
       fillOpacity: pendingFillOpacity,
       strokeColor: pendingStroke,
       strokeWidth: pendingStrokeWidth,
+      label: pendingLabel.trim() || undefined,
+      listEntry: buildListEntry(),
+      gallery: pendingGallery.length ? pendingGallery : undefined,
+      stageIds: pendingStageIds.length ? pendingStageIds : undefined,
     };
-    setView(active.id, { hotspots: [...hotspots, hotspot] });
+    setView(active.id, { hotspots: [...allHotspots, hotspot] });
     // Stay on the tool rather than dropping out after every single region.
     resetShape();
   }
 
+  function saveHotspotEdit() {
+    if (!editingHotspot || !pendingTarget) return;
+    const time = pendingTime.trim() ? Number(pendingTime) : undefined;
+    const [kind, targetId] = pendingTarget.split(':');
+    setView(active.id, {
+      hotspots: allHotspots.map((h) =>
+        h.id === editingHotspot.id
+          ? {
+              ...h,
+              ...(kind === 'slide' ? { targetSlideId: targetId, targetViewId: undefined } : { targetViewId: targetId, targetSlideId: undefined }),
+              targetTime: time,
+              fillColor: pendingFill,
+              fillOpacity: pendingFillOpacity,
+              strokeColor: pendingStroke,
+              strokeWidth: pendingStrokeWidth,
+              label: pendingLabel.trim() || undefined,
+              listEntry: buildListEntry(h.listEntry?.id),
+              gallery: pendingGallery.length ? pendingGallery : undefined,
+              stageIds: pendingStageIds.length ? pendingStageIds : undefined,
+            }
+          : h,
+      ),
+    });
+    setEditingHotspotId(null);
+  }
+
   function removeHotspot(id: string) {
-    setView(active.id, { hotspots: hotspots.filter((h) => h.id !== id) });
+    setView(active.id, { hotspots: allHotspots.filter((h) => h.id !== id) });
+    setEditingHotspotId((cur) => (cur === id ? null : cur));
   }
 
   function jumpTo(hotspot: ViewHotspot) {
+    if (hotspot.gallery?.length) {
+      setLightboxHotspotId(hotspot.id);
+      return;
+    }
     if (hotspot.targetSlideId) {
       selectSlide(hotspot.targetSlideId);
       return;
@@ -675,6 +877,9 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   }
 
   const centroid: Point | null = drawingPoints ? centroidOf(drawingPoints) : null;
+  const editingCentroid: Point | null = editingHotspot ? centroidOf(editingHotspot.points) : null;
+  const showPopup = pickingTarget || !!editingHotspotId;
+  const popupCentroid = editingHotspotId ? editingCentroid : centroid;
 
   return (
     <div className="mt-6 flex flex-col">
@@ -715,20 +920,58 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           </div>
         )}
       </div>
+      {(active.stages?.length || editable) && active.kind !== 'walkthrough' && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          {active.stages?.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => setActiveStageId(s.id)}
+              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+                s.id === activeStage?.id
+                  ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                  : 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--ink-3)]'
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+          {editable && (
+            <button
+              onClick={() => {
+                const stage = { id: makeId('stage'), label: `Stage ${(active.stages?.length ?? 0) + 1}` };
+                setView(active.id, { stages: [...(active.stages ?? []), stage] });
+                setActiveStageId(stage.id);
+              }}
+              className="rounded-full border border-dashed border-[var(--line)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            >
+              + Stage
+            </button>
+          )}
+        </div>
+      )}
+      <div className="flex gap-4">
       <div
-        className={`relative aspect-video w-full select-none ${drawing ? 'cursor-crosshair' : ''}`}
+        className={`relative aspect-video min-w-0 flex-1 select-none ${drawing ? 'cursor-crosshair' : ''}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={() => setCursor(null)}
       >
         <MediaBox
-          url={active.url}
+          url={stageUrl}
           kind={active.kind === 'walkthrough' ? 'video' : 'image'}
           editable={editable}
-          onChangeUrl={(url) => setView(active.id, { url })}
-          transform={active.transform}
-          onChangeTransform={(t) => setView(active.id, { transform: t })}
+          onChangeUrl={(url) =>
+            activeStage
+              ? setView(active.id, { stages: active.stages!.map((s) => (s.id === activeStage.id ? { ...s, url } : s)) })
+              : setView(active.id, { url })
+          }
+          transform={stageTransform}
+          onChangeTransform={(t) =>
+            activeStage
+              ? setView(active.id, { stages: active.stages!.map((s) => (s.id === activeStage.id ? { ...s, transform: t } : s)) })
+              : setView(active.id, { transform: t })
+          }
           allowAdjust={tool === null}
           className="h-full w-full"
           mediaRef={active.kind === 'walkthrough' ? videoRef : undefined}
@@ -741,22 +984,25 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               d={shapePath(h.points, h.shape)}
               vectorEffect="non-scaling-stroke"
               fill={h.fillColor ?? DEFAULT_FILL}
-              fillOpacity={h.fillOpacity ?? DEFAULT_FILL_OPACITY}
+              fillOpacity={hoveredHotspotId === h.id ? Math.min(1, (h.fillOpacity ?? DEFAULT_FILL_OPACITY) * 1.8) : (h.fillOpacity ?? DEFAULT_FILL_OPACITY)}
               stroke={h.strokeColor ?? DEFAULT_STROKE}
-              strokeWidth={h.strokeWidth ?? DEFAULT_STROKE_WIDTH}
-              className={drawing ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer'}
+              strokeWidth={hoveredHotspotId === h.id ? (h.strokeWidth ?? DEFAULT_STROKE_WIDTH) * 1.6 : (h.strokeWidth ?? DEFAULT_STROKE_WIDTH)}
+              className={drawing ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer transition-[fill-opacity,stroke-width]'}
+              onMouseEnter={() => !drawing && setHoveredHotspotId(h.id)}
+              onMouseLeave={() => setHoveredHotspotId((cur) => (cur === h.id ? null : cur))}
               onClick={(e) => {
                 e.stopPropagation();
-                if (editable) removeHotspot(h.id);
+                if (editable) startEditingHotspot(h);
                 else jumpTo(h);
               }}
             >
               <title>
                 {editable
-                  ? 'Click to remove'
-                  : h.targetSlideId
-                    ? (project?.slides.find((s) => s.id === h.targetSlideId)?.fields.title ?? 'Linked slide')
-                    : views.find((v) => v.id === h.targetViewId)?.label}
+                  ? 'Click to edit'
+                  : h.label ||
+                    (h.targetSlideId
+                      ? (project?.slides.find((s) => s.id === h.targetSlideId)?.fields.title ?? 'Linked slide')
+                      : views.find((v) => v.id === h.targetViewId)?.label)}
               </title>
             </path>
           ))}
@@ -873,12 +1119,21 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           </div>
         )}
 
-        {pickingTarget && centroid && (
+        {showPopup && popupCentroid && (
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ left: `${centroid.x * 100}%`, top: `${centroid.y * 100}%` }}
-            className="absolute z-20 w-52 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--line)] bg-white p-3 shadow-xl"
+            style={{ left: `${popupCentroid.x * 100}%`, top: `${popupCentroid.y * 100}%` }}
+            className="absolute z-20 w-60 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--line)] bg-white p-3 shadow-xl"
           >
+            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--ink-3)]">
+              {editingHotspotId ? 'Edit hotspot' : 'New hotspot'}
+            </div>
+            <input
+              value={pendingLabel}
+              onChange={(e) => setPendingLabel(e.target.value)}
+              placeholder="Label (optional)"
+              className="mb-2 w-full rounded-md border border-[var(--line)] px-2 py-1.5 text-xs outline-none"
+            />
             <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--ink-3)]">Jump to</div>
             <select
               value={pendingTarget}
@@ -964,16 +1219,138 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               />
             </label>
 
-            <div className="flex gap-2">
-              <button onClick={confirmRegion} className="flex-1 rounded-md bg-[var(--accent)] px-2 py-1.5 text-xs font-semibold text-white">
-                Add region
+            <label className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold text-[var(--ink-3)]">
+              <input type="checkbox" checked={pendingListOn} onChange={(e) => setPendingListOn(e.target.checked)} className="accent-[var(--accent)]" />
+              Add to side list
+            </label>
+            {pendingListOn && (
+              <div className="mb-2 flex flex-col gap-1.5 rounded-md bg-[var(--surface-2)] p-2">
+                <input
+                  value={pendingListValue}
+                  onChange={(e) => setPendingListValue(e.target.value)}
+                  placeholder="Value, e.g. 24 sqm (optional)"
+                  className="w-full rounded-md border border-[var(--line)] bg-white px-2 py-1 text-xs outline-none"
+                />
+                <textarea
+                  value={pendingListDescription}
+                  onChange={(e) => setPendingListDescription(e.target.value)}
+                  placeholder="Description (optional)"
+                  rows={2}
+                  className="w-full resize-none rounded-md border border-[var(--line)] bg-white px-2 py-1 text-xs outline-none"
+                />
+              </div>
+            )}
+
+            {!!active.stages?.length && (
+              <div className="mb-2">
+                <span className="mb-1 block text-[10px] font-semibold text-[var(--ink-3)]">Active on</span>
+                <div className="flex flex-wrap gap-2">
+                  {active.stages.map((s) => (
+                    <label key={s.id} className="flex items-center gap-1 text-[11px] text-[var(--ink-2)]">
+                      <input
+                        type="checkbox"
+                        checked={pendingStageIds.length === 0 || pendingStageIds.includes(s.id)}
+                        onChange={(e) =>
+                          setPendingStageIds((prev) => {
+                            const base = prev.length === 0 ? active.stages!.map((st) => st.id) : prev;
+                            return e.target.checked ? [...base, s.id] : base.filter((id) => id !== s.id);
+                          })
+                        }
+                        className="accent-[var(--accent)]"
+                      />
+                      {s.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mb-2">
+              <span className="mb-1 block text-[10px] font-semibold text-[var(--ink-3)]">Gallery images</span>
+              {pendingGallery.length > 0 && (
+                <div className="mb-1.5 flex flex-wrap gap-1.5">
+                  {pendingGallery.map((img) => (
+                    <div key={img.id} className="group relative h-10 w-10 overflow-hidden rounded border border-[var(--line)]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img.url} alt="" className="h-full w-full object-cover" />
+                      <button
+                        onClick={() => setPendingGallery((g) => g.filter((i) => i.id !== img.id))}
+                        className="absolute inset-0 flex items-center justify-center bg-black/60 text-xs font-bold text-white opacity-0 group-hover:opacity-100"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => galleryFileRef.current?.click()}
+                className="w-full rounded-md border border-dashed border-[var(--line)] px-2 py-1.5 text-[11px] font-medium text-[var(--ink-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              >
+                {galleryBusy ? 'Adding…' : '+ Add image'}
               </button>
+              <input
+                ref={galleryFileRef}
+                type="file"
+                accept="image/*"
+                className="absolute h-px w-px overflow-hidden opacity-0"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!file) return;
+                  setGalleryBusy(true);
+                  try {
+                    const url = await fileToSlideImage(file);
+                    setPendingGallery((g) => [...g, { id: makeId('gal'), url }]);
+                  } catch (err) {
+                    console.error('Could not read that image:', err);
+                  }
+                  setGalleryBusy(false);
+                }}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={editingHotspotId ? saveHotspotEdit : confirmRegion}
+                className="flex-1 rounded-md bg-[var(--accent)] px-2 py-1.5 text-xs font-semibold text-white"
+              >
+                {editingHotspotId ? 'Save' : 'Add region'}
+              </button>
+              {editingHotspotId && (
+                <button
+                  onClick={() => removeHotspot(editingHotspotId)}
+                  className="rounded-md border border-[var(--line)] px-2 py-1.5 text-xs font-medium text-red-500 hover:border-red-300"
+                >
+                  Remove
+                </button>
+              )}
               <button onClick={cancelDrawing} className="rounded-md border border-[var(--line)] px-2 py-1.5 text-xs font-medium text-[var(--ink-2)]">
                 Cancel
               </button>
             </div>
           </div>
         )}
+      </div>
+      {(() => {
+        const lightboxHotspot = hotspots.find((h) => h.id === lightboxHotspotId && h.gallery?.length);
+        return lightboxHotspot ? (
+          <Lightbox
+            images={lightboxHotspot.gallery!}
+            keyPlanImage={lightboxHotspot.keyPlanImage}
+            onClose={() => setLightboxHotspotId(null)}
+          />
+        ) : null;
+      })()}
+      {showHotspotList && (
+        <HotspotSidePanel
+          hotspots={hotspots.filter((h) => h.listEntry)}
+          hoveredId={hoveredHotspotId}
+          onHover={setHoveredHotspotId}
+          onSelect={(h) => (editable ? startEditingHotspot(h) : jumpTo(h))}
+        />
+      )}
       </div>
     </div>
   );
@@ -1410,26 +1787,29 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
           />
         </div>
       ) : slide.layout === 'title-slide' ? (
-        <div className="text-center">
-          <Kicker slide={slide} editable={editable} />
-          <EditableText
-            editable={editable}
-            value={slide.fields.title ?? ''}
-            onChange={(v) => updateField('title', v)}
-            as="h1"
-            placeholder="Presentation title"
-            style={headlineStyle(3)}
-            className="font-display text-[var(--accent)] outline-none"
-          />
-          <EditableText
-            editable={editable}
-            value={slide.fields.subtitle ?? ''}
-            onChange={(v) => updateField('subtitle', v)}
-            as="p"
-            placeholder="Subtitle"
-            className="mx-auto mt-4 max-w-lg text-[var(--ink-2)] outline-none"
-          />
-          <ClientLogo editable={editable} dark={dark} />
+        <div className="relative text-center">
+          <HeroVideo url={slide.fields.heroVideoUrl} editable={editable} onChangeUrl={(url) => updateField('heroVideoUrl', url)} />
+          <div className="relative">
+            <Kicker slide={slide} editable={editable} />
+            <EditableText
+              editable={editable}
+              value={slide.fields.title ?? ''}
+              onChange={(v) => updateField('title', v)}
+              as="h1"
+              placeholder="Presentation title"
+              style={headlineStyle(3)}
+              className={`font-display outline-none ${slide.fields.heroVideoUrl ? 'text-white' : 'text-[var(--accent)]'}`}
+            />
+            <EditableText
+              editable={editable}
+              value={slide.fields.subtitle ?? ''}
+              onChange={(v) => updateField('subtitle', v)}
+              as="p"
+              placeholder="Subtitle"
+              className={`mx-auto mt-4 max-w-lg outline-none ${slide.fields.heroVideoUrl ? 'text-white/80' : 'text-[var(--ink-2)]'}`}
+            />
+            <ClientLogo editable={editable} dark={dark || !!slide.fields.heroVideoUrl} />
+          </div>
         </div>
       ) : slide.layout === 'blank' ? null : slide.layout === 'concept' ? (
         <ConceptBody slide={slide} editable={editable} animate={animate} dark={dark} />
@@ -1448,6 +1828,9 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
           {slide.layout === 'merge-diagram' && <MergeDiagram slide={slide} editable={editable} />}
           {slide.layout === 'stat-hero' && <StatHero slide={slide} editable={editable} />}
           {slide.layout === 'linked-views' && <LinkedViewsExplorer slide={slide} editable={editable} />}
+          {slide.layout === 'orbit' && <OrbitDiagram slide={slide} editable={editable} />}
+          {slide.layout === 'site-locus' && <SiteLocusDiagram slide={slide} editable={editable} />}
+          {slide.layout === 'material-compare' && <MaterialCompare slide={slide} editable={editable} />}
           {slide.style === 'design' && (
             <MediaBox
               url={slide.fields.imageUrl ?? ''}

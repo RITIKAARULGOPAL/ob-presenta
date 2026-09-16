@@ -95,6 +95,17 @@ function MediaBox({
     if (!url) setAdjusting(false);
   }, [url]);
 
+  function openPicker() {
+    if (!fileRef.current) {
+      // Diagnostic only — if this ever fires, the ref genuinely wasn't
+      // attached when the click happened, which would explain a silent
+      // no-op click with no other symptom.
+      console.warn('MediaBox: file input ref was not attached when "Choose a file" was clicked.');
+      return;
+    }
+    fileRef.current.click();
+  }
+
   async function accept(file: File | undefined) {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
@@ -147,12 +158,18 @@ function MediaBox({
             <img src={url} alt="" style={imageStyle(transform)} className="h-full w-full object-cover" />
           )
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-white/40">
+          <div
+            className={`flex h-full flex-col items-center justify-center gap-2 text-sm text-white/40 ${canUpload ? 'cursor-pointer' : ''}`}
+            // Click anywhere in the empty-state box, not just the small
+            // button — a bigger hit target, and a fallback in case
+            // something is only covering the button's own exact bounds.
+            onClick={canUpload ? (e) => { e.stopPropagation(); openPicker(); } : undefined}
+          >
             {canUpload ? (
               <>
                 <span>{dragging ? 'Drop to add' : busy ? 'Reading image…' : 'Drag an image here'}</span>
                 <button
-                  onClick={(e) => { e.stopPropagation(); fileRef.current?.click(); }}
+                  onClick={(e) => { e.stopPropagation(); openPicker(); }}
                   className="rounded-md border border-dashed border-white/30 px-2.5 py-1 text-xs font-semibold text-white/70 hover:border-white/60 hover:text-white"
                 >
                   Choose a file
@@ -222,7 +239,7 @@ function MediaBox({
           transform={transform}
           onChange={(t) => onChangeTransform?.(t)}
           onDone={() => setAdjusting(false)}
-          onReplace={() => fileRef.current?.click()}
+          onReplace={openPicker}
           onRemove={() => { onChangeUrl(''); onChangeTransform?.(undefined); setAdjusting(false); setNote(''); }}
         />
       )}

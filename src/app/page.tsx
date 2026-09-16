@@ -114,6 +114,8 @@ export default function HomePage() {
               {projects.map((p) => (
                 <div
                   key={p.id}
+                  data-project-id={p.id}
+                  data-project-name={p.name}
                   className="flex items-center gap-4 rounded-xl border border-white/15 bg-white/[0.07] px-6 py-5 transition hover:bg-white/[0.12]"
                 >
                   <button onClick={() => router.push(`/p/${p.id}/edit`)} className="flex min-w-0 flex-1 items-center gap-4 text-left">

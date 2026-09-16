@@ -32,6 +32,177 @@ or re-explain anything.
 
 ---
 
+## 2026-09-17 (cont'd 3)
+
+**Done:**
+- **Closed out the "Unable to add image" report — confirmed not a code bug.**
+  User re-tested and still saw "nothing happens" on a Linked Views empty
+  image slot, even after the earlier `hidden`-attribute fix (commit
+  `6b68c38`). Investigated further this round:
+  - Widened `MediaBox`'s click target from just the small "Choose a file"
+    button to the whole empty-state box, and added a dev diagnostic
+    (`console.warn` if `fileRef.current` were null at click time) —
+    [SlideRenderer.tsx](src/components/SlideRenderer.tsx), `MediaBox`'s new
+    `openPicker()` helper. Verified live: the diagnostic never fired, proving
+    the ref is valid and `.click()` is genuinely being called on the file
+    input.
+  - Ruled out an enterprise Chrome-profile policy (user was on a "Work"
+    profile) by testing on a non-work profile too — same symptom.
+  - Ruled out "dialog never opens at all" by having the user Alt+Tab after
+    clicking — **the native file dialog was opening the whole time, just
+    without stealing window focus**, so it looked like nothing happened.
+  - Confirmed end-to-end: after Alt+Tab to the hidden dialog, picking a file
+    and confirming, the image uploaded into the slide correctly.
+  - **Conclusion: not a Presenta bug.** The upload feature works correctly;
+    the OS/Chrome dialog simply doesn't come to the foreground on this
+    machine, which is a browser/window-manager focus behavior no page's
+    JavaScript can control (intentionally, for security — a page must not be
+    able to hijack focus of a native OS dialog it triggers). Workaround:
+    Alt+Tab (or check the taskbar) after clicking "Choose a file".
+  - The widened-click-area change and the diagnostic warning are harmless,
+    real UX/debuggability improvements and are being kept regardless.
+
+**Left off / next up:**
+- Nothing outstanding on this specific report. If it resurfaces, the
+  `console.warn` diagnostic in `MediaBox.openPicker()` is still in place to
+  quickly rule the ref/click-wiring theory in or out again.
+- Still uncommitted along with the batch-export work from the same day —
+  see the entry above for what's staged.
+
+---
+
+## 2026-09-17 (cont'd 2)
+
+**Done:**
+- **Root-caused and fixed the batch-export hang from the previous entry** —
+  it was real, reproduced on the user's own machine too (not a sandbox
+  artifact): a real Selenium-driven Chrome (headless *and* headed) crashes
+  outright ("tab crashed") on this app's **dev-mode** (`next dev`/Turbopack)
+  bundle — reproducibly, on every page including the plain home page — while
+  the exact same pages load fine once served from a **production** build
+  (`next build` + `next start`). [scripts/batch_export.py](scripts/batch_export.py)
+  now always builds and runs a production server for the export automation
+  instead of `next dev` (a few seconds' build cost, paid once per script
+  run) — this class of instability is specific to the dev bundle's HMR
+  client/eval-heavy module wrapping, not anything about the app's own code
+  or data.
+- **Fixed the real, unrelated, long-standing `pdfjs-dist` type error** (first
+  noted several entries back) properly instead of working around it — it
+  was simply never added to `package.json` despite being imported in
+  [importDeck.ts](src/lib/importDeck.ts). Added it as a real dependency.
+  `npx tsc --noEmit -p .` is now **fully clean, zero errors** for the first
+  time this whole session — every prior entry's "2 pre-existing unrelated
+  errors" caveat no longer applies. This was also required to make `next
+  build` succeed at all (production builds run real type-checking; dev mode
+  doesn't), which the batch-export fix above depends on.
+- Fixed two more real bugs found while verifying the fix end-to-end:
+  - A `UnicodeEncodeError` crashed the script mid-run on Windows consoles
+    (default cp1252 encoding can't print ✓/✗/…/→) — fixed by reconfiguring
+    stdout/stderr with `errors="replace"` at startup.
+  - On Windows, `Popen.terminate()` on a `shell=True` `npm run start` only
+    killed the outer `cmd.exe` wrapper, leaving the actual `next start`
+    Node process orphaned and still holding the port — fixed with
+    `taskkill /F /T` (kills the whole process tree) on Windows.
+  - Two projects sharing a sanitized name (several are literally named
+    "xx"/"zzz" in this dev database) would silently overwrite each other's
+    exported file — output filenames now include a short suffix from the
+    project id.
+  - A stray non-PDF/PPTX file appearing in the download folder mid-poll
+    (observed once, cause unconfirmed — possibly a Chrome/Windows artifact)
+    could be mistaken for the real download — `wait_for_new_file` now only
+    considers files with the expected extension.
+- Added `--export-timeout` (default 300s) since large decks take a while to
+  rasterize (this app renders each slide to a PNG before assembling the
+  PDF/PPTX) — the 163-slide Qualcomm deck did **not** finish within 300s in
+  testing; needs a considerably longer timeout raised via this flag (not
+  yet confirmed how long it actually needs — the one attempt at 900s in this
+  session didn't produce a log, likely lost when its background shell exited
+  rather than a real second failure; worth a clean re-run next session).
+- Verified end-to-end on real data: ran the full batch across all 20 real
+  projects in this Supabase database — every distinctly-named small/medium
+  project exported a real, valid PDF successfully (confirmed by file size
+  and count); duplicate-named ones no longer overwrite each other (fixed
+  above, not yet re-verified against the full 20 after the fix, only against
+  a smaller manual test). `tsc` clean throughout.
+
+**Left off / next up:**
+- **The 163-slide Qualcomm deck's actual export time is still unknown** —
+  confirm it with a clean, foreground (not backgrounded) run and
+  `--export-timeout` set generously (e.g. 1200+), and note the real number
+  here once known so the default can be sanity-checked against it.
+- Should re-run the full 20-project batch once more after the duplicate-name
+  and stray-file fixes to confirm nothing regressed — only spot-tested
+  individual pieces after those fixes, not the full batch again.
+- `.gitignore` now excludes `__pycache__/` (added alongside this work).
+
+---
+
+## 2026-09-17 (cont'd)
+
+**Done:**
+- Added a Python batch-export tool: [scripts/batch_export.py](scripts/batch_export.py) +
+  [requirements-batch-export.txt](scripts/requirements-batch-export.txt).
+  Presenta's own export ([exportDeck.ts](src/lib/exportDeck.ts)) is entirely
+  client-side (rasterizes slides, assembles PDF/PPTX in-browser, triggers a
+  download) — there's no server API for it — so this drives a real headless
+  Chrome via Selenium: for each project, open its editor, click Export,
+  wait for the file. Projects are listed via a direct Supabase REST call
+  (reads `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` straight from `.env.local`)
+  rather than scraping the home page — see "Watch out for" below for why.
+  `pip install -r scripts/requirements-batch-export.txt`, then e.g.
+  `python scripts/batch_export.py --port 3001 --out ./exports --format both`.
+- Handled the "different port" request: this Next.js version (16, Turbopack)
+  allows only **one** dev server per project directory regardless of port —
+  starting a second copy on another port while one's already running on
+  3000 fails outright ("Another next dev server is already running"). The
+  script detects this and reuses whatever's already up (checks `--port`,
+  then falls back to checking 3000) instead of trying to spawn a doomed
+  second instance; it only starts its own server if truly nothing is
+  running anywhere reachable, and only shuts down a server it started
+  itself. Added a `dev-3001` entry to [launch.json](.claude/launch.json) for
+  the Claude Browser preview tool's own use, for symmetry.
+- Added a harmless `data-project-id`/`data-project-name` attribute to each
+  project row on the home page ([page.tsx](src/app/page.tsx)) — not
+  currently used by the script (see below) but a small, safe, generally
+  useful hook for any future browser-automation over this page.
+
+**Left off / next up:**
+- **Not fully verified end-to-end in this session's sandbox.** Listing
+  projects via the direct Supabase REST call works (confirmed — returned
+  the real 20-project list correctly). But opening a project's *editor*
+  page in the same headless Chrome instance got stuck indefinitely on
+  "Loading…" — the editor's own client-side Supabase fetch (loading the
+  slide data) never resolved or errored, so the Export button never
+  appeared and the script timed out. This looks like an environment-specific
+  quirk (see Watch out for) rather than a bug in the script's own logic —
+  couldn't get further in the time available. **Next step: run the script
+  from a plain terminal on your own machine (not through this session's
+  automation) and see if it gets past that point** — if the editor loads
+  fine there, the tool should just work; if it hangs there too, that's a
+  real bug worth another look.
+- Given the above, the actual PDF/PPTX file output has **not** been
+  confirmed to work — only the "list projects" and "reuse existing dev
+  server" pieces are verified.
+
+**Watch out for:**
+- A real headless Chrome (Selenium-driven) making the app's own
+  `supabase-js` client-side fetch calls appears to hang indefinitely in
+  this session's sandboxed environment, even though: (a) a plain `curl` to
+  the same Supabase REST endpoint with the same key succeeds instantly, and
+  (b) a raw `fetch()` executed inside that same headless page also
+  completes normally (tested with a deliberately-unauthenticated request,
+  got the expected 401 back fast). So it's specifically supabase-js's own
+  call path that stalls here, not network reachability in general — worth
+  investigating further if this repros outside this specific sandbox too,
+  but not chased down further given the time this already took. This is
+  exactly why project *listing* was moved off the client-side fetch (onto a
+  direct REST call from Python) — but the editor page itself still depends
+  on that same client-side fetch to load a project's slides, and that part
+  couldn't be routed around the same way without duplicating a large chunk
+  of the app's own data-loading logic.
+
+---
+
 ## 2026-09-17
 
 **Done:** (plan: Parts C & D of `C:\Users\Ritika\.claude\plans\ok-lets-no-do-giggly-snowglobe.md`)

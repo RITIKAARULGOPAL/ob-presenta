@@ -68,6 +68,7 @@ function MediaBox({
   className,
   mediaRef,
   elevated = false,
+  square = false,
 }: {
   url: string;
   kind: 'image' | 'video';
@@ -81,6 +82,10 @@ function MediaBox({
   /** A larger radius + a real soft shadow instead of the plain frame — for a
    *  slide's one hero image (the `design` style), not every MediaBox use. */
   elevated?: boolean;
+  /** No rounding at all — for a full-bleed slot flush with the slide's own
+   *  edges (e.g. an "as is" imported slide), where any radius would visibly
+   *  clip the image's own corners. */
+  square?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -133,7 +138,7 @@ function MediaBox({
     <div className={`relative ${className ?? ''}`}>
       <div
         ref={frameRef}
-        className={`relative h-full w-full overflow-hidden bg-black/30 ${elevated ? 'rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)]' : 'rounded-lg'} ${dragging ? 'ring-2 ring-[var(--accent)]' : ''} ${
+        className={`relative h-full w-full overflow-hidden bg-black/30 ${square ? '' : elevated ? 'rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)]' : 'rounded-lg'} ${dragging ? 'ring-2 ring-[var(--accent)]' : ''} ${
           canAdjust && url && !adjusting ? 'cursor-pointer' : ''
         }`}
         onClick={canAdjust && url && !adjusting ? () => setAdjusting(true) : undefined}
@@ -1996,14 +2001,24 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
           </div>
         </div>
       ) : slide.layout === 'blank' ? (
-        slide.fields.imageUrl ? (
+        slide.fields.imageUrl || editable ? (
           // Full-bleed, edge-to-edge — deliberately escapes the base
           // wrapper's own px-16/py padding (an absolutely positioned
           // element's containing block is its relative ancestor's padding
           // edge, not inside it) so an "as is" imported slide image shows
-          // with no added chrome around it.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={slide.fields.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          // with no added chrome around it. Still a real MediaBox, so an
+          // imported "as is" slide can be replaced/re-cropped/adjusted like
+          // any other image slot, not just displayed read-only.
+          <MediaBox
+            url={slide.fields.imageUrl ?? ''}
+            kind="image"
+            editable={editable}
+            onChangeUrl={(url) => updateField('imageUrl', url)}
+            transform={slide.fields.imageTransform}
+            onChangeTransform={(t) => updateField('imageTransform', t)}
+            className="absolute inset-0 h-full w-full"
+            square
+          />
         ) : null
       ) : slide.layout === 'concept' ? (
         <ConceptBody slide={slide} editable={editable} animate={animate} dark={dark} />

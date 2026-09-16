@@ -28,6 +28,11 @@ export interface DesignPillar {
   /** The question this pillar answers — reads well as a section subtitle. */
   question: string;
   concepts: DesignConcept[];
+  /** True for a pillar that's only meant to be reached via its own quick
+   *  "+ Add slide" entries (see edit/page.tsx) rather than browsed in the
+   *  Concept Library gallery — e.g. a specific client reference deck, which
+   *  doesn't fit the gallery's pick-a-pillar-then-a-concept framing. */
+  hideFromLibrary?: boolean;
 }
 
 export const DESIGN_PILLARS: DesignPillar[] = [
@@ -499,6 +504,7 @@ export const DESIGN_PILLARS: DesignPillar[] = [
     numeral: '13',
     title: 'E-Com Express — Reference Deck',
     question: 'A real client deck, shown exactly as delivered.',
+    hideFromLibrary: true,
     concepts: [
       {
         id: 'ecom-workplace-aspirations',

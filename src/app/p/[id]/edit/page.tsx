@@ -11,7 +11,11 @@ import { ScaledStage } from '@/components/ScaledStage';
 import { PropertiesPanel } from '@/components/PropertiesPanel';
 import { ConceptLibraryDropdown } from '@/components/ConceptLibraryDropdown';
 import { exportToPdf, exportToPptx } from '@/lib/exportDeck';
-import { IconBulb, IconTextBlock, IconStar, IconBars, IconLink, IconFile, IconScreen } from '@/components/icons';
+import { DESIGN_PILLARS } from '@/lib/conceptLibrary';
+import { conceptSlide } from '@/lib/conceptSlides';
+import { IconBulb, IconTextBlock, IconStar, IconBars, IconLink, IconFile, IconScreen, IconImage } from '@/components/icons';
+
+const ECOM_PILLAR = DESIGN_PILLARS.find((p) => p.id === 'ecom-express');
 
 export default function EditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -26,6 +30,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const loadProject = useEditorStore((s) => s.loadProject);
   const currentSlide = useEditorStore((s) => s.currentSlide());
   const addSlide = useEditorStore((s) => s.addSlide);
+  const addSlides = useEditorStore((s) => s.addSlides);
   const saveError = useEditorStore((s) => s.saveError);
   const logoSaveUnavailable = useEditorStore((s) => s.logoSaveUnavailable);
 
@@ -154,6 +159,23 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 >
                   <IconLink className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" /> Linked Views
                 </button>
+                {ECOM_PILLAR && (
+                  <>
+                    <div className="my-1 border-t border-slate-100" />
+                    {ECOM_PILLAR.concepts.map((concept) => (
+                      <button
+                        key={concept.id}
+                        onClick={() => {
+                          addSlides([conceptSlide(ECOM_PILLAR, concept)]);
+                          setShowAddMenu(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        <IconImage className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" /> {concept.title}
+                      </button>
+                    ))}
+                  </>
+                )}
               </div>
             )}
           </div>

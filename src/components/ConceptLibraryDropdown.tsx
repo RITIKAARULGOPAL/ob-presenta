@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { DESIGN_PILLARS, TOTAL_CONCEPTS, type DesignConcept, type DesignPillar } from '@/lib/conceptLibrary';
+import { DESIGN_PILLARS, type DesignConcept, type DesignPillar } from '@/lib/conceptLibrary';
 import { conceptSlide, designSequenceSlide, keyIdeaSlide, pillarSectionSlide } from '@/lib/conceptSlides';
 import { useEditorStore } from '@/lib/editorStore';
 import { SlideRenderer } from './SlideRenderer';
@@ -58,9 +58,11 @@ export function ConceptLibraryDropdown({ onClose }: { onClose: () => void }) {
   const addConceptSlide = useEditorStore((s) => s.addConceptSlide);
   const addSlides = useEditorStore((s) => s.addSlides);
   const selectSlide = useEditorStore((s) => s.selectSlide);
-  const [pillarId, setPillarId] = useState<string>(DESIGN_PILLARS[0]?.id ?? '');
+  const libraryPillars = useMemo(() => DESIGN_PILLARS.filter((p) => !p.hideFromLibrary), []);
+  const totalLibraryConcepts = useMemo(() => libraryPillars.reduce((n, p) => n + p.concepts.length, 0), [libraryPillars]);
+  const [pillarId, setPillarId] = useState<string>(libraryPillars[0]?.id ?? '');
 
-  const pillar = DESIGN_PILLARS.find((p) => p.id === pillarId) ?? DESIGN_PILLARS[0];
+  const pillar = libraryPillars.find((p) => p.id === pillarId) ?? libraryPillars[0];
   const slides = useMemo(() => project?.slides ?? [], [project?.slides]);
 
   /** conceptId → the slide already representing it, so a second click goes to
@@ -106,7 +108,7 @@ export function ConceptLibraryDropdown({ onClose }: { onClose: () => void }) {
       <div className="fixed right-3 top-14 z-50 flex max-h-[74vh] w-[620px] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl">
         {/* Pillars */}
         <div className="w-[130px] shrink-0 overflow-y-auto border-r border-slate-100 bg-slate-50 py-1 sm:w-[168px]">
-          {DESIGN_PILLARS.map((p) => {
+          {libraryPillars.map((p) => {
             const count = p.concepts.filter((c) => inDeck.has(c.id)).length;
             return (
               <button
@@ -131,7 +133,7 @@ export function ConceptLibraryDropdown({ onClose }: { onClose: () => void }) {
             <div className="flex items-baseline justify-between gap-2">
               <span className="truncate text-[12px] font-semibold text-slate-800">{pillar.title}</span>
               <span className="shrink-0 text-[10px] text-slate-400">
-                {inDeck.size} of {TOTAL_CONCEPTS} added
+                {inDeck.size} of {totalLibraryConcepts} added
               </span>
             </div>
             <p className="mt-0.5 text-[11px] leading-snug text-slate-500">

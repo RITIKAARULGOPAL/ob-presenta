@@ -1,0 +1,1315 @@
+{
+  "slideWidthEmu": 9144000,
+  "slideHeightEmu": 5143500,
+  "slides": [
+    {
+      "index": 1,
+      "shapes": [
+        {
+          "name": "Google Shape;68;p15",
+          "type": "PICTURE (13)",
+          "x": 262.3,
+          "y": 268.15,
+          "w": 102.47,
+          "h": 102.34,
+          "image": "s1-img1.jpg",
+          "imageBytes": 92667
+        },
+        {
+          "name": "Google Shape;69;p15",
+          "type": "PLACEHOLDER (14)",
+          "x": 14.77,
+          "y": 41.38,
+          "w": 1192.73,
+          "h": 23.81,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Workplace Aspirations",
+                  "bold": false,
+                  "size": null,
+                  "color": null,
+                  "italic": false,
+                  "font": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;70;p15",
+          "type": "PLACEHOLDER (14)",
+          "x": 14.77,
+          "y": 17.57,
+          "w": 1192.73,
+          "h": 23.81,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Design Concept",
+                  "bold": false,
+                  "size": null,
+                  "color": null,
+                  "italic": false,
+                  "font": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;71;p15",
+          "type": "FREEFORM (5)",
+          "x": 293.12,
+          "y": 299.8,
+          "w": 7.65,
+          "h": 9.31,
+          "fillColor": "#EB1780"
+        },
+        {
+          "name": "Google Shape;73;p15",
+          "type": "PICTURE (13)",
+          "x": 86.46,
+          "y": 265.34,
+          "w": 73.66,
+          "h": 73.57,
+          "image": "s1-img2.jpg",
+          "imageBytes": 92667
+        },
+        {
+          "name": "Google Shape;74;p15",
+          "type": "FREEFORM (5)",
+          "x": 99.94,
+          "y": 312.06,
+          "w": 20.21,
+          "h": 14.51,
+          "fillColor": "#EB1780"
+        },
+        {
+          "name": "Google Shape;76;p15",
+          "type": "PICTURE (13)",
+          "x": 550.12,
+          "y": 265.34,
+          "w": 73.66,
+          "h": 73.57,
+          "image": "s1-img3.jpg",
+          "imageBytes": 92667
+        },
+        {
+          "name": "Google Shape;77;p15",
+          "type": "FREEFORM (5)",
+          "x": 586.11,
+          "y": 301.87,
+          "w": 7.69,
+          "h": 8.69,
+          "fillColor": "#EB1780"
+        },
+        {
+          "name": "Google Shape;79;p15",
+          "type": "PICTURE (13)",
+          "x": 748.89,
+          "y": 261.24,
+          "w": 102.47,
+          "h": 102.34,
+          "image": "s1-img4.jpg",
+          "imageBytes": 92667
+        },
+        {
+          "name": "Google Shape;80;p15",
+          "type": "FREEFORM (5)",
+          "x": 799.21,
+          "y": 307.11,
+          "w": 3.41,
+          "h": 8.52,
+          "fillColor": "#EB1780"
+        },
+        {
+          "name": "Google Shape;82;p15",
+          "type": "PICTURE (13)",
+          "x": 923.03,
+          "y": 254.89,
+          "w": 102.47,
+          "h": 102.34,
+          "image": "s1-img5.jpg",
+          "imageBytes": 92667
+        },
+        {
+          "name": "Google Shape;83;p15",
+          "type": "FREEFORM (5)",
+          "x": 958.13,
+          "y": 273.64,
+          "w": 29.91,
+          "h": 13.94,
+          "fillColor": "#EB1780"
+        },
+        {
+          "name": "Google Shape;84;p15",
+          "type": "PICTURE (13)",
+          "x": 699.83,
+          "y": 265.28,
+          "w": 102.47,
+          "h": 102.47,
+          "image": "s1-img6.png",
+          "imageBytes": 373888
+        },
+        {
+          "name": "Google Shape;85;p15",
+          "type": "PLACEHOLDER (14)",
+          "x": 14.77,
+          "y": 370.49,
+          "w": 166.17,
+          "h": 23.81,
+          "text": [
+            {
+              "align": "CENTER (2)",
+              "runs": [
+                {
+                  "text": "Choices",
+                  "bold": false,
+                  "size": 8.0,
+                  "color": "#434343",
+                  "italic": false,
+                  "font": "Poppins"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;86;p15",
+          "type": "PLACEHOLDER (14)",
+          "x": 220.22,
+          "y": 370.49,
+          "w": 180.28,
+          "h": 23.81,
+          "text": [
+            {
+              "align": "CENTER (2)",
+              "runs": [
+                {
+                  "text": "Self Expression",
+                  "bold": false,
+                  "size": 8.0,
+                  "color": "#434343",
+                  "italic": false,
+                  "font": "Poppins"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;87;p15",
+          "type": "PLACEHOLDER (14)",
+          "x": 449.21,
+          "y": 370.49,
+          "w": 166.17,
+          "h": 23.81,
+          "text": [
+            {
+              "align": "CENTER (2)",
+              "runs": [
+                {
+                  "text": "Diversity",
+                  "bold": false,
+                  "size": 8.0,
+                  "color": "#434343",
+                  "italic": false,
+                  "font": "Poppins"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;88;p15",
+          "type": "PLACEHOLDER (14)",
+          "x": 667.98,
+          "y": 370.49,
+          "w": 166.17,
+          "h": 23.81,
+          "text": [
+            {
+              "align": "CENTER (2)",
+              "runs": [
+                {
+                  "text": "Flexibility",
+                  "bold": false,
+                  "size": 8.0,
+                  "color": "#434343",
+                  "italic": false,
+                  "font": "Poppins"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;89;p15",
+          "type": "PLACEHOLDER (14)",
+          "x": 886.74,
+          "y": 370.49,
+          "w": 166.17,
+          "h": 23.81,
+          "text": [
+            {
+              "align": "CENTER (2)",
+              "runs": [
+                {
+                  "text": "Collaboration",
+                  "bold": false,
+                  "size": 8.0,
+                  "color": "#434343",
+                  "italic": false,
+                  "font": "Poppins"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;90;p15",
+          "type": "PLACEHOLDER (14)",
+          "x": 1105.51,
+          "y": 370.49,
+          "w": 157.31,
+          "h": 23.81,
+          "text": [
+            {
+              "align": "CENTER (2)",
+              "runs": [
+                {
+                  "text": "Wellness",
+                  "bold": false,
+                  "size": 8.0,
+                  "color": "#434343",
+                  "italic": false,
+                  "font": "Poppins"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;91;p15",
+          "type": "TEXT_BOX (17)",
+          "x": 14.77,
+          "y": 394.3,
+          "w": 186.62,
+          "h": 83.23,
+          "text": [
+            {
+              "align": "JUSTIFY (4)",
+              "runs": [
+                {
+                  "text": "To give one the ",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins ExtraLight"
+                },
+                {
+                  "text": "agile ",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins Light"
+                },
+                {
+                  "text": "choices",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins ExtraLight"
+                },
+                {
+                  "text": ", to be oneself and one that best ",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins ExtraLight"
+                },
+                {
+                  "text": "accommodates",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins Light"
+                },
+                {
+                  "text": " their needs.",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins Light"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;92;p15",
+          "type": "TEXT_BOX (17)",
+          "x": 220.22,
+          "y": 394.3,
+          "w": 186.62,
+          "h": 62.32,
+          "text": [
+            {
+              "align": "JUSTIFY (4)",
+              "runs": [
+                {
+                  "text": "To have spaces that allow people to come ",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins ExtraLight"
+                },
+                {
+                  "text": "together, celebrate",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins Light"
+                },
+                {
+                  "text": " and have those ",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins ExtraLight"
+                },
+                {
+                  "text": "moments ",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins Light"
+                },
+                {
+                  "text": "that matter.",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins ExtraLight"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;93;p15",
+          "type": "TEXT_BOX (17)",
+          "x": 438.99,
+          "y": 397.1,
+          "w": 186.62,
+          "h": 62.32,
+          "text": [
+            {
+              "align": "JUSTIFY (4)",
+              "runs": [
+                {
+                  "text": "A workplace that caters to ",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins ExtraLight"
+                },
+                {
+                  "text": "everybody ",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins Light"
+                },
+                {
+                  "text": "and takes in to consideration their needs to bring out their best.",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins ExtraLight"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;94;p15",
+          "type": "TEXT_BOX (17)",
+          "x": 662.87,
+          "y": 394.3,
+          "w": 186.62,
+          "h": 69.38,
+          "text": [
+            {
+              "align": "JUSTIFY (4)",
+              "runs": [
+                {
+                  "text": "To be creative at the place of work , by having spaces that ",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins ExtraLight"
+                },
+                {
+                  "text": "multifunction",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins Light"
+                },
+                {
+                  "text": " and boost productivity.",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins ExtraLight"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;95;p15",
+          "type": "TEXT_BOX (17)",
+          "x": 876.52,
+          "y": 397.11,
+          "w": 186.62,
+          "h": 80.42,
+          "text": [
+            {
+              "align": "JUSTIFY (4)",
+              "runs": [
+                {
+                  "text": "To have spaces that brings the best ideas to table, and one that equips the team to brainstorm together.",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins ExtraLight"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;96;p15",
+          "type": "TEXT_BOX (17)",
+          "x": 1080.78,
+          "y": 393.57,
+          "w": 186.62,
+          "h": 88.9,
+          "text": [
+            {
+              "align": "JUSTIFY (4)",
+              "runs": [
+                {
+                  "text": "Opportunities to rejuvenate oneself during the day, and recharge amongst biophilia & ",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins ExtraLight"
+                },
+                {
+                  "text": "through",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins ExtraLight"
+                },
+                {
+                  "text": " ",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins ExtraLight"
+                },
+                {
+                  "text": "incidental",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins ExtraLight"
+                },
+                {
+                  "text": " conversations .",
+                  "bold": false,
+                  "size": 7.0,
+                  "color": "#595959",
+                  "italic": false,
+                  "font": "Poppins ExtraLight"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;97;p15",
+          "type": "PLACEHOLDER (14)",
+          "x": 205.63,
+          "y": 161.92,
+          "w": 868.75,
+          "h": 41.15,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "What do you ",
+                  "bold": false,
+                  "size": 20.0,
+                  "color": null,
+                  "italic": false,
+                  "font": "Poppins Medium"
+                },
+                {
+                  "text": "aspire",
+                  "bold": false,
+                  "size": 20.0,
+                  "color": "#EB1780",
+                  "italic": false,
+                  "font": "Poppins Medium"
+                },
+                {
+                  "text": " for at your workplace ?",
+                  "bold": false,
+                  "size": 20.0,
+                  "color": null,
+                  "italic": false,
+                  "font": "Poppins Medium"
+                },
+                {
+                  "text": " ",
+                  "bold": false,
+                  "size": 20.0,
+                  "color": null,
+                  "italic": false,
+                  "font": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;98;p15",
+          "type": "PLACEHOLDER (14)",
+          "x": 17.7,
+          "y": 504.15,
+          "w": 585.32,
+          "h": 31.83,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Let us incorporate these values into your everyday \u2026",
+                  "bold": false,
+                  "size": 10.0,
+                  "color": "#EB1780",
+                  "italic": false,
+                  "font": "Poppins Medium"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;99;p15",
+          "type": "PLACEHOLDER (14)",
+          "x": 17.7,
+          "y": 534.15,
+          "w": 600.61,
+          "h": 48.8,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "To ship these, one needs to better understand the brand and how to deliver them in the best tailored workplace; one that is playful, creative &  efficient.",
+                  "bold": false,
+                  "size": 8.1,
+                  "color": "#434343",
+                  "italic": false,
+                  "font": "Courier New"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "shapes": [
+        {
+          "name": "Google Shape;104;p16",
+          "type": "PLACEHOLDER (14)",
+          "x": 14.77,
+          "y": 17.57,
+          "w": 1192.73,
+          "h": 23.81,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Brand Landscape",
+                  "bold": false,
+                  "size": null,
+                  "color": null,
+                  "italic": false,
+                  "font": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;105;p16",
+          "type": "PLACEHOLDER (14)",
+          "x": 14.77,
+          "y": 41.38,
+          "w": 1192.73,
+          "h": 23.81,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Let us dive in to understanding ECOM a notch better.",
+                  "bold": false,
+                  "size": null,
+                  "color": null,
+                  "italic": false,
+                  "font": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;106;p16",
+          "type": "PICTURE (13)",
+          "x": 62.24,
+          "y": 334.57,
+          "w": 330.12,
+          "h": 219.54,
+          "image": "s2-img1.png",
+          "imageBytes": 6307191
+        },
+        {
+          "name": "Google Shape;107;p16",
+          "type": "PICTURE (13)",
+          "x": 394.9,
+          "y": 165.87,
+          "w": 279.03,
+          "h": 199.65,
+          "image": "s2-img2.jpg",
+          "imageBytes": 1004920
+        },
+        {
+          "name": "Google Shape;108;p16",
+          "type": "PICTURE (13)",
+          "x": 394.9,
+          "y": 368.13,
+          "w": 279.03,
+          "h": 185.98,
+          "image": "s2-img3.png",
+          "imageBytes": 3803498
+        },
+        {
+          "name": "Google Shape;109;p16",
+          "type": "PLACEHOLDER (14)",
+          "x": 62.24,
+          "y": 530.3,
+          "w": 236.68,
+          "h": 23.81,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Efficiency ",
+                  "bold": false,
+                  "size": 9.0,
+                  "color": "#FFFFFF",
+                  "italic": false,
+                  "font": "Courier New"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;110;p16",
+          "type": "PLACEHOLDER (14)",
+          "x": 394.9,
+          "y": 341.71,
+          "w": 279.06,
+          "h": 23.81,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Valued Trust",
+                  "bold": false,
+                  "size": 9.0,
+                  "color": "#FFFFFF",
+                  "italic": false,
+                  "font": "Courier New"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;111;p16",
+          "type": "PLACEHOLDER (14)",
+          "x": 394.9,
+          "y": 530.3,
+          "w": 236.68,
+          "h": 23.81,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Secure",
+                  "bold": false,
+                  "size": 9.0,
+                  "color": "#FFFFFF",
+                  "italic": false,
+                  "font": "Courier New"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;112;p16",
+          "type": "PICTURE (13)",
+          "x": 62.24,
+          "y": 165.87,
+          "w": 330.11,
+          "h": 166.08,
+          "image": "s2-img4.png",
+          "imageBytes": 353443
+        },
+        {
+          "name": "Google Shape;113;p16",
+          "type": "PLACEHOLDER (14)",
+          "x": 68.58,
+          "y": 308.14,
+          "w": 236.68,
+          "h": 23.81,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Tech Enabled",
+                  "bold": false,
+                  "size": 9.0,
+                  "color": "#FFFFFF",
+                  "italic": false,
+                  "font": "Courier New"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;114;p16",
+          "type": "PICTURE (13)",
+          "x": 677.5,
+          "y": 165.87,
+          "w": 172.46,
+          "h": 254.71,
+          "image": "s2-img5.jpg",
+          "imageBytes": 257736
+        },
+        {
+          "name": "Google Shape;115;p16",
+          "type": "PLACEHOLDER (14)",
+          "x": 676.51,
+          "y": 398.66,
+          "w": 172.47,
+          "h": 23.81,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Enablers",
+                  "bold": false,
+                  "size": 9.0,
+                  "color": "#FFFFFF",
+                  "italic": false,
+                  "font": "Courier New"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;116;p16",
+          "type": "PICTURE (13)",
+          "x": 1056.05,
+          "y": 323.96,
+          "w": 160.69,
+          "h": 93.54,
+          "image": "s2-img6.png",
+          "imageBytes": 17458
+        },
+        {
+          "name": "Google Shape;117;p16",
+          "type": "PLACEHOLDER (14)",
+          "x": 853.49,
+          "y": 331.95,
+          "w": 289.26,
+          "h": 85.54,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Reliable",
+                  "bold": false,
+                  "size": 24.0,
+                  "color": "#434343",
+                  "italic": false,
+                  "font": null
+                },
+                {
+                  "text": " Journey",
+                  "bold": false,
+                  "size": 24.0,
+                  "color": "#434343",
+                  "italic": false,
+                  "font": null
+                },
+                {
+                  "text": " ",
+                  "bold": false,
+                  "size": 24.0,
+                  "color": null,
+                  "italic": false,
+                  "font": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;118;p16",
+          "type": "PLACEHOLDER (14)",
+          "x": 677.49,
+          "y": 466.9,
+          "w": 540.26,
+          "h": 55.39,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "A trusted partner that promises to be the reliable partner, and that is what sets the brand apart. This unwavering commitment and their decade long journey of trust could pave the way for the brand new workplace. ",
+                  "bold": false,
+                  "size": 7.1,
+                  "color": "#434343",
+                  "italic": false,
+                  "font": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;119;p16",
+          "type": "PLACEHOLDER (14)",
+          "x": 677.49,
+          "y": 522.3,
+          "w": 540.26,
+          "h": 31.83,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Let us then curate this journey at your workplace !",
+                  "bold": false,
+                  "size": 9.0,
+                  "color": "#EB1780",
+                  "italic": false,
+                  "font": "Poppins Medium"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "shapes": [
+        {
+          "name": "Google Shape;124;p17",
+          "type": "PICTURE (13)",
+          "x": 14.77,
+          "y": 165.99,
+          "w": 326.98,
+          "h": 125.19,
+          "image": "s3-img1.jpg",
+          "imageBytes": 626130
+        },
+        {
+          "name": "Google Shape;125;p17",
+          "type": "PICTURE (13)",
+          "x": 226.77,
+          "y": 428.82,
+          "w": 114.99,
+          "h": 125.19,
+          "image": "s3-img2.jpg",
+          "imageBytes": 81083
+        },
+        {
+          "name": "Google Shape;126;p17",
+          "type": "PICTURE (13)",
+          "x": 14.77,
+          "y": 294.2,
+          "w": 209.52,
+          "h": 131.59,
+          "image": "s3-img3.png",
+          "imageBytes": 4829003
+        },
+        {
+          "name": "Google Shape;127;p17",
+          "type": "PICTURE (13)",
+          "x": 114.57,
+          "y": 428.82,
+          "w": 109.72,
+          "h": 124.72,
+          "image": "s3-img4.png",
+          "imageBytes": 2914547
+        },
+        {
+          "name": "Google Shape;128;p17",
+          "type": "PICTURE (13)",
+          "x": 226.77,
+          "y": 294.2,
+          "w": 114.99,
+          "h": 131.59,
+          "image": "s3-img5.png",
+          "imageBytes": 1561063
+        },
+        {
+          "name": "Google Shape;129;p17",
+          "type": "PICTURE (13)",
+          "x": 14.77,
+          "y": 428.82,
+          "w": 97.33,
+          "h": 124.72,
+          "image": "s3-img6.png",
+          "imageBytes": 323152
+        },
+        {
+          "name": "Google Shape;130;p17",
+          "type": "PLACEHOLDER (14)",
+          "x": 234.39,
+          "y": 502.05,
+          "w": 97.34,
+          "h": 42.25,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Vibrant Youth",
+                  "bold": false,
+                  "size": 9.0,
+                  "color": null,
+                  "italic": false,
+                  "font": "Courier New"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;131;p17",
+          "type": "PLACEHOLDER (14)",
+          "x": 14.78,
+          "y": 506.65,
+          "w": 97.34,
+          "h": 42.25,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Playful Zeal",
+                  "bold": false,
+                  "size": 9.0,
+                  "color": null,
+                  "italic": false,
+                  "font": "Courier New"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;132;p17",
+          "type": "PLACEHOLDER (14)",
+          "x": 106.69,
+          "y": 497.48,
+          "w": 114.98,
+          "h": 51.4,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Cultural Nostalgia",
+                  "bold": false,
+                  "size": 9.0,
+                  "color": null,
+                  "italic": false,
+                  "font": "Courier New"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;133;p17",
+          "type": "PLACEHOLDER (14)",
+          "x": 229.4,
+          "y": 383.55,
+          "w": 109.73,
+          "h": 42.25,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Nourish",
+                  "bold": false,
+                  "size": 9.0,
+                  "color": null,
+                  "italic": false,
+                  "font": "Courier New"
+                },
+                {
+                  "text": " the Soul",
+                  "bold": false,
+                  "size": 9.0,
+                  "color": null,
+                  "italic": false,
+                  "font": "Courier New"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;134;p17",
+          "type": "PLACEHOLDER (14)",
+          "x": 14.78,
+          "y": 382.53,
+          "w": 209.51,
+          "h": 42.25,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Subtle Interpretations",
+                  "bold": false,
+                  "size": 9.0,
+                  "color": null,
+                  "italic": false,
+                  "font": "Courier New"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;135;p17",
+          "type": "PLACEHOLDER (14)",
+          "x": 575.79,
+          "y": 465.48,
+          "w": 684.39,
+          "h": 115.4,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Understanding the Address or the people",
+                  "bold": false,
+                  "size": 12.0,
+                  "color": "#434343",
+                  "italic": false,
+                  "font": null
+                },
+                {
+                  "text": " ",
+                  "bold": false,
+                  "size": 12.0,
+                  "color": "#434343",
+                  "italic": false,
+                  "font": "Poppins"
+                },
+                {
+                  "text": "that make the space is crucial, as it forms the crux of the Workplace.",
+                  "bold": false,
+                  "size": 12.0,
+                  "color": "#434343",
+                  "italic": false,
+                  "font": "Poppins Light"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;136;p17",
+          "type": "PLACEHOLDER (14)",
+          "x": 14.78,
+          "y": 258.41,
+          "w": 326.97,
+          "h": 32.92,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Incidental",
+                  "bold": false,
+                  "size": 9.0,
+                  "color": null,
+                  "italic": false,
+                  "font": "Courier New"
+                },
+                {
+                  "text": " conversations",
+                  "bold": false,
+                  "size": 9.0,
+                  "color": null,
+                  "italic": false,
+                  "font": "Courier New"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;137;p17",
+          "type": "PLACEHOLDER (14)",
+          "x": 575.79,
+          "y": 433.64,
+          "w": 409.99,
+          "h": 31.83,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Who ?",
+                  "bold": false,
+                  "size": 22.0,
+                  "color": "#EB1780",
+                  "italic": false,
+                  "font": "Poppins Medium"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;138;p17",
+          "type": "PLACEHOLDER (14)",
+          "x": 14.77,
+          "y": 17.57,
+          "w": 1192.73,
+          "h": 23.81,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Design Cues",
+                  "bold": false,
+                  "size": null,
+                  "color": null,
+                  "italic": false,
+                  "font": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;139;p17",
+          "type": "PLACEHOLDER (14)",
+          "x": 14.77,
+          "y": 41.38,
+          "w": 1192.73,
+          "h": 23.81,
+          "text": [
+            {
+              "align": "LEFT (1)",
+              "runs": [
+                {
+                  "text": "Bringing the Workplace Aspiration & Brand Landscape together",
+                  "bold": false,
+                  "size": null,
+                  "color": null,
+                  "italic": false,
+                  "font": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Google Shape;140;p17",
+          "type": "PICTURE (13)",
+          "x": 344.45,
+          "y": 165.99,
+          "w": 228.65,
+          "h": 388.14,
+          "image": "s3-img7.png",
+          "imageBytes": 2361569
+        }
+      ]
+    }
+  ]
+}

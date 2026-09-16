@@ -31,13 +31,24 @@ export function pillarSectionSlide(pillar: DesignPillar): Slide {
  *  empty image slot for the project's own plan or render. Falls back to the
  *  library description when a concept has no authored presentation copy.
  *
- *  A concept with `imageUrl` set (an external slide imported "as is" rather
- *  than one of this framework's own templates) skips all of that and
- *  becomes a plain full-bleed image slide instead — see the 'blank' layout
- *  branch in SlideRenderer.tsx, which renders `fields.imageUrl` edge-to-edge
- *  with no title/kicker chrome overlaid, so the original design shows
- *  untouched. */
+ *  A concept with `elements` set (an external slide imported "as is," each
+ *  photo/text/shape kept independently editable) becomes a `'freeform'`
+ *  slide instead — see FreeformSlide in SlideRenderer.tsx. A concept with
+ *  only `imageUrl` (no per-element breakdown) becomes a plain full-bleed
+ *  `'blank'`-layout image slide, one flat picture with no title/kicker
+ *  chrome overlaid. */
 export function conceptSlide(pillar: DesignPillar, concept: DesignConcept): Slide {
+  if (concept.elements) {
+    return {
+      id: makeId('slide'),
+      layout: 'freeform',
+      style: 'standard',
+      fields: { elements: concept.elements.map((el) => ({ ...el, id: makeId('elem') })) },
+      animation: animation(),
+      conceptOrigin: { pillarId: pillar.id, conceptId: concept.id },
+    };
+  }
+
   if (concept.imageUrl) {
     return {
       id: makeId('slide'),

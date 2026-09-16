@@ -8,16 +8,25 @@
 // Source: "Generic Office Design Concepts — A consolidated framework for
 // analysing and designing workplace environments" (Officebanao).
 
+import type { FreeformElement } from '@/types/slide';
+import { ECOM_SLIDE_1_ELEMENTS, ECOM_SLIDE_2_ELEMENTS, ECOM_SLIDE_3_ELEMENTS } from './ecomExpressSlides.generated';
+
 export interface DesignConcept {
   /** Stable slug — safe to persist in a slide, unlike an array index. */
   id: string;
   title: string;
   description: string;
-  /** When set, this concept is a straight image slide (e.g. a real deck
-   *  page imported "as is") instead of the usual lead/points composition —
-   *  see conceptSlide() in conceptSlides.ts for the branch. Path under
+  /** When set (and `elements` isn't), this concept is a flat full-bleed
+   *  image slide instead of the usual lead/points composition — see
+   *  conceptSlide() in conceptSlides.ts for the branch. Path under
    *  /public, e.g. "/concept-library/ecom-express/slide-1.png". */
   imageUrl?: string;
+  /** When set, this concept is a `'freeform'`-layout slide — every photo/
+   *  text block/shape from an imported source file, independently
+   *  editable, at its original position. Takes priority over `imageUrl`
+   *  when both are set. See conceptSlide()'s branch and `FreeformElement`
+   *  in types/slide.ts. */
+  elements?: FreeformElement[];
 }
 
 export interface DesignPillar {
@@ -510,19 +519,19 @@ export const DESIGN_PILLARS: DesignPillar[] = [
         id: 'ecom-workplace-aspirations',
         title: 'Workplace Aspirations',
         description: 'What do you aspire for at your workplace?',
-        imageUrl: '/concept-library/ecom-express/slide-1.png',
+        elements: ECOM_SLIDE_1_ELEMENTS,
       },
       {
         id: 'ecom-brand-landscape',
         title: 'Brand Landscape',
         description: 'Understanding the ECOM brand a notch better.',
-        imageUrl: '/concept-library/ecom-express/slide-2.png',
+        elements: ECOM_SLIDE_2_ELEMENTS,
       },
       {
         id: 'ecom-design-cues',
         title: 'Design Cues',
         description: 'Bringing the Workplace Aspiration & Brand Landscape together.',
-        imageUrl: '/concept-library/ecom-express/slide-3.png',
+        elements: ECOM_SLIDE_3_ELEMENTS,
       },
     ],
   },

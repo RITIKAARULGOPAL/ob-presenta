@@ -30,7 +30,7 @@ import { ImageAdjustOverlay } from './ImageAdjustOverlay';
 import { LogoAdjustOverlay } from './LogoAdjustOverlay';
 import { clamp, imageStyle, maxPan, MAX_ZOOM, MIN_ZOOM } from '@/lib/imageTransform';
 import { makeId } from '@/lib/id';
-import type { Brand, HotspotGalleryImage, ImageTransform, LinkedView, Slide, ViewHotspot } from '@/types/slide';
+import type { Brand, FreeformElement, HotspotGalleryImage, ImageTransform, LinkedView, Slide, ViewHotspot } from '@/types/slide';
 import type { Point } from '@/lib/hotspotShape';
 
 interface SlideRendererProps {
@@ -66,6 +66,7 @@ function MediaBox({
   onChangeTransform,
   allowAdjust = true,
   className,
+  style,
   mediaRef,
   elevated = false,
   square = false,
@@ -78,6 +79,7 @@ function MediaBox({
   onChangeTransform?: (t: ImageTransform | undefined) => void;
   allowAdjust?: boolean;
   className?: string;
+  style?: React.CSSProperties;
   mediaRef?: React.Ref<HTMLVideoElement>;
   /** A larger radius + a real soft shadow instead of the plain frame — for a
    *  slide's one hero image (the `design` style), not every MediaBox use. */
@@ -135,7 +137,7 @@ function MediaBox({
   }
 
   return (
-    <div className={`relative ${className ?? ''}`}>
+    <div className={`relative ${className ?? ''}`} style={style}>
       <div
         ref={frameRef}
         className={`relative h-full w-full overflow-hidden bg-black/30 ${square ? '' : elevated ? 'rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)]' : 'rounded-lg'} ${dragging ? 'ring-2 ring-[var(--accent)]' : ''} ${
@@ -453,6 +455,114 @@ function HeroVideo({ url, editable, onChangeUrl }: { url?: string; editable: boo
         </div>
       )}
     </>
+  );
+}
+
+/** One text box on a `'freeform'` slide — shows its original rich, per-run
+ *  styling (e.g. one pink word inside an otherwise black headline) until
+ *  actually edited, at which point a real edit collapses it to a single
+ *  plain-styled run. contentEditable directly on the rich markup rather than
+ *  reusing EditableText, since EditableText only takes one flat string/style
+ *  and would flatten the multi-run look on every render, not just on edit. */
+function FreeformTextBox({
+  el,
+  editable,
+  onChange,
+}: {
+  el: FreeformElement & { type: 'text' };
+  editable: boolean;
+  onChange: (patch: Partial<FreeformElement & { type: 'text' }>) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const plainText = el.paragraphs.map((p) => p.runs.map((r) => r.text).join('')).join('\n');
+
+  return (
+    <div
+      ref={ref}
+      contentEditable={editable}
+      suppressContentEditableWarning
+      className="absolute overflow-hidden outline-none"
+      style={{
+        left: `${el.x * 100}%`,
+        top: `${el.y * 100}%`,
+        width: `${el.w * 100}%`,
+        height: `${el.h * 100}%`,
+        fontSize: `${el.fontSize}px`,
+        fontFamily: el.fontFamily,
+        lineHeight: 1.25,
+      }}
+      onBlur={(e) => {
+        const newText = e.currentTarget.innerText.replace(/\n+$/, '');
+        if (newText === plainText) return;
+        const first = el.paragraphs[0]?.runs[0];
+        onChange({
+          paragraphs: [{ align: el.paragraphs[0]?.align ?? 'left', runs: [{ text: newText, bold: first?.bold, italic: first?.italic, color: first?.color }] }],
+        });
+      }}
+    >
+      {el.paragraphs.map((p, i) => (
+        <div key={i} style={{ textAlign: p.align }}>
+          {p.runs.map((r, j) => (
+            <span key={j} style={{ fontWeight: r.bold ? 700 : 400, fontStyle: r.italic ? 'italic' : 'normal', color: r.color }}>
+              {r.text}
+            </span>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** A slide imported "as is" from an external file (see conceptSlides.ts) —
+ *  every photo/text block/shape from the source sits at its original
+ *  position, independently editable, rather than one flat screenshot. No
+ *  title/kicker chrome (matches the 'blank' layout's own convention) since
+ *  the imported content already carries its own. */
+function FreeformSlide({ slide, editable }: SlideRendererProps) {
+  const updateField = useEditorStore((s) => s.updateField);
+  const elements = slide.fields.elements ?? [];
+
+  function setElement(id: string, patch: Partial<FreeformElement>) {
+    updateField(
+      'elements',
+      elements.map((el) => (el.id === id ? ({ ...el, ...patch } as FreeformElement) : el)),
+    );
+  }
+
+  return (
+    <div className="absolute inset-0 overflow-hidden bg-white">
+      {elements.map((el) => {
+        if (el.type === 'image') {
+          return (
+            <MediaBox
+              key={el.id}
+              url={el.url}
+              kind="image"
+              editable={editable}
+              onChangeUrl={(url) => setElement(el.id, { url })}
+              transform={el.transform}
+              onChangeTransform={(t) => setElement(el.id, { transform: t })}
+              // `position: absolute` via style, not className — MediaBox's
+              // own wrapper hardcodes `relative` in its className, and a
+              // same-specificity Tailwind utility class doesn't reliably
+              // override another by string order; inline style always wins.
+              style={{ position: 'absolute', left: `${el.x * 100}%`, top: `${el.y * 100}%`, width: `${el.w * 100}%`, height: `${el.h * 100}%` }}
+              square
+            />
+          );
+        }
+        if (el.type === 'text') {
+          return <FreeformTextBox key={el.id} el={el} editable={editable} onChange={(patch) => setElement(el.id, patch)} />;
+        }
+        return (
+          <div
+            key={el.id}
+            className="absolute"
+            style={{ left: `${el.x * 100}%`, top: `${el.y * 100}%`, width: `${el.w * 100}%`, height: `${el.h * 100}%`, backgroundColor: el.color }}
+          />
+        );
+      })}
+    </div>
   );
 }
 
@@ -2000,6 +2110,8 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
             <ClientLogo editable={editable} dark={dark || !!slide.fields.heroVideoUrl} />
           </div>
         </div>
+      ) : slide.layout === 'freeform' ? (
+        <FreeformSlide slide={slide} editable={editable} />
       ) : slide.layout === 'blank' ? (
         slide.fields.imageUrl || editable ? (
           // Full-bleed, edge-to-edge — deliberately escapes the base

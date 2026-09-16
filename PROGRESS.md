@@ -32,6 +32,76 @@ or re-explain anything.
 
 ---
 
+## 2026-09-17 (cont'd 6)
+
+**Context:** user corrected the "as is" concept-library slides twice more —
+first wanting them editable, then rejecting the whole-slide-as-one-image
+approach outright ("No not as a whole , image by image, text, line ,shape"):
+each photo/text/shape from the original PPTX needed to be its own
+independently editable object, positioned pixel-accurately.
+
+**Done:**
+- **Built genuine per-element reconstruction of all 3 E-Com Express slides**
+  ("Workplace Aspirations", "Brand Landscape", "Design Cues"), replacing the
+  flat full-bleed image versions:
+  - Extracted real shape geometry/text/images from the source `.pptx` via
+    `python-pptx`, recursing into `GROUP` shapes (a first pass without this
+    silently dropped every icon/label nested in a group). One-off generator
+    kept for reproducibility: [scripts/gen_ecom_elements.py](scripts/gen_ecom_elements.py)
+    reads `public/concept-library/ecom-express/elements/extracted.json` and
+    writes [src/lib/ecomExpressSlides.generated.ts](src/lib/ecomExpressSlides.generated.ts)
+    (do not hand-edit the generated file).
+  - New `SlideLayout: 'freeform'` + `FreeformElement` union (image/text/shape,
+    normalized 0–1 x/y/w/h, multi-run rich text) — [slide.ts](src/types/slide.ts).
+  - New `FreeformSlide`/`FreeformTextBox` renderers in
+    [SlideRenderer.tsx](src/components/SlideRenderer.tsx). Text is
+    `contentEditable`, showing full rich multi-run formatting until an actual
+    edit collapses it to one run (pragmatic tradeoff, not a full rich-text
+    editor). Images reuse `MediaBox` (replace/adjust already works, proven
+    elsewhere in the app).
+  - `conceptSlide()` ([conceptSlides.ts](src/lib/conceptSlides.ts)) now
+    branches on `concept.elements` before `imageUrl`, producing a `'freeform'`
+    slide with fresh per-insertion element ids.
+- **Found and fixed two real, previously-latent bugs**, both only exposed
+  because this is the first feature needing true fixed-canvas absolute
+  positioning:
+  - **Presenter mode had no `ScaledStage`** ([present/page.tsx](src/app/p/[id]/present/page.tsx))
+    — unlike the editor, it rendered `SlideRenderer` in an unconstrained
+    `h-screen w-screen` box, so anything positioned by exact percentage
+    distorted to the window's actual aspect ratio. Fixed by wrapping in the
+    same `ScaledStage` the editor already uses.
+  - **`MediaBox`'s `className="absolute"` lost a Tailwind specificity tie**
+    against its own hardcoded `relative` class (equal-specificity utilities
+    don't resolve by source order) — images rendered in normal document flow
+    and stacked vertically instead of at their intended x/y%. Fixed by adding
+    a `style` prop to `MediaBox` and passing `position: 'absolute'` there
+    instead of via `className` (inline style always wins).
+- **Verified live in Presenter mode**, all 3 slides: images correctly
+  positioned per their original PPTX layout (icon rows, image grids), text
+  correctly sized/colored/positioned (including a pink word-highlight inside
+  an otherwise-black headline), footer/logo chrome correct — closely matching
+  the original PowerPoint renders. Also verified end-to-end: a text element's
+  edit-and-blur correctly collapses and persists; an image element's DOM
+  structure confirms it's wired through the same `MediaBox` replace/adjust
+  path already proven elsewhere. Console shows only the pre-existing
+  migration-column 400s.
+
+**Left off / next up:**
+- The "Linking Test" scratch project now has several leftover duplicate
+  copies of these slides from repeated testing (both old flat-image and new
+  freeform versions) — clean up before presenting live, not before.
+- The now-superseded flat-image assets
+  (`public/concept-library/ecom-express/slide-{1,2,3}.png`) are no longer
+  referenced by the pillar's concepts (which use `elements` now) — likely
+  safe to delete, not yet done.
+- Editability was verified structurally + via a scripted DOM edit, not by a
+  real click-and-type in this session (the browser-automation pane's canvas
+  rendered too small at this viewport to reliably click precise element
+  positions) — worth one real manual click-to-edit check before presenting.
+- Nothing from this batch is committed yet.
+
+---
+
 ## 2026-09-17 (cont'd 5)
 
 **Done:**

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { getProject } from '@/lib/data';
 import { useEditorStore } from '@/lib/editorStore';
 import { SlideRenderer } from '@/components/SlideRenderer';
+import { ScaledStage } from '@/components/ScaledStage';
 
 export default function PresenterPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -71,7 +72,14 @@ export default function PresenterPage({ params }: { params: Promise<{ id: string
     <div className="relative h-screen w-screen bg-black">
       {currentSlide && (
         <div className="absolute inset-0">
-          <SlideRenderer slide={currentSlide} editable={false} animate />
+          {/* Same fixed 1280x720 canvas the editor and export use — without
+              this, a layout that positions content by exact pixel/percent
+              (e.g. a freeform imported slide) would distort to whatever
+              shape the actual browser window happens to be, since nothing
+              else here enforces a 16:9 box. */}
+          <ScaledStage>
+            <SlideRenderer slide={currentSlide} editable={false} animate />
+          </ScaledStage>
         </div>
       )}
 

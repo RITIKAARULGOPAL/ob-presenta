@@ -18,7 +18,8 @@ export type SlideLayout =
   | 'site-locus'
   | 'material-compare'
   | 'orbit'
-  | 'occupancy-chart';
+  | 'occupancy-chart'
+  | 'freeform';
 
 export type SlideStyleKind = 'standard' | 'section-starter' | 'company' | 'design';
 
@@ -240,6 +241,10 @@ export interface SlideFields {
    *  set once (on first Excel import) so re-imports don't need re-picking.
    *  May go stale if that slide is deleted; tolerate a miss. */
   linkedViewSlideId?: string;
+
+  /** freeform layout: an imported slide's photos/text/shapes, each
+   *  independently editable. See FreeformElement. */
+  elements?: FreeformElement[];
 }
 
 /** Set on slides generated from the concept library, so the UI can show what a
@@ -250,6 +255,64 @@ export interface ConceptOrigin {
   /** Unset on a pillar's own section-starter slide. */
   conceptId?: string;
 }
+
+/** One run of styled text within a `FreeformTextElement` paragraph — mirrors
+ *  a PowerPoint text run, so a color/weight highlight mid-sentence (e.g. one
+ *  pink word inside an otherwise black headline) survives the import. */
+export interface FreeformTextRun {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  color?: string;
+}
+
+export interface FreeformParagraph {
+  align: 'left' | 'center' | 'right';
+  runs: FreeformTextRun[];
+}
+
+/** One independently-editable piece of a `'freeform'` slide — the layout
+ *  used for a slide imported "as is" from an external file, where every
+ *  photo/text block/shape needs to stay separately editable rather than
+ *  collapsing into one flat picture. Position/size are fractions of the
+ *  slide canvas (0–1, top-left origin) — same convention as hotspot points
+ *  in `ViewHotspot`, not raw pixels, so this holds up at any render scale. */
+export type FreeformElement =
+  | {
+      id: string;
+      type: 'image';
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      url: string;
+      transform?: ImageTransform;
+    }
+  | {
+      id: string;
+      type: 'text';
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      /** One font size for the whole box — every run inside it was the same
+       *  size in the source (only color/weight/italic varied per run). */
+      fontSize: number;
+      paragraphs: FreeformParagraph[];
+      /** A specific font family from the source file (e.g. a monospace
+       *  closing statement) — falls back to the deck's own body font when
+       *  unset. */
+      fontFamily?: string;
+    }
+  | {
+      id: string;
+      type: 'shape';
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      color: string;
+    };
 
 export type AnimationEntry = 'none' | 'fadeUp' | 'fadeIn' | 'scaleIn' | 'slideLeft';
 

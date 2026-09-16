@@ -134,6 +134,8 @@ export function defaultFieldsForLayout(layout: SlideLayout) {
         occupancyUnit: '',
         occupancyZones: [makeOccupancyZone('Zone 1'), makeOccupancyZone('Zone 2'), makeOccupancyZone('Zone 3')],
       };
+    case 'freeform':
+      return { elements: [] };
     default:
       return {};
   }
@@ -193,6 +195,7 @@ export const LAYOUT_LABELS: Record<SlideLayout, string> = {
   'material-compare': 'Materials Compare',
   orbit: 'Orbit Diagram',
   'occupancy-chart': 'Occupancy Chart',
+  freeform: 'Freeform (Imported)',
 };
 
 export const STYLE_LABELS: Record<SlideStyleKind, string> = {

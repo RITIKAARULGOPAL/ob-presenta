@@ -32,6 +32,75 @@ or re-explain anything.
 
 ---
 
+## 2026-09-16 (cont'd 4)
+
+**Done:**
+- Built Part A step 5 — the last piece of the linked-views hotspot upgrade,
+  per the plan: transient viewer zoom/pan. New per-view "Zoom/pan" checkbox
+  (editable mode, next to the drawing tools) turns on `LinkedView.zoomPanEnabled`;
+  when on and in view/Presenter mode (never in the editor, where dragging the
+  image already means "adjust the authored crop"), the viewer can wheel-zoom
+  and drag-pan the image — a "Reset zoom" pill appears once zoomed. This is
+  genuinely transient (`viewportZoom`/`viewportPanX/Y` component state, never
+  written to `ImageTransform` or the project) and resets whenever the active
+  view/stage changes. The image and its hotspot SVG overlay are wrapped
+  together in one scaled/translated container so hotspots stay registered to
+  the image at any zoom level. A drag that actually moved (a small threshold,
+  tracked via `panRef`/`justPannedRef`) suppresses the hotspot's own click for
+  that one gesture, so panning never accidentally triggers a navigate/lightbox
+  — a plain (near-stationary) click still does.
+  - One real bug caught and fixed during verification, not stale-console
+    noise this time: the wheel handler originally used React's own `onWheel`
+    prop and called `e.preventDefault()` inside it — React attaches wheel
+    listeners passively by default, so this actually failed with "Unable to
+    preventDefault inside passive event listener invocation." console errors
+    every scroll (would have let the underlying page scroll during a zoom
+    gesture). Fixed by attaching a real native `wheel` listener via a ref +
+    `useEffect` with `{ passive: false }` instead of the JSX prop.
+- Verified in-browser on "Linking Test": enabled zoom/pan on the Layout view,
+  confirmed wheel-scroll zooms in/out and drag pans (hotspots visibly stay
+  registered to the image), confirmed a plain click on a hotspot still opens
+  its gallery/lightbox correctly while zoomed in, confirmed (by diffing the
+  console's `preventDefault` error count before/after a fresh scroll on a
+  hard-reloaded page — it stayed at its old count, meaning no *new* one fired)
+  that the passive-listener fix actually holds. `tsc --noEmit` clean (only
+  the pre-existing unrelated `pdfjs-dist` errors in `importDeck.ts`).
+  - **Correction to something claimed "confirmed stale" in earlier entries
+    today**: this session's browser tool does **not** clear its console
+    buffer on `navigate` — it just keeps accumulating for the tab's whole
+    lifetime, growing past 260+ entries by the end of this session. So
+    "the same error text is still there after a reload" was never actually
+    proof of staleness by itself; what does prove it is what I used this
+    time — checking whether the *count* of a specific error grows after
+    triggering the action again. The earlier `SlideRenderer.tsx:1203`/`1440`
+    parse-error read is still believed stale (`tsc` was clean each time and
+    the UI kept working), but that belief rests on the tsc-clean + working-UI
+    reasoning, not on the console going quiet — it never does.
+- **Part A of the plan (`C:\Users\Ritika\.claude\plans\ok-lets-no-do-giggly-snowglobe.md`)
+  is now fully built end-to-end** — all 5 steps (data model, side-list/hover,
+  gallery/lightbox, stages, zoom/pan) plus Part B (3 new layouts, hero video,
+  Presenter nav bar) and the file-input fix. Nothing scoped in the plan is
+  known-incomplete; the plan's own "Known limitations" (no touch-hover,
+  hotspot-coordinate drift across differently-framed stage images) remain
+  intentionally unsolved, per the plan.
+
+**Left off / next up:**
+- Still unconfirmed by the user: the file-input fix resolving their real
+  "Choose a file" symptom in their own environment.
+- This whole plan has had no dedicated cross-feature regression pass (e.g.
+  stages + gallery + zoom/pan all in play on the same view at once) — each
+  step was verified in isolation as it was built. Worth a broader manual pass
+  before considering this fully done, especially given the console-buffer
+  correction above (don't trust an old-looking error as proof of anything
+  either way — verify by count-diffing a fresh trigger, or just trust
+  `tsc`/actual UI behavior instead).
+- The "Linking Test" scratch project can be cleaned up now that Part A is
+  fully built and exercised.
+- Nothing from today is committed beyond commit `6b68c38` (quick-wins +
+  Part A steps 2–4) — this zoom/pan slice is not committed yet.
+
+---
+
 ## 2026-09-16 (cont'd 3)
 
 **Done:**

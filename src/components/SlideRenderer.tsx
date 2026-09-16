@@ -27,7 +27,7 @@ import { SiteLocusDiagram } from './SiteLocusDiagram';
 import { MaterialCompare } from './MaterialCompare';
 import { ImageAdjustOverlay } from './ImageAdjustOverlay';
 import { LogoAdjustOverlay } from './LogoAdjustOverlay';
-import { imageStyle } from '@/lib/imageTransform';
+import { clamp, imageStyle, maxPan, MAX_ZOOM, MIN_ZOOM } from '@/lib/imageTransform';
 import { makeId } from '@/lib/id';
 import type { Brand, HotspotGalleryImage, ImageTransform, LinkedView, Slide, ViewHotspot } from '@/types/slide';
 import type { Point } from '@/lib/hotspotShape';
@@ -566,6 +566,19 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   /** Which stages the hotspot being drawn/edited is active on. Empty = every
    *  stage (matches `stageIds` being unset on save). */
   const [pendingStageIds, setPendingStageIds] = useState<string[]>([]);
+  /** Transient viewer-only zoom/pan — never written to `ImageTransform` or the
+   *  project, just a magnifier over the authored crop. Reset whenever the
+   *  shown view/stage changes so it never looks "stuck" on a new image. */
+  const [viewportZoom, setViewportZoom] = useState(1);
+  const [viewportPanX, setViewportPanX] = useState(0);
+  const [viewportPanY, setViewportPanY] = useState(0);
+  const panRef = useRef<{ startX: number; startY: number; startPanX: number; startPanY: number; moved: boolean } | null>(null);
+  const stageBoxRef = useRef<HTMLDivElement>(null);
+  const zoomPanActiveRef = useRef(false);
+  /** True for the one click that immediately follows a pan drag that actually
+   *  moved — read and cleared by the hotspot's own onClick, since pointerup
+   *  fires (and clears panRef) before the browser's click event does. */
+  const justPannedRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const active = views.find((v) => v.id === activeId) ?? views[0];
   const activeStage = active?.stages?.find((s) => s.id === activeStageId) ?? active?.stages?.[0];
@@ -615,6 +628,12 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     return () => window.removeEventListener('keydown', onKey);
   }, [editingHotspotId]);
 
+  useEffect(() => {
+    setViewportZoom(1);
+    setViewportPanX(0);
+    setViewportPanY(0);
+  }, [activeId, activeStageId]);
+
   if (!active) return null;
 
   const otherViews = views.filter((v) => v.id !== active.id);
@@ -660,8 +679,50 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     return drawing && editable && !!active.url && active.kind !== 'walkthrough' && !pickingTarget;
   }
 
+  /** Whether the viewer's own magnifier (distinct from the authored crop) is
+   *  allowed right now — gated on `tool === null` exactly like `MediaBox`'s
+   *  own `allowAdjust`, so it never competes with drawing or the edit popup.
+   *  Viewer-only: in the editor, dragging the image already means "adjust the
+   *  authored crop" (MediaBox's own overlay) — zoom/pan only takes over once
+   *  there's no editing gesture it could compete with. */
+  const zoomPanActive = !!active.zoomPanEnabled && !editable && tool === null && !editingHotspotId && !pickingTarget;
+  // Read inside the native wheel listener below without re-subscribing it
+  // every render — React's own onWheel is passive and can't preventDefault.
+  zoomPanActiveRef.current = zoomPanActive;
+
+  useEffect(() => {
+    const el = stageBoxRef.current;
+    if (!el) return;
+    function onWheel(e: WheelEvent) {
+      if (!zoomPanActiveRef.current) return;
+      e.preventDefault();
+      setViewportZoom((z) => clamp(z + (e.deltaY < 0 ? 0.2 : -0.2), MIN_ZOOM, MAX_ZOOM));
+    }
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  // Re-clamp pan whenever zoom changes (zooming out must not leave the pan
+  // further from center than the new zoom level allows).
+  useEffect(() => {
+    const limit = maxPan(viewportZoom) * 100;
+    setViewportPanX((x) => clamp(x, -limit, limit));
+    setViewportPanY((y) => clamp(y, -limit, limit));
+  }, [viewportZoom]);
+
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    if (!drawable()) return;
+    if (!drawable()) {
+      if (zoomPanActive && viewportZoom > 1) {
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          // No active pointer to capture; pointermove still works without it.
+        }
+        panRef.current = { startX: e.clientX, startY: e.clientY, startPanX: viewportPanX, startPanY: viewportPanY, moved: false };
+        justPannedRef.current = false;
+      }
+      return;
+    }
     setOrtho(e.shiftKey);
     const point = pointAt(e);
 
@@ -691,7 +752,19 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   }
 
   function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (!drawable()) return;
+    if (!drawable()) {
+      const pan = panRef.current;
+      if (!pan) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const dxPct = ((e.clientX - pan.startX) / rect.width) * 100;
+      const dyPct = ((e.clientY - pan.startY) / rect.height) * 100;
+      // A few px of jitter shouldn't disqualify what's really just a click.
+      if (Math.abs(dxPct) + Math.abs(dyPct) > 0.6) pan.moved = true;
+      const limit = maxPan(viewportZoom) * 100;
+      setViewportPanX(clamp(pan.startPanX + dxPct, -limit, limit));
+      setViewportPanY(clamp(pan.startPanY + dyPct, -limit, limit));
+      return;
+    }
     setOrtho(e.shiftKey);
     const point = pointAt(e);
     setCursor(point);
@@ -703,7 +776,19 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   }
 
   function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    if (!drawable() || !dragging) return;
+    if (!drawable()) {
+      if (panRef.current) {
+        if (panRef.current.moved) justPannedRef.current = true;
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {
+          // Capture may already be gone; nothing to release.
+        }
+        panRef.current = null;
+      }
+      return;
+    }
+    if (!dragging) return;
     setOrtho(e.shiftKey);
     setDragging(false);
     try {
@@ -899,6 +984,15 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
         ))}
         {editable && active.url && active.kind !== 'walkthrough' && (
           <div className="ml-auto flex items-center gap-1.5">
+            <label className="flex items-center gap-1 text-[11px] font-medium text-[var(--ink-3)]" title="Lets viewers wheel-zoom and drag-pan this image (Presenter/view mode only)">
+              <input
+                type="checkbox"
+                checked={!!active.zoomPanEnabled}
+                onChange={(e) => setView(active.id, { zoomPanEnabled: e.target.checked })}
+                className="accent-[var(--accent)]"
+              />
+              Zoom/pan
+            </label>
             {TOOLS.map((t) => (
               <button
                 key={t.key}
@@ -951,11 +1045,18 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
       )}
       <div className="flex gap-4">
       <div
-        className={`relative aspect-video min-w-0 flex-1 select-none ${drawing ? 'cursor-crosshair' : ''}`}
+        ref={stageBoxRef}
+        className={`relative aspect-video min-w-0 flex-1 select-none overflow-hidden ${
+          drawing ? 'cursor-crosshair' : zoomPanActive && viewportZoom > 1 ? 'cursor-grab active:cursor-grabbing' : ''
+        }`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={() => setCursor(null)}
+      >
+      <div
+        className="h-full w-full transition-transform duration-100 ease-out"
+        style={{ transform: `scale(${viewportZoom}) translate(${viewportPanX}%, ${viewportPanY}%)` }}
       >
         <MediaBox
           url={stageUrl}
@@ -992,6 +1093,12 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               onMouseLeave={() => setHoveredHotspotId((cur) => (cur === h.id ? null : cur))}
               onClick={(e) => {
                 e.stopPropagation();
+                // A pan gesture that ended over a hotspot must not also fire
+                // its click — only a real (near-stationary) click should.
+                if (justPannedRef.current) {
+                  justPannedRef.current = false;
+                  return;
+                }
                 if (editable) startEditingHotspot(h);
                 else jumpTo(h);
               }}
@@ -1082,6 +1189,21 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
             </>
           )}
         </svg>
+      </div>
+
+        {zoomPanActive && viewportZoom > 1 && (
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => {
+              setViewportZoom(1);
+              setViewportPanX(0);
+              setViewportPanY(0);
+            }}
+            className="absolute right-2 top-2 z-20 rounded-md bg-black/75 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-black/85"
+          >
+            Reset zoom
+          </button>
+        )}
 
         {drawing && !pickingTarget && (
           <div onPointerDown={(e) => e.stopPropagation()} className="absolute left-2 top-2 z-20 flex items-center gap-2 rounded-md bg-black/75 px-2.5 py-1.5 text-[11px] font-medium text-white">

@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getProject, optionalColumnsMissing } from '@/lib/data';
@@ -14,8 +14,13 @@ import { exportToPdf, exportToPptx } from '@/lib/exportDeck';
 import { DESIGN_PILLARS } from '@/lib/conceptLibrary';
 import { conceptSlide } from '@/lib/conceptSlides';
 import { IconBulb, IconTextBlock, IconStar, IconBars, IconLink, IconFile, IconScreen, IconImage } from '@/components/icons';
+import { clamp } from '@/lib/imageTransform';
 
 const ECOM_PILLAR = DESIGN_PILLARS.find((p) => p.id === 'ecom-express');
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 3;
+const ZOOM_STEP = 0.1;
+const ZOOM_DEFAULT = 1;
 
 export default function EditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -25,13 +30,29 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const [showConceptPicker, setShowConceptPicker] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exportStatus, setExportStatus] = useState('');
+  const [zoomFactor, setZoomFactor] = useState(ZOOM_DEFAULT);
+  const stageAreaRef = useRef<HTMLDivElement>(null);
 
   const project = useEditorStore((s) => s.project);
   const loadProject = useEditorStore((s) => s.loadProject);
   const currentSlide = useEditorStore((s) => s.currentSlide());
   const addSlide = useEditorStore((s) => s.addSlide);
   const addSlides = useEditorStore((s) => s.addSlides);
+  const undo = useEditorStore((s) => s.undo);
+  const redo = useEditorStore((s) => s.redo);
+  const canUndo = useEditorStore((s) => s.canUndo());
+  const canRedo = useEditorStore((s) => s.canRedo());
+  const selectedSlideIds = useEditorStore((s) => s.selectedSlideIds);
+  const clearSlideSelection = useEditorStore((s) => s.clearSlideSelection);
+  const selectAllSlides = useEditorStore((s) => s.selectAllSlides);
+  const removeSlide = useEditorStore((s) => s.removeSlide);
+  const removeSlides = useEditorStore((s) => s.removeSlides);
+  const duplicateSlide = useEditorStore((s) => s.duplicateSlide);
+  const duplicateSlides = useEditorStore((s) => s.duplicateSlides);
+  const goNext = useEditorStore((s) => s.goNext);
+  const goPrev = useEditorStore((s) => s.goPrev);
   const saveError = useEditorStore((s) => s.saveError);
+  const saveStatus = useEditorStore((s) => s.saveStatus);
   const logoSaveUnavailable = useEditorStore((s) => s.logoSaveUnavailable);
 
   useEffect(() => {
@@ -51,6 +72,112 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    // A native listener, not React's own onWheel — React's is passive and
+    // can't preventDefault, so Ctrl+wheel would zoom the whole browser page
+    // (native pinch-zoom) at the same time it zoomed the canvas. Registered
+    // once with empty deps; setZoomFactor's functional form means it never
+    // needs to close over the latest zoomFactor.
+    const el = stageAreaRef.current;
+    if (!el) return;
+    function onWheel(e: WheelEvent) {
+      if (!(e.ctrlKey || e.metaKey)) return; // plain wheel/trackpad scrolls (pans) the canvas natively
+      e.preventDefault();
+      setZoomFactor((z) => clamp(z + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP), ZOOM_MIN, ZOOM_MAX));
+    }
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      // Escape clears a multi-selection even mid-edit (harmless either way),
+      // but every other shortcut below is deck-level, not text editing — a
+      // field mid-edit has its own native handling for Z/Delete/arrows/etc.
+      // (e.g. Ctrl+Z there reverts keystrokes in that one field, which is
+      // right: the deck-level undo below only has snapshots at blur-time,
+      // see EditableText, so hijacking it here would feel like "did nothing"
+      // while the caret's still in a field).
+      if (e.key === 'Escape') {
+        if (selectedSlideIds.length > 1) clearSlideSelection();
+        return;
+      }
+
+      const active = document.activeElement;
+      const isEditingText =
+        active instanceof HTMLElement && (active.isContentEditable || active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
+      if (isEditingText) return;
+
+      const currentSlideId = currentSlide?.id;
+      const mod = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        if (selectedSlideIds.length > 1) removeSlides(selectedSlideIds);
+        else if (currentSlideId) removeSlide(currentSlideId);
+        return;
+      }
+
+      if (mod && !e.shiftKey && key === 'z') {
+        e.preventDefault();
+        undo();
+        return;
+      }
+      if (mod && (key === 'y' || (e.shiftKey && key === 'z'))) {
+        e.preventDefault();
+        redo();
+        return;
+      }
+      if (mod && key === 'd') {
+        e.preventDefault();
+        if (selectedSlideIds.length > 1) duplicateSlides(selectedSlideIds);
+        else if (currentSlideId) duplicateSlide(currentSlideId);
+        return;
+      }
+      if (mod && key === 'a') {
+        e.preventDefault();
+        selectAllSlides();
+        return;
+      }
+      if (mod && (key === '=' || key === '+')) {
+        e.preventDefault();
+        setZoomFactor((z) => clamp(z + ZOOM_STEP, ZOOM_MIN, ZOOM_MAX));
+        return;
+      }
+      if (mod && key === '-') {
+        e.preventDefault();
+        setZoomFactor((z) => clamp(z - ZOOM_STEP, ZOOM_MIN, ZOOM_MAX));
+        return;
+      }
+      if (mod && key === '0') {
+        e.preventDefault();
+        setZoomFactor(ZOOM_DEFAULT);
+        return;
+      }
+      if (!mod && !e.shiftKey && !e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        e.preventDefault();
+        if (e.key === 'ArrowUp') goPrev();
+        else goNext();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [
+    undo,
+    redo,
+    selectedSlideIds,
+    clearSlideSelection,
+    selectAllSlides,
+    removeSlide,
+    removeSlides,
+    duplicateSlide,
+    duplicateSlides,
+    goNext,
+    goPrev,
+    currentSlide,
+  ]);
 
   async function handleExport(kind: 'pdf' | 'pptx') {
     if (!project) return;
@@ -91,19 +218,63 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     </div>
   ) : null;
 
+  // Idle (no edit yet this session) shows nothing — there's nothing to
+  // report about a save that hasn't been attempted. Once one has, this
+  // stays visible so the indicator doesn't disappear the moment a save
+  // finishes, matching the always-present status text in Docs/Slides.
+  const saveStatusLabel =
+    saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : saveStatus === 'error' ? 'Save failed' : null;
+
   return (
     <div className="flex h-screen flex-col bg-slate-100">
       {saveBanner}
       <header className="flex flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-2.5">
-        <div className="flex items-center gap-2 rounded-full bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-white">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#5fa8e8]" />
-          {project.name}
-          <span className="font-normal text-white/60">· by {project.preparedBy}</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 rounded-full bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-white">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#5fa8e8]" />
+            {project.name}
+            <span className="font-normal text-white/60">· by {project.preparedBy}</span>
+          </div>
+          {saveStatusLabel && (
+            <span
+              className={`flex items-center gap-1.5 text-[11px] font-medium ${
+                saveStatus === 'error' ? 'text-red-500' : 'text-slate-500'
+              }`}
+            >
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  saveStatus === 'saving' ? 'animate-pulse bg-amber-400' : saveStatus === 'error' ? 'bg-red-500' : 'bg-emerald-500'
+                }`}
+              />
+              {saveStatusLabel}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Link href="/" className="rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200">
             ⌂ Home
           </Link>
+          <div className="flex items-center overflow-hidden rounded-full bg-slate-100">
+            <button
+              onClick={() => undo()}
+              disabled={!canUndo}
+              title="Undo (Ctrl+Z)"
+              aria-label="Undo"
+              className="px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              ↶
+            </button>
+            <span className="h-4 w-px bg-slate-300" />
+            <button
+              onClick={() => redo()}
+              disabled={!canRedo}
+              title="Redo (Ctrl+Y)"
+              aria-label="Redo"
+              className="px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              ↷
+            </button>
+          </div>
           <div className="relative">
             <button
               onClick={() => setShowAddMenu((v) => !v)}
@@ -215,16 +386,48 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
       <div className="flex min-h-0 flex-1">
         <SlideRail />
-        <main className="min-h-0 flex-1 p-8">
-          <ScaledStage stageClassName="overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-slate-200">
+        <main ref={stageAreaRef} className="min-h-0 flex-1 p-8">
+          <ScaledStage
+            pannable
+            zoomFactor={zoomFactor}
+            stageClassName="overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-slate-200"
+          >
             {currentSlide && <SlideRenderer slide={currentSlide} editable animate />}
           </ScaledStage>
         </main>
         <PropertiesPanel />
       </div>
 
-      <div className="flex-shrink-0 border-t border-slate-200 bg-white px-4 py-1.5 text-center text-[11px] text-slate-400">
-        Editor mode — click any headline or field to edit it
+      <div className="flex flex-shrink-0 items-center justify-between border-t border-slate-200 bg-white px-4 py-1.5 text-[11px] text-slate-400">
+        <span className="flex-1" />
+        <span className="text-center">
+          Editor mode — click any headline or field to edit it · ↑↓ change slide · Ctrl/⌘+D duplicate · Ctrl/⌘+Z undo
+        </span>
+        <span className="flex flex-1 items-center justify-end gap-1">
+          <button
+            onClick={() => setZoomFactor((z) => clamp(z - ZOOM_STEP, ZOOM_MIN, ZOOM_MAX))}
+            title="Zoom out (Ctrl/⌘+-)"
+            aria-label="Zoom out"
+            className="flex h-5 w-5 items-center justify-center rounded text-slate-500 hover:bg-slate-100"
+          >
+            −
+          </button>
+          <button
+            onClick={() => setZoomFactor(ZOOM_DEFAULT)}
+            title="Reset zoom (Ctrl/⌘+0)"
+            className="w-10 rounded text-slate-500 hover:bg-slate-100"
+          >
+            {Math.round(zoomFactor * 100)}%
+          </button>
+          <button
+            onClick={() => setZoomFactor((z) => clamp(z + ZOOM_STEP, ZOOM_MIN, ZOOM_MAX))}
+            title="Zoom in (Ctrl/⌘+=)"
+            aria-label="Zoom in"
+            className="flex h-5 w-5 items-center justify-center rounded text-slate-500 hover:bg-slate-100"
+          >
+            +
+          </button>
+        </span>
       </div>
     </div>
   );

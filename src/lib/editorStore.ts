@@ -1,8 +1,8 @@
 import { create } from 'zustand';
-import { createSlide, createStyledSlide, defaultFieldsForLayout, defaultFieldsForStyle } from './slideDefaults';
+import { cloneSlide, createSlide, createStyledSlide, defaultFieldsForLayout, defaultFieldsForStyle } from './slideDefaults';
 import { optionalColumnsMissing, saveProject } from './data';
 import { makeId } from './id';
-import type { Brand, FontPairing, ImageTransform, OccupancyZone, Project, Slide, SlideFields, SlideLayout, SlideStyleKind, TypographySettings } from '@/types/slide';
+import type { Brand, FontPairing, ImageTransform, Project, Slide, SlideBackground, SlideFields, SlideLayout, SlideStyleKind, TypographySettings } from '@/types/slide';
 
 type Mode = 'editor' | 'presenter';
 
@@ -10,28 +10,56 @@ interface EditorState {
   project: Project | null;
   currentSlideId: string | null;
   mode: Mode;
-  saving: boolean;
+  /** 'idle' until the first edit of this session — there's nothing to report
+   *  about a save that hasn't been attempted yet. */
+  saveStatus: 'idle' | 'saving' | 'saved' | 'error';
   saveError?: string;
   logoSaveUnavailable: boolean;
-  /** Transient, never persisted: which occupancy-chart zone to highlight for
-   *  a moment right after a hotspot click navigates to its slide. Cleared by
-   *  the chart once shown. */
-  focusZoneId: string | null;
-  setFocusZoneId: (zoneId: string | null) => void;
+  /** Past/future project snapshots for undo/redo — see commitProject below.
+   *  Reset on every loadProject, since this is one global store reused across
+   *  whichever project is currently open; carrying another project's history
+   *  across a navigation would let undo silently restore the wrong deck. */
+  undoStack: Project[];
+  redoStack: Project[];
+  /** Slide-rail multi-selection — purely a UI concern, never persisted or
+   *  pushed onto undo/redo history. `selectionAnchor` is the last
+   *  plain/toggle click, used as the fixed end of a shift-click range. */
+  selectedSlideIds: string[];
+  selectionAnchor: string | null;
 
   loadProject: (project: Project) => void;
   setMode: (mode: Mode) => void;
-  selectSlide: (id: string) => void;
+  /** 'none' (default) selects just this slide, clearing any multi-selection —
+   *  every existing caller (nav dots, linked-slide chips, hotspot jumps) gets
+   *  this by just passing an id. 'toggle'/'range' are the slide rail's own
+   *  ctrl/shift-click behavior, matching Figma/Slides' filmstrip. */
+  selectSlide: (id: string, modifier?: 'none' | 'toggle' | 'range') => void;
+  clearSlideSelection: () => void;
+  selectAllSlides: () => void;
   goNext: () => void;
   goPrev: () => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
 
   updateField: <K extends keyof SlideFields>(field: K, value: SlideFields[K]) => void;
   addSlide: (layout?: SlideLayout) => void;
   addSlides: (slides: Slide[]) => void;
   addConceptSlide: (slide: Slide) => void;
   addStyledSlide: (style: SlideStyleKind) => void;
+  duplicateSlide: (id: string) => void;
+  duplicateSlides: (ids: string[]) => void;
   removeSlide: (id: string) => void;
+  removeSlides: (ids: string[]) => void;
+  /** Drag-to-reorder. `toIndex` is an insertion point counted against the
+   *  slide's *current* (pre-move) order — 0..slides.length, where N possible
+   *  insertion points sit before each of the N slides plus one at the very
+   *  end (index N). The caller (the slide rail) derives this from which half
+   *  of a drop target it's hovering. */
+  moveSlide: (id: string, toIndex: number) => void;
   toggleSkip: (id: string) => void;
+  toggleSkipMany: (ids: string[]) => void;
   changeLayout: (layout: SlideLayout) => void;
   changeStyle: (style: SlideStyleKind) => void;
   setBrandOverride: (brand: Brand | undefined) => void;
@@ -48,6 +76,12 @@ interface EditorState {
    *  the project's setting, not all the way to built-in. */
   setSlideTypographyOverride: (patch: TypographySettings) => void;
   setLinkedSlideIds: (ids: string[]) => void;
+  /** Merges into this slide's own background override (color/image/opacity) —
+   *  pass just the key you're changing. */
+  setSlideBackground: (patch: Partial<SlideBackground>) => void;
+  /** Clears the slide's whole background override, back to the style's usual
+   *  white/dark-veil default. */
+  resetSlideBackground: () => void;
 
   addStatItem: () => void;
   removeStatItem: (statId: string) => void;
@@ -57,17 +91,6 @@ interface EditorState {
   removePoint: (pointId: string) => void;
   addOrbitNode: () => void;
   removeOrbitNode: (nodeId: string) => void;
-  addOccupancyZone: () => void;
-  removeOccupancyZone: (zoneId: string) => void;
-  /** Excel import: upserts zones on `chartSlideId` by label match, and — when
-   *  `linkedViewSlideId` is given — patches every hotspot on that slide whose
-   *  `label` case-insensitively matches a row. One atomic persist covering
-   *  both slides. Returns a summary for the upload UI to show. */
-  importOccupancyData: (params: {
-    chartSlideId: string;
-    linkedViewSlideId?: string;
-    zones: { label: string; value: number; capacity?: number }[];
-  }) => { added: number; updated: number; hotspotsUpdated: number; unmatched: string[] };
 
   currentSlide: () => Slide | null;
   currentIndex: () => number;
@@ -109,38 +132,111 @@ function step(slides: Slide[], from: number, dir: 1 | -1, skipSkipped: boolean):
 
 function persist(project: Project) {
   // Fire-and-forget, but not silent: a save that fails has to reach the user,
-  // or they keep editing a deck that isn't being written anywhere.
+  // or they keep editing a deck that isn't being written anywhere. Status
+  // flips to 'saving' synchronously so the indicator shows immediately, not
+  // just once the network round-trip resolves.
+  useEditorStore.setState({ saveStatus: 'saving' });
   void saveProject(project)
-    .then(() => useEditorStore.setState({ saveError: undefined, logoSaveUnavailable: optionalColumnsMissing() }))
+    .then(() =>
+      useEditorStore.setState({ saveStatus: 'saved', saveError: undefined, logoSaveUnavailable: optionalColumnsMissing() }),
+    )
     .catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
       console.error('saveProject failed:', message);
-      useEditorStore.setState({ saveError: message });
+      useEditorStore.setState({ saveStatus: 'error', saveError: message });
     });
+}
+
+const MAX_HISTORY = 50;
+
+/** Every mutating action funnels its new project through here instead of
+ *  calling `set`/`persist` directly — this is the one choke point that makes
+ *  undo/redo possible without instrumenting every action's own undo logic.
+ *  Pushing the *previous* project onto undoStack (not the new one) is what
+ *  makes undo just "pop and restore" rather than needing an inverse for every
+ *  kind of edit. Any new edit clears the redo branch — standard semantics,
+ *  you can't redo past a point where you've since made a different change.
+ *  Capped so a long session doesn't grow history unboundedly; each entry is
+ *  a reference to a past Project, not a deep clone, since every action here
+ *  already builds `next` immutably — see slide.ts's own header comment, this
+ *  is exactly the "undo/redo without a diff engine" it was written for. */
+function commitProject(next: Project, extra?: Partial<Pick<EditorState, 'currentSlideId'>>) {
+  const { project, undoStack } = useEditorStore.getState();
+  useEditorStore.setState({
+    project: next,
+    undoStack: project ? [...undoStack, project].slice(-MAX_HISTORY) : undoStack,
+    redoStack: [],
+    ...extra,
+  });
+  persist(next);
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   project: null,
   currentSlideId: null,
   mode: 'editor',
-  saving: false,
+  saveStatus: 'idle',
   saveError: undefined,
   logoSaveUnavailable: false,
-  focusZoneId: null,
-  setFocusZoneId: (zoneId) => set({ focusZoneId: zoneId }),
+  undoStack: [],
+  redoStack: [],
+  selectedSlideIds: [],
+  selectionAnchor: null,
 
-  loadProject: (project) => set({ project, currentSlideId: project.slides[0]?.id ?? null, mode: 'editor' }),
+  loadProject: (project) =>
+    set({
+      project,
+      currentSlideId: project.slides[0]?.id ?? null,
+      mode: 'editor',
+      undoStack: [],
+      redoStack: [],
+      selectedSlideIds: [],
+      selectionAnchor: null,
+    }),
 
   setMode: (mode) => set({ mode }),
 
-  selectSlide: (id) => set({ currentSlideId: id }),
+  selectSlide: (id, modifier = 'none') => {
+    const { project, selectedSlideIds, selectionAnchor } = get();
+
+    if (modifier === 'toggle') {
+      const has = selectedSlideIds.includes(id);
+      set({
+        currentSlideId: id,
+        selectedSlideIds: has ? selectedSlideIds.filter((x) => x !== id) : [...selectedSlideIds, id],
+        selectionAnchor: id,
+      });
+      return;
+    }
+
+    if (modifier === 'range' && project) {
+      const ids = project.slides.map((s) => s.id);
+      const anchorIdx = ids.indexOf(selectionAnchor ?? id);
+      const clickedIdx = ids.indexOf(id);
+      if (anchorIdx !== -1 && clickedIdx !== -1) {
+        const [lo, hi] = anchorIdx < clickedIdx ? [anchorIdx, clickedIdx] : [clickedIdx, anchorIdx];
+        set({ currentSlideId: id, selectedSlideIds: ids.slice(lo, hi + 1) });
+        return;
+      }
+    }
+
+    set({ currentSlideId: id, selectedSlideIds: [id], selectionAnchor: id });
+  },
+
+  clearSlideSelection: () => set({ selectedSlideIds: [], selectionAnchor: null }),
+
+  selectAllSlides: () => {
+    const { project } = get();
+    if (!project) return;
+    set({ selectedSlideIds: project.slides.map((s) => s.id) });
+  },
 
   goNext: () => {
     const { project, currentSlideId, mode } = get();
     if (!project) return;
     const idx = project.slides.findIndex((s) => s.id === currentSlideId);
     const next = step(project.slides, idx, 1, mode === 'presenter');
-    if (next) set({ currentSlideId: next.id });
+    if (next) set({ currentSlideId: next.id, selectedSlideIds: [next.id], selectionAnchor: next.id });
   },
 
   goPrev: () => {
@@ -148,27 +244,76 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!project) return;
     const idx = project.slides.findIndex((s) => s.id === currentSlideId);
     const prev = step(project.slides, idx, -1, mode === 'presenter');
-    if (prev) set({ currentSlideId: prev.id });
+    if (prev) set({ currentSlideId: prev.id, selectedSlideIds: [prev.id], selectionAnchor: prev.id });
   },
+
+  undo: () => {
+    const { project, currentSlideId, undoStack, redoStack } = get();
+    if (!project || undoStack.length === 0) return;
+    const previous = undoStack[undoStack.length - 1];
+    // If the selected slide didn't survive the trip back, fall back to the
+    // first slide rather than leaving the canvas blank on a stale id.
+    const stillSelected = previous.slides.some((s) => s.id === currentSlideId);
+    set({
+      project: previous,
+      currentSlideId: stillSelected ? currentSlideId : (previous.slides[0]?.id ?? null),
+      undoStack: undoStack.slice(0, -1),
+      redoStack: [...redoStack, project].slice(-MAX_HISTORY),
+    });
+    persist(previous);
+  },
+
+  redo: () => {
+    const { project, currentSlideId, undoStack, redoStack } = get();
+    if (!project || redoStack.length === 0) return;
+    const nextProject = redoStack[redoStack.length - 1];
+    const stillSelected = nextProject.slides.some((s) => s.id === currentSlideId);
+    set({
+      project: nextProject,
+      currentSlideId: stillSelected ? currentSlideId : (nextProject.slides[0]?.id ?? null),
+      undoStack: [...undoStack, project].slice(-MAX_HISTORY),
+      redoStack: redoStack.slice(0, -1),
+    });
+    persist(nextProject);
+  },
+
+  canUndo: () => get().undoStack.length > 0,
+  canRedo: () => get().redoStack.length > 0,
 
   toggleSkip: (id) => {
     const { project } = get();
     if (!project) return;
     const slides = project.slides.map((s) => (s.id === id ? { ...s, skipped: !s.skipped || undefined } : s));
-    const next = { ...project, slides };
-    set({ project: next });
-    persist(next);
+    commitProject({ ...project, slides });
+  },
+
+  toggleSkipMany: (ids) => {
+    const { project } = get();
+    if (!project || ids.length === 0) return;
+    const idSet = new Set(ids);
+    // Mixed-state selection resolves the same way a tri-state checkbox does:
+    // only flip everyone to "included" once every selected slide is already
+    // skipped, otherwise skip whichever aren't yet.
+    const allSkipped = project.slides.filter((s) => idSet.has(s.id)).every((s) => s.skipped);
+    const slides = project.slides.map((s) => (idSet.has(s.id) ? { ...s, skipped: allSkipped ? undefined : true } : s));
+    commitProject({ ...project, slides });
   },
 
   updateField: (field, value) => {
     const { project, currentSlideId } = get();
     if (!project || !currentSlideId) return;
+    const slide = project.slides.find((s) => s.id === currentSlideId);
+    // EditableText fires onBlur unconditionally, even when the field's text
+    // never actually changed (e.g. clicking straight from one field to a
+    // toolbar button blurs the first field with its own unchanged value) —
+    // without this guard, that harmless blur still pushed a no-op entry onto
+    // undoStack, so the *first* Undo after finishing an edit silently undid
+    // nothing visible instead of the real change.
+    if (!slide || slide.fields[field] === value) return;
     const slides = project.slides.map((s) =>
       s.id === currentSlideId ? { ...s, fields: { ...s.fields, [field]: value } } : s
     );
-    const next = { ...project, slides };
-    set({ project: next });
-    persist(next);
+    commitProject({ ...project, slides });
   },
 
   addSlide: (layout: SlideLayout = 'title-content') => {
@@ -178,9 +323,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const idx = project.slides.findIndex((s) => s.id === currentSlideId);
     const slides = [...project.slides];
     slides.splice(idx + 1, 0, slide);
-    const next = { ...project, slides };
-    set({ project: next, currentSlideId: slide.id });
-    persist(next);
+    commitProject({ ...project, slides }, { currentSlideId: slide.id });
   },
 
   addSlides: (incoming: Slide[]) => {
@@ -189,10 +332,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const idx = project.slides.findIndex((s) => s.id === currentSlideId);
     const slides = [...project.slides];
     slides.splice(idx + 1, 0, ...incoming);
-    const next = { ...project, slides };
     // Land on the first inserted slide, so a bulk insert is visibly where it went.
-    set({ project: next, currentSlideId: incoming[0].id });
-    persist(next);
+    commitProject({ ...project, slides }, { currentSlideId: incoming[0].id });
   },
 
   addConceptSlide: (slide: Slide) => {
@@ -210,9 +351,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
     slides.splice(at, 0, slide);
 
-    const next = { ...project, slides };
-    set({ project: next, currentSlideId: slide.id });
-    persist(next);
+    commitProject({ ...project, slides }, { currentSlideId: slide.id });
   },
 
   addStyledSlide: (style: SlideStyleKind) => {
@@ -222,22 +361,79 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const idx = project.slides.findIndex((s) => s.id === currentSlideId);
     const slides = [...project.slides];
     slides.splice(idx + 1, 0, slide);
-    const next = { ...project, slides };
-    set({ project: next, currentSlideId: slide.id });
-    persist(next);
+    commitProject({ ...project, slides }, { currentSlideId: slide.id });
+  },
+
+  duplicateSlide: (id) => {
+    const { project } = get();
+    if (!project) return;
+    const idx = project.slides.findIndex((s) => s.id === id);
+    if (idx === -1) return;
+    const clone = cloneSlide(project.slides[idx]);
+    const slides = [...project.slides];
+    slides.splice(idx + 1, 0, clone);
+    commitProject({ ...project, slides }, { currentSlideId: clone.id });
+  },
+
+  duplicateSlides: (ids) => {
+    const { project } = get();
+    if (!project || ids.length === 0) return;
+    const idSet = new Set(ids);
+    // Land the clones together right after the last selected slide, keeping
+    // their relative order — same "land next to where you were" convention
+    // as every other bulk-insert action in this store.
+    const insertAfter = project.slides.reduce((last, s, i) => (idSet.has(s.id) ? i : last), -1);
+    const clones = project.slides.filter((s) => idSet.has(s.id)).map(cloneSlide);
+    if (clones.length === 0) return;
+    const slides = [...project.slides];
+    slides.splice(insertAfter + 1, 0, ...clones);
+    commitProject({ ...project, slides }, { currentSlideId: clones[0].id });
+    set({ selectedSlideIds: clones.map((c) => c.id), selectionAnchor: clones[0].id });
+  },
+
+  moveSlide: (id, toIndex) => {
+    const { project } = get();
+    if (!project) return;
+    const fromIdx = project.slides.findIndex((s) => s.id === id);
+    if (fromIdx === -1) return;
+    // Removing the dragged slide shifts every later index back by one, so an
+    // insertion point counted against the *original* order needs adjusting
+    // before it's used against the post-removal array.
+    const adjusted = toIndex > fromIdx ? toIndex - 1 : toIndex;
+    const insertAt = Math.max(0, Math.min(adjusted, project.slides.length - 1));
+    if (insertAt === fromIdx) return; // dropped back where it started
+    const slides = [...project.slides];
+    const [moved] = slides.splice(fromIdx, 1);
+    slides.splice(insertAt, 0, moved);
+    commitProject({ ...project, slides });
   },
 
   removeSlide: (id) => {
-    const { project } = get();
+    const { project, currentSlideId } = get();
     if (!project || project.slides.length <= 1) return;
     const idx = project.slides.findIndex((s) => s.id === id);
     // Links hold slide ids, so deleting a target would otherwise leave chips and
     // hotspots pointing nowhere — silently doing nothing when clicked.
     const slides = project.slides.filter((s) => s.id !== id).map((s) => dropLinksTo(s, id));
-    const next = { ...project, slides };
     const fallback = slides[Math.max(0, idx - 1)]?.id ?? slides[0]?.id ?? null;
-    set((state) => ({ project: next, currentSlideId: state.currentSlideId === id ? fallback : state.currentSlideId }));
-    persist(next);
+    commitProject({ ...project, slides }, { currentSlideId: currentSlideId === id ? fallback : currentSlideId });
+  },
+
+  removeSlides: (ids) => {
+    const { project, currentSlideId, selectedSlideIds } = get();
+    if (!project || ids.length === 0) return;
+    const idSet = new Set(ids);
+    if (project.slides.length - idSet.size < 1) return; // must keep at least one slide
+    const firstRemovedIdx = project.slides.findIndex((s) => idSet.has(s.id));
+    const slides = project.slides
+      .filter((s) => !idSet.has(s.id))
+      .map((s) => ids.reduce((acc, removedId) => dropLinksTo(acc, removedId), s));
+    const fallback = slides[Math.max(0, firstRemovedIdx - 1)]?.id ?? slides[0]?.id ?? null;
+    commitProject(
+      { ...project, slides },
+      { currentSlideId: idSet.has(currentSlideId ?? '') ? fallback : currentSlideId },
+    );
+    set({ selectedSlideIds: selectedSlideIds.filter((id) => !idSet.has(id)), selectionAnchor: null });
   },
 
   changeLayout: (layout) => {
@@ -246,9 +442,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const slides = project.slides.map((s) =>
       s.id === currentSlideId ? { ...s, layout, style: 'standard' as const, fields: defaultFieldsForLayout(layout) } : s
     );
-    const next = { ...project, slides };
-    set({ project: next });
-    persist(next);
+    commitProject({ ...project, slides });
   },
 
   changeStyle: (style) => {
@@ -264,18 +458,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           }
         : s
     );
-    const next = { ...project, slides };
-    set({ project: next });
-    persist(next);
+    commitProject({ ...project, slides });
   },
 
   setBrandOverride: (brand) => {
     const { project, currentSlideId } = get();
     if (!project || !currentSlideId) return;
     const slides = project.slides.map((s) => (s.id === currentSlideId ? { ...s, brandOverride: brand } : s));
-    const next = { ...project, slides };
-    set({ project: next });
-    persist(next);
+    commitProject({ ...project, slides });
   },
 
   setClientLogo: (dataUrl) => {
@@ -284,41 +474,31 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // A new logo very likely has a different shape than the old one, so a
     // rotation/zoom picked for the previous file is more likely to look wrong
     // than right on the replacement.
-    const next = { ...project, clientLogo: dataUrl, clientLogoTransform: undefined };
-    set({ project: next });
-    persist(next);
+    commitProject({ ...project, clientLogo: dataUrl, clientLogoTransform: undefined });
   },
 
   setClientLogoTransform: (transform) => {
     const { project } = get();
     if (!project) return;
-    const next = { ...project, clientLogoTransform: transform };
-    set({ project: next });
-    persist(next);
+    commitProject({ ...project, clientLogoTransform: transform });
   },
 
   setAccentColor: (hex) => {
     const { project } = get();
     if (!project) return;
-    const next = { ...project, accentColor: hex };
-    set({ project: next });
-    persist(next);
+    commitProject({ ...project, accentColor: hex });
   },
 
   setFontFamily: (font) => {
     const { project } = get();
     if (!project) return;
-    const next = { ...project, fontFamily: font };
-    set({ project: next });
-    persist(next);
+    commitProject({ ...project, fontFamily: font });
   },
 
   setTypography: (patch) => {
     const { project } = get();
     if (!project) return;
-    const next = { ...project, typography: { ...project.typography, ...patch } };
-    set({ project: next });
-    persist(next);
+    commitProject({ ...project, typography: { ...project.typography, ...patch } });
   },
 
   setSlideTypographyOverride: (patch) => {
@@ -327,9 +507,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const slides = project.slides.map((s) =>
       s.id === currentSlideId ? { ...s, typographyOverride: { ...s.typographyOverride, ...patch } } : s
     );
-    const next = { ...project, slides };
-    set({ project: next });
-    persist(next);
+    commitProject({ ...project, slides });
+  },
+
+  setSlideBackground: (patch) => {
+    const { project, currentSlideId } = get();
+    if (!project || !currentSlideId) return;
+    const slides = project.slides.map((s) =>
+      s.id === currentSlideId ? { ...s, background: { ...s.background, ...patch } } : s,
+    );
+    commitProject({ ...project, slides });
+  },
+
+  resetSlideBackground: () => {
+    const { project, currentSlideId } = get();
+    if (!project || !currentSlideId) return;
+    const slides = project.slides.map((s) => (s.id === currentSlideId ? { ...s, background: undefined } : s));
+    commitProject({ ...project, slides });
   },
 
   setLinkedSlideIds: (ids) => {
@@ -340,9 +534,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ? { ...s, fields: { ...s.fields, linkedSlideIds: ids.length ? ids : undefined } }
         : s,
     );
-    const next = { ...project, slides };
-    set({ project: next });
-    persist(next);
+    commitProject({ ...project, slides });
   },
 
   addStatItem: () => {
@@ -355,9 +547,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       stats.push({ id: makeId('stat'), value: last?.value ?? '0', label: last?.label ?? 'New stat' });
       return { ...s, fields: { ...s.fields, stats } };
     });
-    const next = { ...project, slides };
-    set({ project: next });
-    persist(next);
+    commitProject({ ...project, slides });
   },
 
   removeStatItem: (statId) => {
@@ -368,9 +558,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const stats = (s.fields.stats ?? []).filter((st) => st.id !== statId);
       return stats.length ? { ...s, fields: { ...s.fields, stats } } : s;
     });
-    const next = { ...project, slides };
-    set({ project: next });
-    persist(next);
+    commitProject({ ...project, slides });
   },
 
   addMergeItem: () => {
@@ -382,9 +570,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       items.push({ id: makeId('item'), label: 'New item' });
       return { ...s, fields: { ...s.fields, items } };
     });
-    const next = { ...project, slides };
-    set({ project: next });
-    persist(next);
+    commitProject({ ...project, slides });
   },
 
   removeMergeItem: (itemId) => {
@@ -395,9 +581,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const items = (s.fields.items ?? []).filter((it) => it.id !== itemId);
       return items.length ? { ...s, fields: { ...s.fields, items } } : s;
     });
-    const next = { ...project, slides };
-    set({ project: next });
-    persist(next);
+    commitProject({ ...project, slides });
   },
 
   addPoint: () => {
@@ -408,9 +592,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ? { ...sl, fields: { ...sl.fields, points: [...(sl.fields.points ?? []), { id: makeId('point'), label: 'New point' }] } }
         : sl,
     );
-    const next = { ...project, slides };
-    set({ project: next });
-    persist(next);
+    commitProject({ ...project, slides });
   },
 
   removePoint: (pointId) => {
@@ -421,9 +603,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ? { ...sl, fields: { ...sl.fields, points: (sl.fields.points ?? []).filter((pt) => pt.id !== pointId) } }
         : sl,
     );
-    const next = { ...project, slides };
-    set({ project: next });
-    persist(next);
+    commitProject({ ...project, slides });
   },
 
   addOrbitNode: () => {
@@ -434,9 +614,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ? { ...sl, fields: { ...sl.fields, orbitNodes: [...(sl.fields.orbitNodes ?? []), { id: makeId('orbit'), label: 'New node' }] } }
         : sl,
     );
-    const next = { ...project, slides };
-    set({ project: next });
-    persist(next);
+    commitProject({ ...project, slides });
   },
 
   removeOrbitNode: (nodeId) => {
@@ -447,117 +625,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ? { ...sl, fields: { ...sl.fields, orbitNodes: (sl.fields.orbitNodes ?? []).filter((n) => n.id !== nodeId) } }
         : sl,
     );
-    const next = { ...project, slides };
-    set({ project: next });
-    persist(next);
-  },
-
-  addOccupancyZone: () => {
-    const { project, currentSlideId } = get();
-    if (!project || !currentSlideId) return;
-    const slides = project.slides.map((sl) =>
-      sl.id === currentSlideId
-        ? { ...sl, fields: { ...sl.fields, occupancyZones: [...(sl.fields.occupancyZones ?? []), { id: makeId('zone'), label: 'New zone', value: 0 }] } }
-        : sl,
-    );
-    const next = { ...project, slides };
-    set({ project: next });
-    persist(next);
-  },
-
-  removeOccupancyZone: (zoneId) => {
-    const { project, currentSlideId } = get();
-    if (!project || !currentSlideId) return;
-    const slides = project.slides.map((sl) =>
-      sl.id === currentSlideId
-        ? { ...sl, fields: { ...sl.fields, occupancyZones: (sl.fields.occupancyZones ?? []).filter((z) => z.id !== zoneId) } }
-        : sl,
-    );
-    const next = { ...project, slides };
-    set({ project: next });
-    persist(next);
-  },
-
-  importOccupancyData: ({ chartSlideId, linkedViewSlideId, zones }) => {
-    const { project } = get();
-    const empty = { added: 0, updated: 0, hotspotsUpdated: 0, unmatched: [] as string[] };
-    if (!project) return empty;
-
-    const matchesLabel = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
-
-    let added = 0;
-    let updated = 0;
-    let hotspotsUpdated = 0;
-    const unmatched: string[] = [];
-
-    const chartSlide = project.slides.find((s) => s.id === chartSlideId);
-    const linkedSlide = linkedViewSlideId ? project.slides.find((s) => s.id === linkedViewSlideId) : undefined;
-    const allHotspotLabels = new Set(
-      (linkedSlide?.fields.views ?? []).flatMap((v) => (v.hotspots ?? []).map((h) => (h.label ?? '').trim().toLowerCase())),
-    );
-
-    const existingZones = chartSlide?.fields.occupancyZones ?? [];
-    const nextZones: OccupancyZone[] = [...existingZones];
-    const zoneIdByLabel = new Map<string, string>();
-    for (const z of nextZones) zoneIdByLabel.set(z.label.trim().toLowerCase(), z.id);
-
-    for (const row of zones) {
-      const label = row.label.trim();
-      if (!label) continue;
-      const key = label.toLowerCase();
-      const idx = nextZones.findIndex((z) => matchesLabel(z.label, label));
-      if (idx >= 0) {
-        nextZones[idx] = { ...nextZones[idx], label, value: row.value, capacity: row.capacity };
-        updated += 1;
-      } else {
-        const zone: OccupancyZone = { id: makeId('zone'), label, value: row.value, capacity: row.capacity };
-        nextZones.push(zone);
-        zoneIdByLabel.set(key, zone.id);
-        added += 1;
-      }
-      if (!allHotspotLabels.has(key)) unmatched.push(label);
-    }
-    for (const z of nextZones) zoneIdByLabel.set(z.label.trim().toLowerCase(), z.id);
-
-    const slides = project.slides.map((sl) => {
-      if (sl.id === chartSlideId) {
-        return { ...sl, fields: { ...sl.fields, occupancyZones: nextZones, linkedViewSlideId: linkedViewSlideId ?? sl.fields.linkedViewSlideId } };
-      }
-      if (linkedSlide && sl.id === linkedSlide.id) {
-        const views = (sl.fields.views ?? []).map((v) => {
-          if (!v.hotspots?.length) return v;
-          let changed = false;
-          const hotspots = v.hotspots.map((h) => {
-            const key = (h.label ?? '').trim().toLowerCase();
-            const row = zones.find((r) => matchesLabel(r.label, h.label ?? ''));
-            if (!row || !key) return h;
-            changed = true;
-            hotspotsUpdated += 1;
-            const zoneId = zoneIdByLabel.get(key);
-            return {
-              ...h,
-              listEntry: {
-                id: h.listEntry?.id ?? makeId('list'),
-                label: h.label ?? row.label,
-                value: row.capacity != null ? `${row.value} / ${row.capacity}` : String(row.value),
-                description: h.listEntry?.description,
-              },
-              targetSlideId: chartSlideId,
-              targetViewId: undefined,
-              targetZoneId: zoneId,
-            };
-          });
-          return changed ? { ...v, hotspots } : v;
-        });
-        return { ...sl, fields: { ...sl.fields, views } };
-      }
-      return sl;
-    });
-
-    const next = { ...project, slides };
-    set({ project: next });
-    persist(next);
-    return { added, updated, hotspotsUpdated, unmatched };
+    commitProject({ ...project, slides });
   },
 
   currentSlide: () => {

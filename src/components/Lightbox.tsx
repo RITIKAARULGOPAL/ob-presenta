@@ -22,12 +22,18 @@ export function Lightbox({
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape' && e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      // Capture phase + stopImmediatePropagation: Presenter mode listens for
+      // all three of these same keys on the same `window` target (Escape
+      // exits to the editor, the arrows change slide) — without this, one
+      // keypress would both act on the lightbox AND on the deck underneath.
+      e.stopImmediatePropagation();
       if (e.key === 'Escape') onClose();
       else if (e.key === 'ArrowRight') setIndex((i) => (i + 1) % images.length);
-      else if (e.key === 'ArrowLeft') setIndex((i) => (i - 1 + images.length) % images.length);
+      else setIndex((i) => (i - 1 + images.length) % images.length);
     }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true });
   }, [images.length, onClose]);
 
   if (!image) return null;

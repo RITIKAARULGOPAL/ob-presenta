@@ -1,9 +1,11 @@
 'use client';
 
+import { useRef } from 'react';
 import { useEditorStore } from '@/lib/editorStore';
 import { AccentPicker } from './AccentPicker';
 import { LAYOUT_LABELS, STYLE_LABELS } from '@/lib/slideDefaults';
 import { FONT_PAIRINGS, TYPE_SCALES, HEADLINE_WEIGHTS, BODY_FONTS, TRACKINGS } from '@/lib/fonts';
+import { fileToSlideImage } from '@/lib/imageFile';
 import { IconLayers, IconGrid, IconImage, IconLink, IconDroplet, IconType } from './icons';
 import type { Brand, SlideLayout, SlideStyleKind } from '@/types/slide';
 
@@ -69,6 +71,9 @@ export function PropertiesPanel() {
   const setAccentColor = useEditorStore((s) => s.setAccentColor);
   const setSlideTypographyOverride = useEditorStore((s) => s.setSlideTypographyOverride);
   const setLinkedSlideIds = useEditorStore((s) => s.setLinkedSlideIds);
+  const setSlideBackground = useEditorStore((s) => s.setSlideBackground);
+  const resetSlideBackground = useEditorStore((s) => s.resetSlideBackground);
+  const bgFileRef = useRef<HTMLInputElement>(null);
 
   const linkedIds = slide?.fields.linkedSlideIds ?? [];
   // Plans, renders and design slides are what a concept wants to point at —
@@ -123,6 +128,73 @@ export function PropertiesPanel() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="mb-2 border-t border-slate-100 pt-6">
+        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+          <IconDroplet className="h-3.5 w-3.5" /> Background
+        </h4>
+        <div className="flex items-center gap-2">
+          <label
+            title="Background colour"
+            className="relative h-7 w-7 flex-shrink-0 cursor-pointer overflow-hidden rounded-md border border-slate-200"
+            style={{ backgroundColor: slide.background?.color ?? '#ffffff' }}
+          >
+            <input
+              type="color"
+              value={slide.background?.color ?? '#ffffff'}
+              onChange={(e) => setSlideBackground({ color: e.target.value })}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            />
+          </label>
+          <input
+            ref={bgFileRef}
+            type="file"
+            accept="image/*"
+            className="absolute h-px w-px overflow-hidden opacity-0"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (!file) return;
+              setSlideBackground({ imageUrl: await fileToSlideImage(file) });
+            }}
+          />
+          <button
+            onClick={() => bgFileRef.current?.click()}
+            className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300"
+          >
+            {slide.background?.imageUrl ? 'Replace image' : 'Choose image'}
+          </button>
+          {(slide.background?.color || slide.background?.imageUrl) && (
+            <button
+              onClick={resetSlideBackground}
+              className="ml-auto text-[11px] font-medium text-slate-400 hover:text-slate-600"
+            >
+              Reset
+            </button>
+          )}
+        </div>
+        {slide.background?.imageUrl && (
+          <div className="mt-3">
+            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              Image darken (for text legibility)
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={0.8}
+              step={0.05}
+              value={slide.background.imageOpacity ?? 0}
+              onChange={(e) => setSlideBackground({ imageOpacity: Number(e.target.value) })}
+              className="w-full accent-[#0b72c2]"
+            />
+          </div>
+        )}
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+          Replaces this slide&apos;s default background. Text colour doesn&apos;t
+          auto-adjust — pick a Section Starter/Design style above for light text
+          on a dark background.
+        </p>
       </div>
 
       <div className="mb-2 border-t border-slate-100 pt-6">

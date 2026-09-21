@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { EditableText } from './EditableText';
 import { useEditorStore } from '@/lib/editorStore';
 import { shadeWithBlack, tintWithWhite } from '@/lib/color';
@@ -21,11 +21,12 @@ import {
 } from '@/lib/hotspotShape';
 import { ConceptDiagram } from './ConceptDiagram';
 import { HotspotSidePanel } from './HotspotSidePanel';
+import { SeatingTable } from './SeatingTable';
 import { Lightbox } from './Lightbox';
+import { SpaceDetailOverlay } from './SpaceDetailOverlay';
 import { OrbitDiagram } from './OrbitDiagram';
 import { SiteLocusDiagram } from './SiteLocusDiagram';
 import { MaterialCompare } from './MaterialCompare';
-import { OccupancyChart } from './OccupancyChart';
 import { ImageAdjustOverlay } from './ImageAdjustOverlay';
 import { LogoAdjustOverlay } from './LogoAdjustOverlay';
 import { clamp, imageStyle, maxPan, MAX_ZOOM, MIN_ZOOM } from '@/lib/imageTransform';
@@ -481,12 +482,8 @@ function FreeformTextBox({
       ref={ref}
       contentEditable={editable}
       suppressContentEditableWarning
-      className="absolute overflow-hidden outline-none"
+      className="h-full w-full overflow-hidden outline-none"
       style={{
-        left: `${el.x * 100}%`,
-        top: `${el.y * 100}%`,
-        width: `${el.w * 100}%`,
-        height: `${el.h * 100}%`,
         fontSize: `${el.fontSize}px`,
         fontFamily: el.fontFamily,
         lineHeight: 1.25,
@@ -513,6 +510,169 @@ function FreeformTextBox({
   );
 }
 
+const FREEFORM_DRAG_THRESHOLD_PX = 4;
+const SNAP_THRESHOLD_PX = 6;
+
+/** Candidate alignment lines for one axis: the slide's own edges/center,
+ *  plus every other element's edges/center on that axis. Checked against
+ *  the dragged element's own left/center/right (or top/center/bottom) —
+ *  whichever pairing is closest, within `SNAP_THRESHOLD_PX`, wins. Returns
+ *  the snapped coordinate unchanged if nothing is close enough to snap to.
+ *  Pixel-based threshold (via `containerSize`) rather than a fixed fraction,
+ *  so the snap distance feels the same regardless of slide/element size. */
+function snapAxis(rawStart: number, size: number, others: number[], containerSize: number): { value: number; guide: number | null } {
+  const edges = [rawStart, rawStart + size / 2, rawStart + size];
+  const candidates = [0, 0.5, 1, ...others];
+
+  let best: { deltaPx: number; delta: number; candidate: number } | null = null;
+  for (const edge of edges) {
+    for (const candidate of candidates) {
+      const deltaPx = Math.abs(edge - candidate) * containerSize;
+      if (deltaPx <= SNAP_THRESHOLD_PX && (!best || deltaPx < best.deltaPx)) {
+        best = { deltaPx, delta: edge - candidate, candidate };
+      }
+    }
+  }
+  return best ? { value: rawStart - best.delta, guide: best.candidate } : { value: rawStart, guide: null };
+}
+
+/** Wraps one freeform element with drag-to-move: the wrapper owns absolute
+ *  positioning and the pointer gesture, and its child just fills it at
+ *  100%/100%, keeping its own click/edit behavior (MediaBox's adjust mode,
+ *  the text box's contentEditable) for a plain click that never crossed the
+ *  drag threshold. A capture-phase click listener swallows the click that
+ *  would otherwise follow a completed drag's pointerup — the same "a real
+ *  drag isn't also a click" rule the linked-views hotspot canvas already
+ *  applies to its own pan-vs-click disambiguation.
+ *
+ *  Safe to layer on top of MediaBox's own adjust-mode dragging (pan/zoom/
+ *  rotate handles): `ImageAdjustOverlay` stops propagation on every
+ *  pointerdown inside itself, so none of that ever reaches this wrapper's
+ *  own `onPointerDown` — the two never compete for the same gesture. */
+function FreeformElementWrapper({
+  el,
+  editable,
+  containerRef,
+  siblings,
+  onMoveEnd,
+  onGuideChange,
+  children,
+}: {
+  el: FreeformElement;
+  editable: boolean;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  /** Every other element on this slide, read fresh at drag-start — used to
+   *  compute snap candidates (their edges/centers), never mutated here. */
+  siblings: FreeformElement[];
+  onMoveEnd: (pos: { x: number; y: number }) => void;
+  /** Reports the alignment guide line(s) currently active for THIS drag, so
+   *  the shared slide-level overlay can draw them; called with {x:null,
+   *  y:null} once the drag ends. */
+  onGuideChange: (guides: { x: number | null; y: number | null }) => void;
+  children: React.ReactNode;
+}) {
+  const elRef = useRef(el);
+  elRef.current = el;
+  const siblingsRef = useRef(siblings);
+  siblingsRef.current = siblings;
+  // `onMoveEnd` is a fresh inline closure every time `FreeformSlide` renders
+  // (`onMoveEnd={(pos) => setElement(el.id, pos)}`), and calling `onGuideChange`
+  // on every pointermove — needed so the guide line actually tracks the drag
+  // — triggers exactly that parent re-render mid-drag. If `onPointerUp`
+  // closed over `onMoveEnd` directly, that dependency change would give it a
+  // new identity mid-drag too, which would fire the cleanup `useEffect`
+  // below (its deps include `onPointerUp`) and unregister both window
+  // listeners *before* the real pointerup ever arrives — the drag would
+  // silently stop committing and the guide line would never clear, with
+  // nothing to log because the listener genuinely isn't there anymore.
+  // Mirroring it into a ref keeps `onPointerUp`'s own identity stable across
+  // any number of mid-drag re-renders, so the listeners survive until the
+  // real pointerup.
+  const onMoveEndRef = useRef(onMoveEnd);
+  onMoveEndRef.current = onMoveEnd;
+  const dragRef = useRef<{ startClientX: number; startClientY: number; startX: number; startY: number; moved: boolean } | null>(null);
+  const [live, setLive] = useState<{ x: number; y: number } | null>(null);
+  // Mirrors `live` outside React state so onPointerUp can read the final
+  // position as a plain synchronous value. Calling `onMoveEnd` (a store
+  // write) from inside a setState *updater* — the obvious-looking
+  // `setLive((pos) => { onMoveEnd(pos); return null })` — actually commits
+  // the move twice in dev: StrictMode intentionally double-invokes updater
+  // functions to catch exactly this kind of side effect hiding in one.
+  const liveRef = useRef<{ x: number; y: number } | null>(null);
+  const justDraggedRef = useRef(false);
+
+  const onPointerMove = useCallback(
+    (e: PointerEvent) => {
+      const drag = dragRef.current;
+      const container = containerRef.current;
+      if (!drag || !container) return;
+      if (!drag.moved && Math.hypot(e.clientX - drag.startClientX, e.clientY - drag.startClientY) < FREEFORM_DRAG_THRESHOLD_PX) return;
+      drag.moved = true;
+      const rect = container.getBoundingClientRect();
+      const { w, h } = elRef.current;
+      const rawX = clamp(drag.startX + (e.clientX - drag.startClientX) / rect.width, 0, 1 - w);
+      const rawY = clamp(drag.startY + (e.clientY - drag.startClientY) / rect.height, 0, 1 - h);
+      const others = siblingsRef.current;
+      const snapX = snapAxis(rawX, w, others.flatMap((o) => [o.x, o.x + o.w / 2, o.x + o.w]), rect.width);
+      const snapY = snapAxis(rawY, h, others.flatMap((o) => [o.y, o.y + o.h / 2, o.y + o.h]), rect.height);
+      const next = { x: snapX.value, y: snapY.value };
+      liveRef.current = next;
+      setLive(next);
+      onGuideChange({ x: snapX.guide, y: snapY.guide });
+    },
+    [containerRef, onGuideChange],
+  );
+
+  const onPointerUp = useCallback(() => {
+    if (dragRef.current?.moved && liveRef.current) {
+      justDraggedRef.current = true;
+      onMoveEndRef.current(liveRef.current);
+    }
+    liveRef.current = null;
+    setLive(null);
+    onGuideChange({ x: null, y: null });
+    dragRef.current = null;
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onPointerMove, onGuideChange]);
+
+  useEffect(
+    () => () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    },
+    [onPointerMove, onPointerUp],
+  );
+
+  return (
+    <div
+      className="absolute"
+      style={{
+        left: `${(live?.x ?? el.x) * 100}%`,
+        top: `${(live?.y ?? el.y) * 100}%`,
+        width: `${el.w * 100}%`,
+        height: `${el.h * 100}%`,
+        cursor: editable ? 'move' : undefined,
+      }}
+      onPointerDown={(e) => {
+        if (!editable) return;
+        dragRef.current = { startClientX: e.clientX, startClientY: e.clientY, startX: el.x, startY: el.y, moved: false };
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onPointerUp);
+      }}
+      onClickCapture={(e) => {
+        if (justDraggedRef.current) {
+          justDraggedRef.current = false;
+          e.stopPropagation();
+        }
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 /** A slide imported "as is" from an external file (see conceptSlides.ts) —
  *  every photo/text block/shape from the source sits at its original
  *  position, independently editable, rather than one flat screenshot. No
@@ -521,47 +681,58 @@ function FreeformTextBox({
 function FreeformSlide({ slide, editable }: SlideRendererProps) {
   const updateField = useEditorStore((s) => s.updateField);
   const elements = slide.fields.elements ?? [];
+  const elementsRef = useRef(elements);
+  elementsRef.current = elements;
+  const containerRef = useRef<HTMLDivElement>(null);
+  // Alignment guide lines for whichever element is currently being dragged —
+  // shared across every wrapper since only one drags at a time; drawn here
+  // rather than per-wrapper because a guide spans the whole slide, not just
+  // the dragged element's own box.
+  const [guides, setGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
 
   function setElement(id: string, patch: Partial<FreeformElement>) {
     updateField(
       'elements',
-      elements.map((el) => (el.id === id ? ({ ...el, ...patch } as FreeformElement) : el)),
+      elementsRef.current.map((el) => (el.id === id ? ({ ...el, ...patch } as FreeformElement) : el)),
     );
   }
 
   return (
-    <div className="absolute inset-0 overflow-hidden bg-white">
-      {elements.map((el) => {
-        if (el.type === 'image') {
-          return (
+    <div ref={containerRef} className="absolute inset-0 overflow-hidden bg-white">
+      {elements.map((el) => (
+        <FreeformElementWrapper
+          key={el.id}
+          el={el}
+          editable={editable}
+          containerRef={containerRef}
+          siblings={elements.filter((s) => s.id !== el.id)}
+          onMoveEnd={(pos) => setElement(el.id, pos)}
+          onGuideChange={setGuides}
+        >
+          {el.type === 'image' ? (
             <MediaBox
-              key={el.id}
               url={el.url}
               kind="image"
               editable={editable}
               onChangeUrl={(url) => setElement(el.id, { url })}
               transform={el.transform}
               onChangeTransform={(t) => setElement(el.id, { transform: t })}
-              // `position: absolute` via style, not className — MediaBox's
-              // own wrapper hardcodes `relative` in its className, and a
-              // same-specificity Tailwind utility class doesn't reliably
-              // override another by string order; inline style always wins.
-              style={{ position: 'absolute', left: `${el.x * 100}%`, top: `${el.y * 100}%`, width: `${el.w * 100}%`, height: `${el.h * 100}%` }}
+              style={{ width: '100%', height: '100%' }}
               square
             />
-          );
-        }
-        if (el.type === 'text') {
-          return <FreeformTextBox key={el.id} el={el} editable={editable} onChange={(patch) => setElement(el.id, patch)} />;
-        }
-        return (
-          <div
-            key={el.id}
-            className="absolute"
-            style={{ left: `${el.x * 100}%`, top: `${el.y * 100}%`, width: `${el.w * 100}%`, height: `${el.h * 100}%`, backgroundColor: el.color }}
-          />
-        );
-      })}
+          ) : el.type === 'text' ? (
+            <FreeformTextBox el={el} editable={editable} onChange={(patch) => setElement(el.id, patch)} />
+          ) : (
+            <div className="h-full w-full" style={{ backgroundColor: el.color }} />
+          )}
+        </FreeformElementWrapper>
+      ))}
+      {guides.x != null && (
+        <div className="pointer-events-none absolute inset-y-0 w-px bg-[#0b72c2]" style={{ left: `${guides.x * 100}%` }} />
+      )}
+      {guides.y != null && (
+        <div className="pointer-events-none absolute inset-x-0 h-px bg-[#0b72c2]" style={{ top: `${guides.y * 100}%` }} />
+      )}
     </div>
   );
 }
@@ -689,6 +860,16 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   const [pendingGallery, setPendingGallery] = useState<HotspotGalleryImage[]>([]);
   const [galleryBusy, setGalleryBusy] = useState(false);
   const galleryFileRef = useRef<HTMLInputElement>(null);
+  /** Space Detail — everything about this space surfaced on click instead of
+   *  navigating away. Collapsed by default; expands automatically once
+   *  editing a hotspot that already has any of this filled in. */
+  const [spaceDetailOpen, setSpaceDetailOpen] = useState(false);
+  const [pendingConceptTitle, setPendingConceptTitle] = useState('');
+  const [pendingConceptBody, setPendingConceptBody] = useState('');
+  const [pendingConceptImage, setPendingConceptImage] = useState('');
+  const [pendingWalkthroughUrl, setPendingWalkthroughUrl] = useState('');
+  const [pendingBoqNote, setPendingBoqNote] = useState('');
+  const [pendingSpaceNote, setPendingSpaceNote] = useState('');
   /** Set while editing an existing hotspot's label/list/style rather than
    *  drawing a new one — the popup is shared between both flows. */
   const [editingHotspotId, setEditingHotspotId] = useState<string | null>(null);
@@ -697,16 +878,25 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   const [hoveredHotspotId, setHoveredHotspotId] = useState<string | null>(null);
   /** The hotspot whose gallery is open in the lightbox (view mode only). */
   const [lightboxHotspotId, setLightboxHotspotId] = useState<string | null>(null);
+  /** The hotspot whose space-detail overlay is open (view mode only) — takes
+   *  over the click ahead of plain navigate/gallery once a hotspot has any
+   *  spaceDetail content or a linked seating row (see jumpTo/hasSpaceDetail). */
+  const [spaceDetailHotspotId, setSpaceDetailHotspotId] = useState<string | null>(null);
+  /** Which gallery index to jump straight to if a render thumbnail inside the
+   *  space-detail overlay is clicked, opening the full Lightbox on top of it. */
+  const [spaceDetailGalleryIndex, setSpaceDetailGalleryIndex] = useState<number | null>(null);
   /** Which named stage is active — undefined means "no stages defined" or
    *  "first one," both of which fall back to the view's own url/transform. */
   const [activeStageId, setActiveStageId] = useState<string | undefined>(undefined);
   /** Which stages the hotspot being drawn/edited is active on. Empty = every
    *  stage (matches `stageIds` being unset on save). */
   const [pendingStageIds, setPendingStageIds] = useState<string[]>([]);
-  /** Which occupancy-chart zone this hotspot jumps to, when the chosen target
-   *  is an occupancy-chart slide. */
-  const [pendingZoneId, setPendingZoneId] = useState('');
-  const setFocusZoneId = useEditorStore((s) => s.setFocusZoneId);
+  /** Rows in the seating table (if any) whose hotspot(s) should highlight
+   *  right now — fed by hovering a SeatingTable row; consumed by the hotspot
+   *  <path> rendering below alongside the simple side-list's own
+   *  hoveredHotspotId. Kept separate since a row can map to several ids at
+   *  once (see SeatingRow.hotspotIds), unlike the single-hotspot side list. */
+  const [hoveredRowHotspotIds, setHoveredRowHotspotIds] = useState<string[]>([]);
   /** Transient viewer-only zoom/pan — never written to `ImageTransform` or the
    *  project, just a magnifier over the authored crop. Reset whenever the
    *  shown view/stage changes so it never looks "stuck" on a new image. */
@@ -716,6 +906,17 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   const panRef = useRef<{ startX: number; startY: number; startPanX: number; startPanY: number; moved: boolean } | null>(null);
   const stageBoxRef = useRef<HTMLDivElement>(null);
   const zoomPanActiveRef = useRef(false);
+  /** Background-music playback for the active view (Render/Axo, typically) —
+   *  mute is a viewer preference kept across view switches; whether the
+   *  browser actually blocked autoplay is per-attempt, so it resets. */
+  const [musicMuted, setMusicMuted] = useState(false);
+  const [musicBlocked, setMusicBlocked] = useState(false);
+  const musicAudioRef = useRef<HTMLAudioElement>(null);
+  /** Key-plan card — visible by default whenever a view sets one, collapsed
+   *  back to its small size on every view switch (never carries the
+   *  expanded state over from the last view shown, matching the reference). */
+  const [keyPlanVisible, setKeyPlanVisible] = useState(true);
+  const [keyPlanExpanded, setKeyPlanExpanded] = useState(false);
   /** True for the one click that immediately follows a pan drag that actually
    *  moved — read and cleared by the hotspot's own onClick, since pointerup
    *  fires (and clears panRef) before the browser's click event does. */
@@ -775,6 +976,46 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     setViewportPanY(0);
   }, [activeId, activeStageId]);
 
+  // Fresh key-plan state per view — never carries an expanded card over from
+  // whichever view was showing before, matching the reference deck.
+  useEffect(() => {
+    setKeyPlanVisible(true);
+    setKeyPlanExpanded(false);
+  }, [activeId]);
+
+  // Background music for the active view: fades in on arrival, stops on
+  // leaving (or when this view has none). A play() promise can reject if
+  // the browser blocks autoplay-with-sound before any user gesture on the
+  // page — surfaced as `musicBlocked` so the UI can offer a tap-to-enable
+  // control instead of silently doing nothing.
+  useEffect(() => {
+    const audio = musicAudioRef.current;
+    if (!audio || !active.musicUrl) return;
+    audio.loop = true;
+    audio.muted = musicMuted;
+    audio.volume = 0;
+    setMusicBlocked(false);
+    let cancelled = false;
+    audio
+      .play()
+      .then(() => {
+        let v = 0;
+        const fadeIn = () => {
+          if (cancelled) return;
+          v = Math.min(0.35, v + 0.05);
+          audio.volume = v;
+          if (v < 0.35) requestAnimationFrame(fadeIn);
+        };
+        fadeIn();
+      })
+      .catch(() => setMusicBlocked(true));
+    return () => {
+      cancelled = true;
+      audio.pause();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, active.musicUrl]);
+
   if (!active) return null;
 
   const otherViews = views.filter((v) => v.id !== active.id);
@@ -792,9 +1033,8 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   // Concept and design slides are the meaningful cross-slide destinations: a
   // zone on a plan should be able to point at the principle behind it.
   const linkableSlides = (project?.slides ?? []).filter(
-    (s) => s.id !== slide.id && (s.conceptOrigin || s.style === 'design' || s.layout === 'linked-views' || s.layout === 'occupancy-chart'),
+    (s) => s.id !== slide.id && (s.conceptOrigin || s.style === 'design' || s.layout === 'linked-views'),
   );
-  const targetOccupancySlide = linkableSlides.find((s) => `slide:${s.id}` === pendingTarget && s.layout === 'occupancy-chart');
 
   const drawing = tool !== null;
   /** Cursor is within snapping distance of the first vertex, so a click closes
@@ -1002,7 +1242,25 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     setPendingListDescription(h?.listEntry?.description ?? '');
     setPendingGallery(h?.gallery ?? []);
     setPendingStageIds(h?.stageIds ?? []);
-    setPendingZoneId(h?.targetZoneId ?? '');
+    setPendingConceptTitle(h?.spaceDetail?.concept?.title ?? '');
+    setPendingConceptBody(h?.spaceDetail?.concept?.body ?? '');
+    setPendingConceptImage(h?.spaceDetail?.concept?.imageUrl ?? '');
+    setPendingWalkthroughUrl(h?.spaceDetail?.walkthroughUrl ?? '');
+    setPendingBoqNote(h?.spaceDetail?.boq?.note ?? '');
+    setPendingSpaceNote(h?.spaceDetail?.note ?? '');
+    setSpaceDetailOpen(!!h?.spaceDetail);
+  }
+
+  function buildSpaceDetail(): ViewHotspot['spaceDetail'] {
+    const concept =
+      pendingConceptTitle.trim() || pendingConceptBody.trim()
+        ? { title: pendingConceptTitle.trim(), body: pendingConceptBody.trim(), imageUrl: pendingConceptImage.trim() || undefined }
+        : undefined;
+    const boq = pendingBoqNote.trim() ? { note: pendingBoqNote.trim() } : undefined;
+    const walkthroughUrl = pendingWalkthroughUrl.trim() || undefined;
+    const note = pendingSpaceNote.trim() || undefined;
+    if (!concept && !boq && !walkthroughUrl && !note) return undefined;
+    return { concept, boq, walkthroughUrl, note };
   }
 
   function startPickingTarget(points: Point[] = drawingPoints ?? []) {
@@ -1049,7 +1307,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
       listEntry: buildListEntry(),
       gallery: pendingGallery.length ? pendingGallery : undefined,
       stageIds: pendingStageIds.length ? pendingStageIds : undefined,
-      targetZoneId: kind === 'slide' && pendingZoneId ? pendingZoneId : undefined,
+      spaceDetail: buildSpaceDetail(),
     };
     setView(active.id, { hotspots: [...allHotspots, hotspot] });
     // Stay on the tool rather than dropping out after every single region.
@@ -1075,7 +1333,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               listEntry: buildListEntry(h.listEntry?.id),
               gallery: pendingGallery.length ? pendingGallery : undefined,
               stageIds: pendingStageIds.length ? pendingStageIds : undefined,
-              targetZoneId: kind === 'slide' && pendingZoneId ? pendingZoneId : undefined,
+              spaceDetail: buildSpaceDetail(),
             }
           : h,
       ),
@@ -1088,14 +1346,29 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     setEditingHotspotId((cur) => (cur === id ? null : cur));
   }
 
+  /** The seating-table row (if any) linked to this hotspot, wherever it
+   *  lives among the active view's seatingZones. */
+  function occupancyFor(hotspotId: string) {
+    for (const zone of active.seatingZones ?? []) {
+      const row = zone.rows.find((r) => r.hotspotIds?.includes(hotspotId));
+      if (row) return row;
+    }
+    return undefined;
+  }
+
   function jumpTo(hotspot: ViewHotspot) {
+    const detail = hotspot.spaceDetail;
+    const hasRichDetail = !!(detail?.concept || detail?.walkthroughUrl || detail?.boq || detail?.note);
+    if (hasRichDetail || occupancyFor(hotspot.id)) {
+      setSpaceDetailHotspotId(hotspot.id);
+      return;
+    }
     if (hotspot.gallery?.length) {
       setLightboxHotspotId(hotspot.id);
       return;
     }
     if (hotspot.targetSlideId) {
       selectSlide(hotspot.targetSlideId);
-      if (hotspot.targetZoneId) setFocusZoneId(hotspot.targetZoneId);
       return;
     }
     if (!hotspot.targetViewId) return;
@@ -1189,6 +1462,40 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           )}
         </div>
       )}
+      {editable && active.kind !== 'walkthrough' && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          <input
+            value={active.musicUrl ?? ''}
+            onChange={(e) => setView(active.id, { musicUrl: e.target.value || undefined })}
+            placeholder="Background music URL (optional)"
+            title="A looping ambient track for this view — fades in on arrival, out on leaving"
+            className="min-w-0 flex-1 rounded-md border border-[var(--line)] px-2 py-1 text-[11px] outline-none"
+          />
+          <input
+            value={active.keyPlanImage?.url ?? ''}
+            onChange={(e) =>
+              setView(active.id, { keyPlanImage: e.target.value ? { url: e.target.value, arrowDeg: active.keyPlanImage?.arrowDeg } : undefined })
+            }
+            placeholder="Key plan image URL (optional)"
+            title="A small orientation crop of the plan, floated over this view's stage"
+            className="min-w-0 flex-1 rounded-md border border-[var(--line)] px-2 py-1 text-[11px] outline-none"
+          />
+          {active.keyPlanImage && (
+            <input
+              type="number"
+              value={active.keyPlanImage.arrowDeg ?? ''}
+              onChange={(e) =>
+                setView(active.id, {
+                  keyPlanImage: { url: active.keyPlanImage!.url, arrowDeg: e.target.value ? Number(e.target.value) : undefined },
+                })
+              }
+              placeholder="Arrow °"
+              title="Camera-direction arrow rotation, in degrees"
+              className="w-16 rounded-md border border-[var(--line)] px-2 py-1 text-[11px] outline-none"
+            />
+          )}
+        </div>
+      )}
       <div className="flex gap-4">
       <div
         ref={stageBoxRef}
@@ -1225,15 +1532,17 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
         />
 
         <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-          {hotspots.filter((h) => hasEnoughPoints(h.points, h.shape)).map((h) => (
+          {hotspots.filter((h) => hasEnoughPoints(h.points, h.shape)).map((h) => {
+            const isHot = hoveredHotspotId === h.id || hoveredRowHotspotIds.includes(h.id);
+            return (
             <path
               key={h.id}
               d={shapePath(h.points, h.shape)}
               vectorEffect="non-scaling-stroke"
               fill={h.fillColor ?? DEFAULT_FILL}
-              fillOpacity={hoveredHotspotId === h.id ? Math.min(1, (h.fillOpacity ?? DEFAULT_FILL_OPACITY) * 1.8) : (h.fillOpacity ?? DEFAULT_FILL_OPACITY)}
+              fillOpacity={isHot ? Math.min(1, (h.fillOpacity ?? DEFAULT_FILL_OPACITY) * 1.8) : (h.fillOpacity ?? DEFAULT_FILL_OPACITY)}
               stroke={h.strokeColor ?? DEFAULT_STROKE}
-              strokeWidth={hoveredHotspotId === h.id ? (h.strokeWidth ?? DEFAULT_STROKE_WIDTH) * 1.6 : (h.strokeWidth ?? DEFAULT_STROKE_WIDTH)}
+              strokeWidth={isHot ? (h.strokeWidth ?? DEFAULT_STROKE_WIDTH) * 1.6 : (h.strokeWidth ?? DEFAULT_STROKE_WIDTH)}
               className={drawing ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer transition-[fill-opacity,stroke-width]'}
               onMouseEnter={() => !drawing && setHoveredHotspotId(h.id)}
               onMouseLeave={() => setHoveredHotspotId((cur) => (cur === h.id ? null : cur))}
@@ -1258,7 +1567,8 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
                       : views.find((v) => v.id === h.targetViewId)?.label)}
               </title>
             </path>
-          ))}
+            );
+          })}
           {drawingPoints && (
             <>
               {/* A drag tool previews filled, since its shape is already
@@ -1387,6 +1697,72 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           </div>
         )}
 
+        {active.musicUrl && (
+          <>
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <audio ref={musicAudioRef} src={active.musicUrl} className="hidden" />
+            <button
+              onClick={() => {
+                const audio = musicAudioRef.current;
+                const next = !musicMuted;
+                setMusicMuted(next);
+                if (audio) {
+                  audio.muted = next;
+                  if (!next && musicBlocked) {
+                    setMusicBlocked(false);
+                    void audio.play().catch(() => setMusicBlocked(true));
+                  }
+                }
+              }}
+              title={musicMuted ? 'Unmute background music' : 'Mute background music'}
+              className="absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-sm text-white hover:bg-black/75"
+            >
+              {musicMuted ? '🔇' : '🔊'}
+            </button>
+            {musicBlocked && !musicMuted && (
+              <button
+                onClick={() => void musicAudioRef.current?.play().catch(() => setMusicBlocked(true))}
+                className="absolute right-12 top-2 z-20 rounded-full bg-black/60 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-black/75"
+              >
+                Tap for sound
+              </button>
+            )}
+          </>
+        )}
+
+        {active.keyPlanImage && (
+          <div
+            className={`absolute bottom-3 left-3 z-20 overflow-hidden rounded-md border-2 border-white/85 shadow-lg transition-all ${
+              !keyPlanVisible ? 'h-8 w-8' : keyPlanExpanded ? 'h-56 w-56' : 'h-20 w-20'
+            }`}
+          >
+            {keyPlanVisible ? (
+              <button onClick={() => setKeyPlanExpanded((v) => !v)} title="Key plan — click to expand" className="block h-full w-full">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={active.keyPlanImage.url}
+                  alt="Key plan"
+                  style={active.keyPlanImage.arrowDeg != null ? { transform: `rotate(${active.keyPlanImage.arrowDeg}deg)` } : undefined}
+                  className="h-full w-full object-cover"
+                />
+              </button>
+            ) : (
+              <button onClick={() => setKeyPlanVisible(true)} title="Show key plan" className="flex h-full w-full items-center justify-center bg-black/60 text-[10px] text-white">
+                ▤
+              </button>
+            )}
+            {keyPlanVisible && (
+              <button
+                onClick={() => setKeyPlanVisible(false)}
+                title="Hide key plan"
+                className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/70 text-[9px] text-white"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        )}
+
         {showPopup && popupCentroid && (
           <div
             onClick={(e) => e.stopPropagation()}
@@ -1427,20 +1803,6 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
                 </optgroup>
               )}
             </select>
-            {targetOccupancySlide && (
-              <select
-                value={pendingZoneId}
-                onChange={(e) => setPendingZoneId(e.target.value)}
-                className="mb-2 w-full rounded-md border border-[var(--line)] px-2 py-1.5 text-xs outline-none"
-              >
-                <option value="">Jump to slide (no specific zone)</option>
-                {(targetOccupancySlide.fields.occupancyZones ?? []).map((z) => (
-                  <option key={z.id} value={z.id}>
-                    Highlight: {z.label}
-                  </option>
-                ))}
-              </select>
-            )}
             {targetView?.kind === 'walkthrough' && (
               <input
                 value={pendingTime}
@@ -1593,6 +1955,64 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               />
             </div>
 
+            <div className="mb-2 border-t border-[var(--line)] pt-2">
+              <button
+                type="button"
+                onClick={() => setSpaceDetailOpen((v) => !v)}
+                className="mb-1.5 flex w-full items-center justify-between text-[10px] font-bold uppercase tracking-wide text-[var(--ink-3)]"
+              >
+                <span>Space Detail — surfaces on click, no navigating away</span>
+                <span>{spaceDetailOpen ? '−' : '+'}</span>
+              </button>
+              {spaceDetailOpen && (
+                <div className="flex flex-col gap-1.5">
+                  <input
+                    value={pendingConceptTitle}
+                    onChange={(e) => setPendingConceptTitle(e.target.value)}
+                    placeholder="Concept title (optional)"
+                    className="w-full rounded-md border border-[var(--line)] px-2 py-1 text-xs outline-none"
+                  />
+                  <textarea
+                    value={pendingConceptBody}
+                    onChange={(e) => setPendingConceptBody(e.target.value)}
+                    placeholder="Concept summary — a couple of lines, not the full slide"
+                    rows={2}
+                    className="w-full resize-none rounded-md border border-[var(--line)] px-2 py-1 text-xs outline-none"
+                  />
+                  <input
+                    value={pendingConceptImage}
+                    onChange={(e) => setPendingConceptImage(e.target.value)}
+                    placeholder="Concept image URL (optional)"
+                    className="w-full rounded-md border border-[var(--line)] px-2 py-1 text-xs outline-none"
+                  />
+                  <input
+                    value={pendingWalkthroughUrl}
+                    onChange={(e) => setPendingWalkthroughUrl(e.target.value)}
+                    placeholder="Walkthrough video URL (optional)"
+                    className="w-full rounded-md border border-[var(--line)] px-2 py-1 text-xs outline-none"
+                  />
+                  <input
+                    value={pendingBoqNote}
+                    onChange={(e) => setPendingBoqNote(e.target.value)}
+                    placeholder="BOQ note (placeholder — real table coming later)"
+                    className="w-full rounded-md border border-[var(--line)] px-2 py-1 text-xs outline-none"
+                  />
+                  <textarea
+                    value={pendingSpaceNote}
+                    onChange={(e) => setPendingSpaceNote(e.target.value)}
+                    placeholder="Anything else about this space (optional)"
+                    rows={2}
+                    className="w-full resize-none rounded-md border border-[var(--line)] px-2 py-1 text-xs outline-none"
+                  />
+                  <p className="text-[10px] text-[var(--ink-3)]">
+                    {editingHotspot && occupancyFor(editingHotspot.id)
+                      ? 'Occupancy is linked via the Seating Capacity table and will show automatically.'
+                      : 'Link this hotspot to a Seating Capacity row to also show occupancy here.'}
+                  </p>
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-2">
               <button
                 onClick={editingHotspotId ? saveHotspotEdit : confirmRegion}
@@ -1620,18 +2040,49 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
         return lightboxHotspot ? (
           <Lightbox
             images={lightboxHotspot.gallery!}
+            startIndex={spaceDetailGalleryIndex ?? 0}
             keyPlanImage={lightboxHotspot.keyPlanImage}
-            onClose={() => setLightboxHotspotId(null)}
+            onClose={() => {
+              setLightboxHotspotId(null);
+              setSpaceDetailGalleryIndex(null);
+            }}
           />
         ) : null;
       })()}
-      {showHotspotList && (
-        <HotspotSidePanel
-          hotspots={hotspots.filter((h) => h.listEntry)}
-          hoveredId={hoveredHotspotId}
-          onHover={setHoveredHotspotId}
-          onSelect={(h) => (editable ? startEditingHotspot(h) : jumpTo(h))}
+      {(() => {
+        const spaceHotspot = hotspots.find((h) => h.id === spaceDetailHotspotId);
+        return spaceHotspot ? (
+          <SpaceDetailOverlay
+            label={spaceHotspot.label}
+            detail={spaceHotspot.spaceDetail}
+            gallery={spaceHotspot.gallery}
+            occupancy={occupancyFor(spaceHotspot.id)}
+            onOpenGallery={(index) => {
+              setSpaceDetailGalleryIndex(index);
+              setLightboxHotspotId(spaceHotspot.id);
+            }}
+            onClose={() => setSpaceDetailHotspotId(null)}
+          />
+        ) : null;
+      })()}
+      {active.seatingZones?.length || (editable && !showHotspotList) ? (
+        <SeatingTable
+          view={active}
+          hotspots={hotspots}
+          editable={editable}
+          hoveredHotspotId={hoveredHotspotId}
+          onHoverHotspots={setHoveredRowHotspotIds}
+          onChangeView={(patch) => setView(active.id, patch)}
         />
+      ) : (
+        showHotspotList && (
+          <HotspotSidePanel
+            hotspots={hotspots.filter((h) => h.listEntry)}
+            hoveredId={hoveredHotspotId}
+            onHover={setHoveredHotspotId}
+            onSelect={(h) => (editable ? startEditingHotspot(h) : jumpTo(h))}
+          />
+        )
       )}
       </div>
     </div>
@@ -2003,15 +2454,24 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
   // through the same slide-then-project-then-built-in chain as the rest.
   const typography = resolveTypography({ ...projectTypography, font: projectFontFamily }, slide.typographyOverride);
   const dark = slide.style === 'section-starter' || slide.style === 'design';
+  // A custom background (color and/or image) replaces the style's own
+  // white/dark-veil default entirely, rather than layering under it — a
+  // slide with one either shows its own flat color, or the style's usual
+  // look, never both fighting for the same pixels.
+  const bg = slide.background;
+  const hasCustomBg = !!(bg?.color || bg?.imageUrl);
 
   const entry = slide.animation?.entry ?? 'none';
   const animClass = animate && entry !== 'none' ? `slide-anim-${entry}` : '';
 
   const base = (
     <div
-      className={`relative flex min-h-full w-full flex-col justify-center px-16 pb-14 pt-10 ${animClass} ${dark ? 'bg-[var(--ink)] [background-image:radial-gradient(120%_90%_at_15%_-10%,var(--dark-veil-1),var(--dark-veil-2)_60%)]' : 'bg-white'}`}
+      className={`relative flex min-h-full w-full flex-col justify-center px-16 pb-14 pt-10 ${animClass} ${
+        hasCustomBg ? '' : dark ? 'bg-[var(--ink)] [background-image:radial-gradient(120%_90%_at_15%_-10%,var(--dark-veil-1),var(--dark-veil-2)_60%)]' : 'bg-white'
+      }`}
       style={
         {
+          ...(bg?.color ? { backgroundColor: bg.color } : {}),
           '--slide-anim-duration': `${slide.animation?.duration ?? 600}ms`,
           '--slide-anim-delay': `${slide.animation?.delay ?? 0}ms`,
           // Every accent-coloured thing on a slide reads from these, so a
@@ -2056,6 +2516,13 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
         } as React.CSSProperties
       }
     >
+      {bg?.imageUrl && (
+        <div className="absolute inset-0 -z-10 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element -- background fill, not a content image; no next/image benefit here */}
+          <img src={bg.imageUrl} alt="" className="h-full w-full object-cover" />
+          {!!bg.imageOpacity && <div className="absolute inset-0 bg-black" style={{ opacity: bg.imageOpacity }} />}
+        </div>
+      )}
       {slide.style === 'section-starter' ? (
         <div className="text-center">
           <EditableText
@@ -2152,7 +2619,6 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
           {slide.layout === 'orbit' && <OrbitDiagram slide={slide} editable={editable} />}
           {slide.layout === 'site-locus' && <SiteLocusDiagram slide={slide} editable={editable} />}
           {slide.layout === 'material-compare' && <MaterialCompare slide={slide} editable={editable} />}
-          {slide.layout === 'occupancy-chart' && <OccupancyChart slide={slide} editable={editable} />}
           {slide.style === 'design' && (
             <MediaBox
               url={slide.fields.imageUrl ?? ''}

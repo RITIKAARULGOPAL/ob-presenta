@@ -6,11 +6,39 @@ import { getProject } from '@/lib/data';
 import { useEditorStore } from '@/lib/editorStore';
 import { SlideRenderer } from '@/components/SlideRenderer';
 import { ScaledStage } from '@/components/ScaledStage';
+import type { Slide } from '@/types/slide';
+
+/** Floating live preview shown above a hovered nav dot — the same
+ *  SlideRenderer the main stage uses, just scaled way down inside a fixed
+ *  1280×720 box (the same reference canvas ScaledStage/export assume), so a
+ *  freeform/linked-views slide previews exactly as it'll actually look
+ *  rather than a stale static thumbnail. */
+function DotPreview({ slide }: { slide: Slide }) {
+  const w = 176;
+  const h = 99; // 16:9
+  const label = slide.fields.title || slide.fields.kickerLabel;
+  return (
+    <div
+      className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-3 -translate-x-1/2 overflow-hidden rounded-lg border border-white/15 bg-black shadow-2xl"
+      style={{ width: w, height: h }}
+    >
+      <div style={{ width: 1280, height: 720, transform: `scale(${w / 1280})`, transformOrigin: 'top left' }}>
+        <SlideRenderer slide={slide} editable={false} />
+      </div>
+      {label && (
+        <div className="absolute inset-x-0 bottom-0 truncate bg-black/75 px-1.5 py-0.5 text-[9px] font-medium text-white/90">
+          {label}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function PresenterPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   const project = useEditorStore((s) => s.project);
   const loadProject = useEditorStore((s) => s.loadProject);
@@ -68,6 +96,17 @@ export default function PresenterPage({ params }: { params: Promise<{ id: string
   }
   const shownIndex = shown.findIndex((s) => s.id === currentSlide?.id);
 
+  // One group per section — a run of slides starting at a section-starter
+  // divider (or the very first slide, which starts the implicit first group
+  // even when it isn't one). Purely a visual clustering of the nav dots; it
+  // doesn't change navigation order or which slides are "in" a section
+  // beyond "everything up to the next divider."
+  const groups: { slide: (typeof shown)[number]; index: number }[][] = [];
+  shown.forEach((s, i) => {
+    if (groups.length === 0 || s.style === 'section-starter') groups.push([]);
+    groups[groups.length - 1].push({ slide: s, index: i });
+  });
+
   return (
     <div className="relative h-screen w-screen bg-black">
       {currentSlide && (
@@ -100,35 +139,63 @@ export default function PresenterPage({ params }: { params: Promise<{ id: string
         ›
       </button>
 
-      <div className="absolute bottom-6 right-6 rounded-full bg-black/40 px-3 py-1.5 text-xs text-white shadow-lg backdrop-blur-sm">
-        Press Esc to exit Presenter mode
+      {/* Keyboard legend — kbd-styled keys rather than plain prose, so it
+          reads at a glance for someone who's never presented from this app
+          before. */}
+      <div className="absolute bottom-6 right-6 flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1.5 text-xs text-white shadow-lg backdrop-blur-sm">
+        <kbd className="rounded border border-white/25 bg-white/5 px-1.5 py-0.5 font-sans text-[10px] leading-none">←</kbd>
+        <kbd className="rounded border border-white/25 bg-white/5 px-1.5 py-0.5 font-sans text-[10px] leading-none">→</kbd>
+        <span className="text-white/60">navigate</span>
+        <span className="mx-0.5 text-white/25">·</span>
+        <kbd className="rounded border border-white/25 bg-white/5 px-1.5 py-0.5 font-sans text-[10px] leading-none">Esc</kbd>
+        <span className="text-white/60">exit</span>
       </div>
 
-      {/* Progress rail: step count + a one-line hint, and a row of clickable
-          dots for jump-to-slide — the deck's own navigation chrome, not part
-          of any one slide's content. */}
+      {/* Progress rail: step count + a one-line hint, a slim fill bar, and a
+          row of clickable dots (grouped by section, hover-previewed) for
+          jump-to-slide — the deck's own navigation chrome, not part of any
+          one slide's content. */}
       <div className="absolute bottom-6 left-1/2 flex max-w-[70vw] -translate-x-1/2 flex-col items-center gap-2">
-        <div className="flex items-center gap-3 rounded-full bg-black/40 px-4 py-1.5 text-xs text-white shadow-lg backdrop-blur-sm">
-          <span className="font-semibold tabular-nums">
-            {shownIndex + 1} / {shown.length}
-          </span>
-          {(currentSlide?.fields.kickerLabel || currentSlide?.fields.title) && (
-            <span className="max-w-[40vw] truncate text-white/70">
-              {currentSlide?.fields.kickerLabel || currentSlide?.fields.title}
+        <div className="flex w-full flex-col items-center gap-1.5 rounded-2xl bg-black/40 px-4 py-1.5 shadow-lg backdrop-blur-sm">
+          <div className="flex items-center gap-3 text-xs text-white">
+            <span className="font-semibold tabular-nums">
+              {shownIndex + 1} / {shown.length}
             </span>
-          )}
+            {(currentSlide?.fields.kickerLabel || currentSlide?.fields.title) && (
+              <span className="max-w-[40vw] truncate text-white/70">
+                {currentSlide?.fields.kickerLabel || currentSlide?.fields.title}
+              </span>
+            )}
+          </div>
+          <div className="h-1 w-full max-w-xs overflow-hidden rounded-full bg-white/15">
+            <div
+              className="h-full rounded-full bg-white transition-[width] duration-300"
+              style={{ width: `${((shownIndex + 1) / shown.length) * 100}%` }}
+            />
+          </div>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-full bg-black/40 px-3 py-2 shadow-lg backdrop-blur-sm">
-          {shown.map((s, i) => (
-            <button
-              key={s.id}
-              onClick={() => selectSlide(s.id)}
-              aria-label={`Go to slide ${i + 1}`}
-              aria-current={i === shownIndex}
-              className={`h-1.5 rounded-full transition-all ${
-                i === shownIndex ? 'w-5 bg-white' : 'w-1.5 bg-white/35 hover:bg-white/60'
-              }`}
-            />
+          {groups.map((group, gi) => (
+            <div
+              key={group[0]?.slide.id ?? gi}
+              className={`flex items-center gap-1.5 ${gi > 0 ? 'ml-1.5 border-l border-white/15 pl-1.5' : ''}`}
+            >
+              {group.map(({ slide: s, index: i }) => (
+                <button
+                  key={s.id}
+                  onClick={() => selectSlide(s.id)}
+                  onMouseEnter={() => setHoveredIndex(i)}
+                  onMouseLeave={() => setHoveredIndex((h) => (h === i ? null : h))}
+                  aria-label={`Go to slide ${i + 1}${s.fields.title ? `: ${s.fields.title}` : ''}`}
+                  aria-current={i === shownIndex}
+                  className={`relative h-1.5 rounded-full transition-all duration-200 ${
+                    i === shownIndex ? 'w-5 bg-white' : 'w-1.5 bg-white/35 hover:w-2.5 hover:bg-white/70'
+                  }`}
+                >
+                  {hoveredIndex === i && <DotPreview slide={s} />}
+                </button>
+              ))}
+            </div>
           ))}
         </div>
       </div>

@@ -32,6 +32,583 @@ or re-explain anything.
 
 ---
 
+## 2026-09-21
+
+**Context:** kicked off Phase G ("tighten the editing experience" — the
+checklist from the post-demo action plan: undo/redo, multi-select, real
+duplicate, drag-to-reorder, keyboard shortcuts, snapping, comments, canvas
+zoom/pan, save-status feedback). Sequenced by dependency/risk: quick isolated
+wins first, then undo/redo as the foundation before building anything else
+that should be undo-aware from the start.
+
+**Done:**
+- **Save-status indicator** — `saveStatus: 'idle'|'saving'|'saved'|'error'` in
+  [editorStore.ts](src/lib/editorStore.ts) (replaces the never-actually-set
+  `saving: boolean`), flipped synchronously in `persist()` before the
+  Supabase call so the UI reflects it immediately, not just on resolve. A
+  small dot+label pill next to the project name in
+  [edit/page.tsx](src/app/p/[id]/edit/page.tsx) shows it live. Idle (no edit
+  yet this session) shows nothing, matching "no news is no news."
+- **Real duplicate** — `cloneSlide()` in
+  [slideDefaults.ts](src/lib/slideDefaults.ts) deep-copies a slide's actual
+  content (previously "add slide" always started from an empty template,
+  never copied anything). Regenerates every nested id (stats/items/points/
+  orbitNodes/views/hotspots/stages/seating rows/gallery images/elements)
+  through a two-pass remap so same-slide cross-references (`stageIds`,
+  `hotspotIds`, `targetViewId`) still resolve correctly in the copy, while
+  `targetSlideId` (pointing at a *different* slide) is left alone. New
+  `duplicateSlide` store action; "⧉ Duplicate slide" button in
+  [SlideRail.tsx](src/components/SlideRail.tsx) next to Skip/Delete.
+- **Undo/redo** — every mutating action in `editorStore.ts` now funnels
+  through one `commitProject()` choke point (pushes the *previous* project
+  onto `undoStack`, clears `redoStack`) instead of calling `set`/`persist`
+  directly, so undo/redo needed no per-action inverse logic. Capped at 50
+  entries; `loadProject` resets both stacks (this is one global store
+  instance reused across whichever project is open — without the reset,
+  undo could restore a *different* project's history after navigating away
+  and back). Ctrl+Z/Ctrl+Y (and Ctrl+Shift+Z) wired in `edit/page.tsx`,
+  skipped while focus is inside a text field so the browser's own native
+  per-field undo still works while typing. Undo/Redo toolbar buttons next to
+  "+ Add slide", disabled via new `canUndo()`/`canRedo()` getters.
+- **Found and fixed a real bug during verification**: `EditableText`'s
+  `onBlur` fires `onChange` unconditionally, even when the field's text
+  didn't actually change (e.g. finishing an edit and immediately clicking a
+  toolbar button blurs the field with its own *unchanged* value). Before
+  undo/redo existed this was harmless — just a redundant identical save.
+  Once undo/redo track history, that no-op blur pushed a spurious duplicate
+  entry, so the *first* Undo click after finishing any edit silently undid
+  nothing visible (it was consuming the no-op entry, not the real change) —
+  a real, if subtle, "undo feels broken" bug that would have hit constantly
+  in normal use. Root-caused via temporary instrumentation (traced exact
+  call sites, confirmed the second commit was `updateField('subtitle', '')`
+  firing from the *next* field's blur when clicking Undo). Fixed at the
+  source in `updateField`: skip the commit entirely if the field's value is
+  unchanged — correct for every string field (title, body, kicker, etc., all
+  `EditableText`-driven) and doesn't affect array-valued fields (those are
+  never blur-driven, always represent a real intended change). Verified live
+  end-to-end afterward: edit → Undo (first click now correctly reverts) →
+  Redo (correctly reapplies), confirmed via `undoDisabled`/`redoDisabled`
+  button state at each step, not just the visible text.
+- Verified all three features live: created/duplicated slides (including a
+  Linked Views slide with 4 nested views, to exercise the id-remap path with
+  no crash), round-tripped undo/redo on a fresh project. `tsc --noEmit`
+  clean throughout. Cleaned up all scratch test projects created during
+  verification.
+- **Multi-select (slide rail)** — plain click selects one slide (and clears
+  any multi-selection); Ctrl/Cmd-click toggles a slide in/out of the
+  selection; Shift-click selects the range from the last click to this one —
+  matches the Figma/Slides filmstrip convention. `selectSlide` grew an
+  optional `modifier` param (default `'none'`) rather than adding a parallel
+  action, so all 8 existing call sites (nav dots, linked-slide chips, hotspot
+  jumps) keep working unchanged. New `selectedSlideIds`/`selectionAnchor`
+  transient store state — deliberately *not* run through `commitProject`,
+  since a UI selection isn't deck content and shouldn't be undoable or
+  persisted. `loadProject`/`goNext`/`goPrev` all reset it, so it can't go
+  stale pointing at a different project or linger while navigating.
+  A small toolbar appears above the rail once 2+ slides are selected
+  ("N selected" + skip-all/duplicate-all/delete-all/clear), and each
+  thumbnail gets a corner checkbox (hover-visible, always visible once
+  anything's selected). New batched actions —
+  `duplicateSlides`/`removeSlides`/`toggleSkipMany` — each produce exactly
+  **one** `commitProject` call for the whole group, not one per slide; this
+  matters now that undo/redo exists, since a loop of single-slide actions
+  would otherwise take N undo clicks to reverse what felt like one action.
+  Escape clears the multi-selection (only — never deletes); Delete/Backspace
+  bulk-removes the selection, scoped tightly to "2+ slides already
+  selected" so it can't fire from an incidental single `currentSlideId`
+  (that still only has its own explicit ✕ button — no keyboard shortcut yet,
+  that's the rest of the keyboard-shortcuts phase item).
+- Verified live end-to-end via dispatched DOM events with modifier flags
+  (plain coordinate-based clicks drifted between an initial rect capture and
+  the actual click in this session's automation, same class of issue noted
+  in earlier entries — dispatching directly on the queried element sidesteps
+  it entirely): click → ctrl-click → shift-click produced the right
+  selection set at each step; bulk duplicate landed both clones and selected
+  them, and one Undo click reverted the *entire* bulk duplicate; Delete key
+  removed both selected slides in one action; Escape cleared the selection
+  without touching the slides. No new console errors beyond the pre-existing
+  migration 400s.
+- **Drag-to-reorder — slides.** Native HTML5 drag-and-drop on each
+  [SlideRail.tsx](src/components/SlideRail.tsx) thumbnail: drag one slide
+  over another, drop in its top or bottom half to insert before/after it (a
+  thin blue insertion line shows which). New `moveSlide(id, toIndex)` store
+  action — `toIndex` is an insertion point counted against the *current*
+  order (0..length), which the rail derives from which half of the drop
+  target the pointer is over. One `commitProject` call per drop, so one
+  Undo click reverts a whole reorder regardless of how far the slide moved.
+- **Drag-to-reorder — in-slide elements.** Scoped down from "reorder" to
+  "move": for the `'freeform'` layout (the only layout with independently
+  positioned objects), every image/text/shape element can now be
+  drag-repositioned on the canvas — a real, user-visible gap versus
+  Figma/Slides that didn't exist before today. New `FreeformElementWrapper`
+  in [SlideRenderer.tsx](src/components/SlideRenderer.tsx) owns the pointer
+  gesture and absolute positioning; children (an image via `MediaBox`, a
+  text box, or a plain shape div) just fill it at 100%/100% and keep their
+  own existing click/edit behavior for a plain click that never crossed a
+  4px drag threshold — confirmed safe to layer on top of `MediaBox`'s own
+  adjust-mode dragging (pan/zoom/rotate handles) because
+  `ImageAdjustOverlay` already stops propagation on every pointerdown
+  inside itself, so the two gestures never compete. Live position during
+  the drag is local component state (for the visual preview); the actual
+  move commits **once**, on release.
+  Z-order and resize are explicitly not part of this — this was "move," not
+  "reorder + resize"; see below.
+- **Found and fixed a real bug while verifying the element-move**: the
+  first version called the store's move-commit (`onMoveEnd`) *inside* the
+  functional updater passed to `setLive` — `setLive((pos) => { onMoveEnd(pos); return null })`.
+  That's exactly the "side effect inside a setState updater" anti-pattern
+  React's StrictMode deliberately double-invokes updater functions in
+  development to catch, so every single-drag move was silently committing
+  **twice** — invisible from the position itself (both commits land on the
+  same final coordinates), but very visible in undo/redo: one Undo click
+  only undid the *phantom* second commit, leaving the actual move in place
+  and making undo look broken. Root-caused by logging each commit's call
+  stack (same technique as the 2026-09-21 EditableText fix) and catching a
+  second `onMoveEnd` frame with an identical stack. Fixed by mirroring
+  `live` into a plain ref and calling `onMoveEnd` as an ordinary statement
+  inside `onPointerUp` instead of from within any state updater — confirmed
+  fixed: one Undo click now reverts the whole move, and the stray "Cannot
+  update a component while rendering" console error the double-invoke had
+  also been causing stopped appearing on fresh drags too (same root cause,
+  two symptoms).
+- Verified live on a real imported freeform slide ("Workplace Aspirations",
+  28 elements): dragging past the threshold moves the element and previews
+  live; releasing commits once; a plain click with no movement still opens
+  the image's adjust overlay (zoom handles + slider appeared) or focuses a
+  text box for editing, unaffected by the new wrapper. `tsc --noEmit` clean
+  throughout.
+- **Keyboard shortcuts.** Consolidated the growing pile of one-off key
+  checks in [edit/page.tsx](src/app/p/[id]/edit/page.tsx) into one handler
+  and rounded out the set: Delete/Backspace now also removes the *single*
+  current slide when nothing's multi-selected (previously only wired for
+  2+ selected); Ctrl/Cmd+D duplicates (the selection if 2+, else the current
+  slide); Ctrl/Cmd+A selects every slide (new `selectAllSlides` action);
+  Arrow Up/Down steps to the previous/next slide. All of it — including
+  Ctrl+Z/Y and Escape from earlier this session — shares one "not while
+  editing text" guard computed once per keypress instead of the
+  copy-pasted per-shortcut version each earlier addition carried. Tooltips
+  on the rail's duplicate/delete/clear buttons and a new hint in the
+  editor's footer bar surface the shortcuts, since the whole point of a
+  shortcut is someone eventually discovering it exists.
+- Verified live: Ctrl+D duplicated the current slide; Ctrl+A selected all
+  and the toolbar showed the right count; Escape cleared it; Arrow Up
+  moved to the previous slide, and the *same* Arrow Down was confirmed
+  correctly suppressed while a title field had focus (no navigation, field
+  keeps the keystroke); Delete with nothing multi-selected removed just the
+  current slide. `tsc --noEmit` clean, no new console errors.
+- **Alignment guides / snapping**, for freeform elements' drag-to-move from
+  earlier today. Scoped to drag-time snapping only (matching the literal
+  "alignment guides/snapping" ask) — no persistent element-selection system,
+  see below for why. New `snapAxis()` helper in
+  [SlideRenderer.tsx](src/components/SlideRenderer.tsx): checks a dragged
+  element's left/center/right (and top/center/bottom) against every
+  candidate on that axis — the slide's own edges/center plus every *other*
+  element's edges/center — and snaps to whichever is closest, within a 6px
+  threshold (pixel-based via the container's real size, so the snap
+  distance feels the same regardless of slide/element size, not a fixed
+  fraction). `FreeformElementWrapper` calls it inside the existing
+  `onPointerMove`, reports the active guide line(s) up to `FreeformSlide`
+  via a new `onGuideChange` prop (shared across every wrapper, since only
+  one drags at a time), which renders them as thin overlay lines spanning
+  the slide — a guide has to span the whole slide, not just the dragged
+  element's own box, which is why it's drawn at the parent level rather
+  than per-wrapper.
+- **Found and fixed a second real bug in the freeform drag machinery**,
+  worse than the StrictMode double-commit from earlier today: reporting the
+  live guide line on every `pointermove` (`onGuideChange` → the parent's
+  `setGuides`) triggers a re-render of `FreeformSlide`, which hands every
+  wrapper a **new** `onMoveEnd` closure (`onMoveEnd={(pos) => setElement(...)}`
+  is defined inline, fresh every render). Since `onPointerUp`'s own
+  `useCallback` had `onMoveEnd` in its dependency array, that made
+  `onPointerUp`'s *identity* change mid-drag too — and the cleanup
+  `useEffect` right below it, which depends on `[onPointerMove, onPointerUp]`,
+  fires its cleanup (`removeEventListener` for both) the instant it sees
+  that changed identity. Net effect: the window-level pointermove/pointerup
+  listeners were being torn down *during* the drag, before the real
+  pointerup ever arrived — silently. The drag stopped committing anything
+  further and the guide line could never clear, with no error anywhere to
+  point at, because by the time you released the mouse there was, quite
+  literally, nothing listening anymore. Fixed the same way `elRef`/
+  `siblingsRef` already handle their own per-render-fresh values: mirrored
+  `onMoveEnd` into a ref (`onMoveEndRef`) and dropped it from `onPointerUp`'s
+  dependency array entirely, so `onPointerUp`'s identity — and therefore the
+  listener registration — now survives any number of mid-drag re-renders,
+  not just zero of them.
+- **This one was hard to isolate because of a second, unrelated problem
+  that looked identical from the outside**: debugging this in the browser
+  pane, dispatched test events sometimes silently landed on the wrong tab
+  because several tool calls omitted an explicit `tabId` and fell back to
+  "whichever tab is currently fronted" — which had quietly drifted away
+  from the tab actually under test (to a leftover PDF tab from earlier in
+  the session) at some point in a long multi-tab session. That produced the
+  *exact same symptom* (dispatched pointer events appearing to do nothing)
+  for a completely different, mundane reason, and cost real time to rule
+  out before the real bug above was even visible. **Lesson for next time**:
+  once a session has more than one open tab, pass `tabId` explicitly on
+  every single browser-tool call, including `find`/`computer`, not just the
+  `javascript_tool`/`read_console_messages` ones — don't rely on "the
+  fronted tab" once there's more than one tab in play, and if a dispatched
+  test event seems to do nothing, verify which tab it actually reached
+  before suspecting the application code.
+- Verified live (in a fresh tab, tabId explicit throughout, after the fix):
+  three consecutive `pointermove` dispatches during one drag all correctly
+  updated the live position (proving multiple mid-drag re-renders no longer
+  break anything); the guide line correctly disappeared after release
+  (previously stuck); the final position matched the last live value
+  exactly; one Undo click reverted the *entire* multi-move drag back to
+  its exact starting position. `tsc --noEmit` clean, no new console errors
+  beyond the pre-existing migration 400s.
+
+**Left off / next up:**
+- Rest of Phase G, in the planned order: editor-canvas zoom/pan next, then
+  comments/annotations last.
+- No persistent "selected element" concept exists for freeform elements —
+  today's snapping only runs *during* an active drag (which already tracks
+  everything it needs locally). A real selection system (click to select,
+  stays selected, Escape/click-elsewhere to deselect) is still worth
+  building for its own sake — it's the prerequisite for element-level
+  keyboard nudge (flagged as skipped in the keyboard-shortcuts entry above)
+  and would also open the door to on-canvas multi-select. Whoever picks
+  that up should know the drag machinery already has the right shape for
+  it (`elRef`/`siblingsRef`/ref-mirroring pattern) — it's a reasonably
+  contained addition on top of what's here now, not a rewrite.
+- Copy/paste (Ctrl+C/V) was considered and deliberately left out — Ctrl+D
+  already covers "make a copy in place," and real copy/paste (especially
+  cross-project) needs a clipboard representation that's a bigger, separate
+  feature, not a rounding-out of this one.
+- Element-level nudge (arrow keys moving a *selected freeform element*, as
+  opposed to changing which slide is current) was also left out here —
+  it needs an actual "selected element" concept that doesn't exist yet
+  (today's freeform drag has no persistent selection, just an active drag),
+  and alignment/snapping will need that same concept, so it makes more
+  sense to add it once, there, rather than twice.
+- Freeform element **resize** and **z-order** are not built — today's step
+  was deliberately scoped to just repositioning (matching the literal
+  "drag-to-reorder" ask), since resize needs its own handle UI and z-order
+  needs a decision on how to expose "bring forward/send back" — worth
+  picking up if freeform slides turn out to need either.
+- On-canvas multi-select (selecting several *elements* within one slide, as
+  opposed to several slides in the rail) is still not built — see the
+  2026-09-21 multi-select entry above for why it was scoped to the rail
+  only; now that freeform elements are independently draggable, it might be
+  worth reconsidering.
+- **Worth remembering for anyone touching `EditableText` next**: its
+  `onBlur` is *always* attached regardless of `editable`, and always calls
+  `onChange` regardless of whether the text actually changed. That's fine on
+  its own, but any new feature that treats a `commitProject`/`updateField`
+  call as meaningful (undo history, "unsaved changes" flags, analytics,
+  etc.) needs to either guard on the caller side (as `updateField` now does)
+  or expect no-op calls to show up.
+- Nothing from today is committed yet — still stacked on top of the
+  already-uncommitted Space Detail / Music+KeyPlan / Seating Table work from
+  2026-09-18. Strongly consider committing before this grows further.
+
+---
+
+## 2026-09-18 (cont'd)
+
+**Done:**
+- **Background music + key plan for a linked view's stage** — modeled on the
+  sidvin reference deck's own render/gallery viewer (looping ambient track
+  with a mute toggle, plus a floating "you are here" key-plan crop with an
+  expand toggle). Added `LinkedView.musicUrl` and `LinkedView.keyPlanImage`
+  ([slide.ts](src/types/slide.ts) — the latter reuses a newly-extracted
+  `KeyPlanImage` shared type, since a hotspot's own `keyPlanImage` was
+  already the identical shape). Works on any view kind, per the user's ask
+  to have it on both Render and Axo — not hard-restricted to just those two,
+  same reasoning as `zoomPanEnabled` already being generic across kinds.
+  [SlideRenderer.tsx](src/components/SlideRenderer.tsx): a real `<audio
+  loop>` element mounts only while its view is active, fades in on arrival
+  (handles the autoplay-blocked case with a "Tap for sound" fallback button
+  rather than silently doing nothing), and unmounts (stops) on leaving —
+  confirmed live that switching from Render to Walkthrough actually removes
+  the audio element rather than leaving it playing underneath. The key-plan
+  card defaults visible, click-to-expand, a small ✕ to hide it, and always
+  resets to its default (visible, collapsed) on every view switch — matches
+  the reference's own "fresh render, fresh key plan" behavior. Both fields
+  are edited via a new row of paste-URL inputs above the stage (editable
+  mode only), next to the existing stage-switcher row.
+- **Found and fixed a real, previously-latent bug** while verifying this:
+  the same one documented in yesterday's Space Detail entry (Escape/arrow
+  keys firing both an in-slide overlay's own handler AND Presenter's
+  page-level one) — turned out to still need watching for any *new*
+  window-level key listener added from here on. No new instance this time
+  (the music/key-plan controls are plain buttons, no new keydown
+  listeners), but worth remembering as a standing rule for this codebase:
+  any future `window.addEventListener('keydown', ...)` inside a
+  Presenter-mode-visible component must use the capture-phase +
+  `stopImmediatePropagation()` pattern from `Lightbox.tsx`/
+  `SpaceDetailOverlay.tsx`, not a plain bubble listener, or it'll double-fire
+  against Presenter's own Escape/arrow handling.
+- Verified live on the real "Ecom Express — Workplace Design Presentation"
+  project: set a test tone + the layout image as a stand-in key plan on the
+  Render view, confirmed in Presenter mode that the audio element mounts,
+  plays (volume fading in), the mute toggle actually flips `audio.muted`,
+  the key-plan expand toggle actually resizes the card, and switching to
+  the Walkthrough tab tears the audio element down. Cleaned up the
+  placeholder test values from the real project afterward — this was
+  verification, not real content, and the user will want to set their own
+  actual music/key-plan assets. `tsc --noEmit` clean throughout; console
+  showed only the pre-existing migration-column 400s and unrelated dev-HMR
+  websocket noise.
+- **Watch out for** (same class of issue as the seating-table one flagged
+  yesterday): while setting these fields via this session's browser
+  automation, a view-tab click twice landed on the *wrong* `LinkedView`
+  (the rail thumbnail's own tab-switch button instead of the main canvas's,
+  or vice versa) before the value got set — caught immediately both times
+  by re-checking the persisted data, and re-done correctly. Not an app bug;
+  a reminder for any future direct-DOM-scripted verification in this repo
+  to always re-verify which `LinkedView` an edit actually landed on before
+  trusting a screenshot alone, since multiple identically-labeled tab
+  buttons exist in the DOM at once (rail preview + main canvas).
+
+**Left off / next up:**
+- No real background-music or key-plan assets have been set on any real
+  project yet — today's work only proved the mechanism works, using a
+  synthesized test tone and the layout image as a stand-in key plan (both
+  removed afterward). Whoever adds real content should just paste the
+  actual URLs into the new fields.
+- Still blocked on the user for the rest of this round's asks from
+  yesterday (typology list, OB/SKV profile decks, audience-option
+  confirmation) — unchanged, see yesterday's entry.
+- Nothing from today is committed yet.
+
+---
+
+## 2026-09-18
+
+**Context:** the meeting from the last few entries went well. Follow-up ask:
+tighten existing features and add what came up in the meeting. First item
+tackled — a "space detail" overlay: click a space on a plan, see the concept/
+render/walkthrough/BOQ/occupancy that justified it, surfaced on top of the
+plan instead of navigating away (the pitch's own logic: by the time you've
+walked from concept slides to the layout, the client remembers there *was*
+a concept, not which one — a click brings the exact idea back mid-conversation).
+Three more asks (typology-driven template population, brand→company-profile
+auto-population, audience-based defaults) and a real-login share-permissions
+phase are scoped but blocked/parked — see Left off below.
+
+**Done:**
+- **New `SpaceDetailOverlay`** ([SpaceDetailOverlay.tsx](src/components/SpaceDetailOverlay.tsx)):
+  a card that surfaces on top of the plan on hotspot click, showing only
+  whichever sections have content — Concept (a short standalone summary
+  card, written for this popup, not a live preview of the actual concept
+  slide — deliberately, per this round's scope decision), Renders (reuses
+  the hotspot's existing `gallery`, no duplicate field — clicking a
+  thumbnail opens the existing `Lightbox` on top), Walkthrough (a new
+  per-hotspot video URL, distinct from a view's own shared walkthrough
+  tab), Occupancy (reuses a linked Seating Capacity row via its
+  `hotspotIds` — no duplicate number to keep in sync), and BOQ (placeholder
+  note only; the real editable line-item table is intentionally parked for
+  a later phase, per this round's scope decision). New `ViewHotspot.spaceDetail`
+  + `SpaceConceptSummary`/`SpaceBoq`/`SpaceDetail` types
+  ([slide.ts](src/types/slide.ts)). `jumpTo()` in
+  [SlideRenderer.tsx](src/components/SlideRenderer.tsx) now checks for any
+  space-detail content (or a linked seating row) before falling through to
+  plain gallery/navigate, and the hotspot popup gained a collapsible "Space
+  Detail" editing section.
+- **Found and fixed a real, previously-latent bug** while verifying this in
+  Presenter mode: pressing Escape to close the new overlay (or the
+  pre-existing `Lightbox`) also exited Presenter mode entirely in the same
+  keypress — both the overlay's own Escape handler and Presenter's
+  page-level one listen on `window`, and neither stops the other. Same bug
+  existed for `Lightbox`'s arrow-key image stepping vs. Presenter's own
+  arrow-key slide navigation. Fixed both by moving to a capture-phase
+  listener + `stopImmediatePropagation()` — the standard fix for "an
+  in-page modal needs to swallow a key before a page-level handler also
+  reacts to it."
+- Verified live on the real "Ecom Express — Workplace Design Presentation"
+  project (the one actually used in the meeting): seeded real `spaceDetail`
+  content on the Conference Room hotspot directly via a Supabase REST PATCH
+  (the browser-automation pane's own hotspot-drawing UI is still fiddly at
+  this viewport — see repeated notes on this in earlier entries), confirmed
+  in Presenter mode that only populated sections render, the walkthrough
+  video plays, and Escape now correctly closes just the overlay. `tsc`
+  clean, no new console errors (only the pre-existing migration-column 400
+  and unrelated HMR-websocket noise).
+- **Along the way, corrected a self-inflicted data problem, not an app
+  bug**: an early verification script piped JSON through `python -c`'s
+  default stdout encoding on Windows (not UTF-8), mangling em-dashes
+  in hotspot labels when it wrote back to Supabase. Re-fetched, repaired
+  every mangled sequence, and rewrote using explicit UTF-8 throughout —
+  confirmed clean afterward. Not an editor bug; a lesson for any future
+  direct-REST verification script in this repo: always force UTF-8 on both
+  ends, don't rely on `python -c ... > file`'s default encoding on Windows.
+
+**Left off / next up:**
+- **Noticed, not fixed**: the real Ecom Express project's Seating Capacity
+  table currently has one row's `hotspotIds` accidentally including *two*
+  hotspots (an old orphaned one plus the real Conference Room one), so that
+  row's occupancy is what surfaces on the Conference Room's space-detail
+  overlay instead of the correct row — a leftover mis-click from live
+  editing during the actual meeting, not a code bug (confirmed by reading
+  the raw persisted data). Worth a quick manual fix in the Seating Capacity
+  table next time this project's open: unlink the stray hotspot from that
+  row. Also that table's zone/row names have reverted to "New zone"/"New
+  area" again at least once during real use — same contentEditable+blur
+  batching hazard documented in the "occupancy chart" rebuild entry above;
+  worth being deliberate about pausing between edits when scripting this
+  table, and probably worth hardening the component itself at some point
+  (debounce or a functional-update form for `setZones` so rapid edits can't
+  silently overwrite each other) rather than continuing to work around it
+  by hand each time.
+- **Blocked on the user for the rest of this round's asks**:
+  1. Typology-driven template population — needs the exact typology list
+     and which concept-library pillars/slides belong to each.
+  2. Brand (OB/SKV/Both) → auto-populated company-profile slides — needs
+     the real source deck(s) for each brand's profile (same pattern as the
+     Ecom Express PPTX import earlier).
+  3. Audience (Leadership vs. Client, defaulting which slides show) — a
+     two-option proposal is on the table, not yet confirmed as final.
+  4. Editor add/remove-slides tightening — mostly exists already
+     (`+ Add slide`, delete, skip); the actual ask is exposing the same
+     typology/brand template picker inside the editor too, not just at
+     creation — blocked on #1/#2 same as they are.
+- **Real Google-account login + viewer/editor sharing** is confirmed
+  explicitly parked for a later phase by the user, not forgotten — see the
+  detailed architecture write-up already given in this session (Supabase
+  Auth + Google OAuth provider, `owner_id`/`project_collaborators` schema,
+  real RLS policies replacing the current fully-open one, a login page, a
+  Share dialog). Today's DB access is still completely open — anyone with
+  the project id can read/write it via the public anon key — worth keeping
+  in mind before treating any project in this database as actually private
+  in the meantime.
+- Nothing from today is committed yet.
+
+---
+
+## 2026-09-17 (cont'd 8)
+
+**Context:** asked to "work on the occupancy chart"; after clarifying scope
+(add features: Excel import was reported broken, plus a bar→hotspot reverse
+jump), investigating the Excel-import report led to re-reading the design
+reference this whole linked-views feature was generalized from
+(`D:\Claude\sidvin-design-deck\index4.html`) — its own "occupancy" concept
+turned out to be a completely different shape than what got built: not a
+bar chart on a separate slide with click-jump, but an Area/Required/Achieved
+table embedded *beside the plan itself*, grouped by zone, two-way
+hover-linked to the plan's hotspots (`renderSeatingTable()`/`hotspotsByRoom`
+in the reference). Confirmed with the user to rebuild against that reference
+rather than patch the old design.
+
+**Done — investigation first:**
+- The reported-broken Excel import turned out to work correctly — root
+  cause was a real UX bug, not silent failure: when the deck had any
+  `linked-views` slides, import didn't touch the chart at all until you
+  *also* picked a linked slide or clicked "Skip linking" in a follow-up
+  banner, so nothing visibly happened on upload alone. (This is now moot —
+  see below — but worth recording that it wasn't the reported "does
+  nothing" bug once actually traced through `runImport`.)
+
+**Done — the rebuild (supersedes the whole occupancy-chart design from the
+2026-09-17 Part C entry above, both the original bars and this session's own
+Excel-import-order fix + reverse-jump additions on top of it):**
+- **Removed entirely**: the `'occupancy-chart'` `SlideLayout`,
+  `OccupancyChart.tsx`, `OccupancyZone`, `ViewHotspot.targetZoneId`,
+  `SlideFields.occupancyZones/occupancyUnit/linkedViewSlideId`, the
+  editorStore's `focusZoneId`/`focusHotspotId` transient state and
+  `addOccupancyZone`/`removeOccupancyZone`/`importOccupancyData` actions, and
+  the hotspot popup's "Highlight: Zone" picker.
+- **Added**: `SeatingRow`/`SeatingZone` types and `LinkedView.seatingTitle`/
+  `seatingZones` ([slide.ts](src/types/slide.ts)) — a row is
+  `{ label, required?, achieved, note?, kind?: 'row'|'group'|'sub',
+  hotspotIds?: string[] }`, so a row can link to zero, one, or several
+  hotspots on the *same* view (matching the reference's own "Total
+  Workstations" group row plus two sub-rows all pointing at one "workhall"
+  hotspot, and inert rows like "Waiting Lounge" with no plan link at all).
+  New [SeatingTable.tsx](src/components/SeatingTable.tsx) renders this beside
+  the plan (replacing `HotspotSidePanel` only when a view actually has
+  `seatingZones`, or for a brand-new view in edit mode — the plain simple
+  side list still works untouched for decks that only use `listEntry`):
+  zone-grouped Area/Required/Achieved rows, group/sub visual treatment,
+  two-way hover (`hoveredHotspotId` in from the plan, `onHoverHotspots` out
+  to it — generalized to a list since one row can map to several hotspot
+  ids, unlike the single-id simple side list), a contextual note area shown
+  only while the relevant row/hotspot is hovered, and full editing UI (+
+  Zone/+ Row, inline label/required/achieved editing, a kind selector, and
+  per-row hotspot-link toggle chips).
+- **New Excel import** ([importExcel.ts](src/lib/importExcel.ts)):
+  `parseSeatingWorkbook` header-detects Zone/Area/Required/Achieved columns
+  (falls back to column order), and `SeatingTable`'s own import button
+  upserts rows into `seatingZones` grouped by zone, auto-linking to a
+  same-view hotspot by case-insensitive label match — same matching
+  philosophy as the old `importOccupancyData`, just producing the new shape
+  and needing no second "which slide" step since everything is already on
+  one view.
+- Verified live on "Linking Test": added a zone + two rows via the editor UI
+  end-to-end (contentEditable zone/row labels, required/achieved inputs all
+  persist correctly to the store, confirmed via React fiber inspection since
+  the browser-automation pane's canvas is very small at this viewport).
+  `tsc --noEmit` clean, no new console errors, and confirmed the app doesn't
+  crash on a slide whose persisted `layout` is still the now-removed
+  `"occupancy-chart"` string (falls back to the generic kicker/title
+  render branch rather than erroring).
+
+**Left off / next up:**
+- **Not independently re-verified live**: the two-way hover between a
+  SeatingTable row and an actual hotspot on the plan. Repeated attempts to
+  draw a fresh test hotspot via this session's browser automation (both
+  real mouse drag and synthetic PointerEvents) didn't complete the
+  rectangle-tool's drag-to-popup flow in this pane — looked like an
+  automation/viewport-scale friction, not an app bug (a real mouse drag did
+  visibly grow the selection box each time). The hover code itself is a
+  direct generalization of the already-shipped, already-verified simple
+  `HotspotSidePanel` hover (same `hoveredHotspotId` plumbing, just widened to
+  a list), so it's believed correct by construction — but worth an actual
+  click-a-row/hover-a-hotspot check next session, ideally from a real
+  browser rather than this automation path.
+- The old "Linking Test" occupancy-chart slide (with the Reception/Workhall/
+  Conference Room data from earlier testing) was deleted since its layout no
+  longer exists — that data is gone, not migrated. No real project data used
+  the old feature (it only ever existed in this session's scratch project),
+  so nothing to migrate in practice.
+- Nothing from this rebuild is committed yet.
+
+---
+
+## 2026-09-17 (cont'd 7)
+
+**Done:**
+- **Added a Google-Slides-style per-slide Background feature**: a new
+  "Background" section in the Properties panel
+  ([PropertiesPanel.tsx](src/components/PropertiesPanel.tsx)) lets you set a
+  flat color and/or a full-bleed image behind the current slide, with an
+  "Image darken" slider (0–80%) for text legibility over busy photos, and a
+  "Reset" to go back to the style's own default. New `Slide.background`
+  (`SlideBackground` — [slide.ts](src/types/slide.ts)) and
+  `setSlideBackground`/`resetSlideBackground` store actions
+  ([editorStore.ts](src/lib/editorStore.ts)). `SlideRenderer.tsx`'s shared
+  root wrapper (every layout renders through it) paints the custom
+  color/image behind everything when set, replacing rather than layering
+  under the style's usual white/dark-veil look. Text color is not
+  auto-adjusted for contrast — same as Google Slides, the panel's own
+  helper text calls this out. Verified live: color and image both apply
+  and persist, darken slider dims the image, Reset clears correctly, `tsc`
+  clean, no new console errors.
+- **Reworked Presenter mode's bottom nav bar**
+  ([present/page.tsx](src/app/p/[id]/present/page.tsx)) with 4 requested
+  additions: a thumbnail preview (a real scaled-down `SlideRenderer`, not a
+  static image) on hovering a nav dot; a thin progress-fill bar under the
+  step counter; dots grouped by section (split at each section-starter
+  slide, with a subtle divider between groups); and a kbd-styled keyboard
+  legend ("← → navigate · Esc exit") replacing the old plain-text hint pill.
+  Verified live on "Linking Test": added a Section Starter slide to confirm
+  grouping actually splits the dots (single group before, two groups with a
+  divider after — confirmed via the DOM, not just visually), hovered a dot
+  and confirmed the live thumbnail preview renders that slide's real content
+  (a freeform slide's photos/text, not a placeholder), confirmed the
+  progress bar's width tracks the current slide. `tsc` clean, no new
+  console errors. Cleaned up the test Section Starter slide afterward.
+
+**Left off / next up:**
+- Nothing outstanding on either feature. Neither is committed yet.
+- Reminder from earlier this session, still true: the "Linking Test"
+  project has accumulated scratch clutter (old flat-image vs. freeform
+  duplicate slides, a few stray test edits) worth tidying before actually
+  presenting live.
+
+---
+
 ## 2026-09-17 (cont'd 6)
 
 **Context:** user corrected the "as is" concept-library slides twice more —

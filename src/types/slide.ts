@@ -18,7 +18,6 @@ export type SlideLayout =
   | 'site-locus'
   | 'material-compare'
   | 'orbit'
-  | 'occupancy-chart'
   | 'freeform';
 
 export type SlideStyleKind = 'standard' | 'section-starter' | 'company' | 'design';
@@ -40,17 +39,39 @@ export interface OrbitNode extends MergeItem {
   imageUrl?: string;
 }
 
-/** occupancy-chart layout: one bar. `value` out of `capacity` when given
- *  (percentage-filled bar); just `value` scaled against the slide's own max
- *  when `capacity` is absent. */
-export interface OccupancyZone {
+export type LinkedViewKind = 'layout' | 'render' | 'walkthrough' | 'axo';
+
+/** One row of a view's seating/capacity table — modeled on the reference
+ *  deck's "Seating Capacity" panel (sidvin-design-deck/index4.html): an
+ *  Area/Required/Achieved table grouped by zone, embedded beside the plan
+ *  it describes rather than off on a separate slide, and two-way hover-
+ *  linked to the plan's own hotspots. A row may link to zero hotspots (an
+ *  inert row, e.g. "Waiting Lounge" with no distinct callout), exactly one,
+ *  or several (e.g. a "Total Workstations" group row and its two breakdown
+ *  sub-rows can all point at the same "workhall" hotspot). */
+export interface SeatingRow {
   id: string;
   label: string;
-  value: number;
-  capacity?: number;
+  /** Free text, not always a number — the reference shows '—' for figures
+   *  the source data doesn't break out this way. Absent = show '—'. */
+  required?: string;
+  achieved: string;
+  /** Shown only while this row (or a hotspot it links to) is hovered — a
+   *  contextual aside, not a permanently-listed description. */
+  note?: string;
+  /** Visual treatment: 'group' is a bold sub-header row (e.g. a combined
+   *  total), 'sub' is an indented breakdown under one. Absent = a plain row. */
+  kind?: 'row' | 'group' | 'sub';
+  /** Hotspot ids on this same view this row highlights on hover, and vice
+   *  versa. Absent/empty = inert (no plan link). */
+  hotspotIds?: string[];
 }
 
-export type LinkedViewKind = 'layout' | 'render' | 'walkthrough' | 'axo';
+export interface SeatingZone {
+  id: string;
+  name: string;
+  rows: SeatingRow[];
+}
 
 /** A structured row shown in a hotspot's side list, and/or as its caption in
  *  a gallery. Presence of a `listEntry` anywhere on a view is what turns on
@@ -69,6 +90,16 @@ export interface HotspotGalleryImage {
   id: string;
   url: string;
   caption?: string;
+}
+
+/** A small cropped orientation thumbnail — "you are here" on the overall
+ *  plan — with an optional camera-direction arrow. Shared shape between a
+ *  hotspot's own gallery/lightbox corner and a linked view's Render/Axo
+ *  stage (see LinkedView.keyPlanImage), matching the reference deck's own
+ *  single key-plan treatment reused across both. */
+export interface KeyPlanImage {
+  url: string;
+  arrowDeg?: number;
 }
 
 export interface ViewHotspot {
@@ -105,19 +136,54 @@ export interface ViewHotspot {
   gallery?: HotspotGalleryImage[];
   /** Small cropped orientation thumbnail shown in the gallery/lightbox corner
    *  (a key-plan crop with a camera-direction arrow). */
-  keyPlanImage?: { url: string; arrowDeg?: number };
+  keyPlanImage?: KeyPlanImage;
   /** Which of the view's stages this hotspot is active on. Absent = every
    *  stage — the correct default both for hotspots drawn before stages
    *  existed and for a view that never defines any. */
   stageIds?: string[];
   /** What a click does when both a gallery and a nav target are set. Only
    *  needs setting to override the default: 'gallery' if one is present,
-   *  else 'navigate'. */
+   *  else 'navigate'. Ignored once `spaceDetail` has any content, or a
+   *  seating row links here — those always take over the click (see
+   *  SpaceDetailOverlay), since the whole point is staying on the plan
+   *  rather than jumping anywhere. */
   clickAction?: 'navigate' | 'gallery';
-  /** An occupancy-chart zone this hotspot represents — only meaningful
-   *  alongside targetSlideId when that slide's layout is 'occupancy-chart'.
-   *  Lets a click jump to the chart slide and highlight the matching bar. */
-  targetZoneId?: string;
+  /** Everything about this one space, surfaced together on click instead of
+   *  navigating away — mid-pitch, without losing the plan or flipping back
+   *  through the deck to find which concept justified this space. Every
+   *  field is independent; the overlay only renders sections that have
+   *  content. Renders reuse `gallery` above rather than duplicating it;
+   *  occupancy reuses a linked SeatingRow (via its `hotspotIds`) rather than
+   *  storing a second copy of the same number. */
+  spaceDetail?: SpaceDetail;
+}
+
+/** A short standalone card for the space-detail overlay — deliberately not
+ *  a live preview of the actual concept slide (that was considered and
+ *  rejected): this is its own lighter summary, written for this popup. */
+export interface SpaceConceptSummary {
+  title: string;
+  body: string;
+  imageUrl?: string;
+}
+
+/** Bill of Quantities — parked as a placeholder section for now (a real
+ *  editable line-item table is a future phase); `note` is just a manual
+ *  text placeholder until that lands. */
+export interface SpaceBoq {
+  note?: string;
+}
+
+export interface SpaceDetail {
+  concept?: SpaceConceptSummary;
+  /** Only meaningful alongside a `gallery` walkthrough clip — separate from
+   *  a view's own shared walkthrough tab, since this one is specific to just
+   *  this space. */
+  walkthroughUrl?: string;
+  boq?: SpaceBoq;
+  /** Free-form extra — "everything pertaining to the space" that doesn't
+   *  fit the other named sections. */
+  note?: string;
 }
 
 /** A named mode a linked view can be switched between while editing/viewing
@@ -145,10 +211,32 @@ export interface LinkedView {
   /** Lets the viewer wheel-zoom/drag-pan the image itself, independent of the
    *  authored `transform` crop. A viewer aid, never persisted back onto it. */
   zoomPanEnabled?: boolean;
+  /** Looping ambient background track played while this view is active —
+   *  matches the reference deck's render/axo viewer having its own mutable
+   *  background music, faded in on arrival and out on leaving. URL only,
+   *  same reasoning as every other media field in this file: no server-side
+   *  storage, so a base64 track would bloat the project row. */
+  musicUrl?: string;
+  /** "You are here" orientation crop shown floating over this view's stage
+   *  (Render/Axo, typically) — toggleable, and click-to-expand, matching the
+   *  reference deck's key-plan card. Fresh per view; never carries an
+   *  expanded state over from the last one shown. */
+  keyPlanImage?: KeyPlanImage;
   /** Whether to show the hotspot side list at all. Unset = show it exactly
    *  when at least one hotspot has a listEntry — compute that default with
-   *  one shared helper wherever this is read, rather than re-deriving it. */
+   *  one shared helper wherever this is read, rather than re-deriving it.
+   *  Ignored once `seatingZones` is set — the seating table replaces the
+   *  plain side list rather than the two coexisting. */
   showHotspotList?: boolean;
+  /** Heading over the seating/capacity table, e.g. "Seating Capacity —
+   *  Achieved 300 Pax". Only meaningful alongside `seatingZones`. */
+  seatingTitle?: string;
+  /** The Area/Required/Achieved table shown beside this view, grouped by
+   *  zone and two-way hover-linked to its hotspots (see SeatingRow). Modeled
+   *  directly on the reference deck's own "Seating Capacity" panel — this is
+   *  what "occupancy" means in this app now, replacing the earlier separate
+   *  bar-chart slide + click-jump design. */
+  seatingZones?: SeatingZone[];
 }
 
 /** How an image sits inside its own frame — the frame itself (position and
@@ -232,15 +320,6 @@ export interface SlideFields {
   orbitNodes?: OrbitNode[];
   orbitCoreTitle?: string;
   orbitCoreBody?: string;
-
-  /** occupancy-chart layout: one bar per zone, and the unit shown in bar
-   *  labels (e.g. "people") — defaults to "occupants" when unset. */
-  occupancyZones?: OccupancyZone[];
-  occupancyUnit?: string;
-  /** Which linked-views slide this chart's zones map to by hotspot label —
-   *  set once (on first Excel import) so re-imports don't need re-picking.
-   *  May go stale if that slide is deleted; tolerate a miss. */
-  linkedViewSlideId?: string;
 
   /** freeform layout: an imported slide's photos/text/shapes, each
    *  independently editable. See FreeformElement. */
@@ -348,6 +427,22 @@ export interface TypographySettings {
   tracking?: 'tight' | 'normal' | 'wide';
 }
 
+/** A per-slide override of the layout/style's own default background —
+ *  same idea as Google Slides' per-slide Background dialog. All optional;
+ *  unset falls back to the style's usual white/dark-veil background. An
+ *  image sits behind everything else on the slide (object-cover, no crop
+ *  controls — kept simple, unlike the per-element ImageTransform every other
+ *  image slot gets); `imageOpacity` is an optional black scrim over it for
+ *  text legibility on busy photos, 0–1. Setting a custom color/image doesn't
+ *  change what text color a slide's content uses (still driven by
+ *  style === 'section-starter' | 'design'), so a dark custom background on
+ *  an otherwise-light style needs a light text style too, same as Slides. */
+export interface SlideBackground {
+  color?: string;
+  imageUrl?: string;
+  imageOpacity?: number;
+}
+
 export interface Slide {
   id: string;
   layout: SlideLayout;
@@ -364,6 +459,8 @@ export interface Slide {
   /** Kept in the deck but left out of Presenter and export — for a slide that
    *  belongs to the project but not to this particular telling of it. */
   skipped?: boolean;
+  /** Per-slide background color/image override — see SlideBackground. */
+  background?: SlideBackground;
 }
 
 export interface Project {

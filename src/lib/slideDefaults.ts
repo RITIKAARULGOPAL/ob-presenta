@@ -1,5 +1,5 @@
 import { makeId } from './id';
-import type { Slide, SlideLayout, SlideStyleKind, StatItem, MergeItem, OrbitNode, LinkedView, OccupancyZone } from '@/types/slide';
+import type { Slide, SlideLayout, SlideStyleKind, StatItem, MergeItem, OrbitNode, LinkedView } from '@/types/slide';
 
 const defaultAnimation = () => ({ entry: 'none' as const, duration: 600, delay: 0 });
 
@@ -11,9 +11,6 @@ function makeItem(): MergeItem {
 }
 export function makeOrbitNode(): OrbitNode {
   return { id: makeId('orbit'), label: '' };
-}
-export function makeOccupancyZone(label = ''): OccupancyZone {
-  return { id: makeId('zone'), label, value: 0 };
 }
 function makeLinkedViews(): LinkedView[] {
   // The labels here name the kind of view a slot holds, so they're structure
@@ -126,14 +123,6 @@ export function defaultFieldsForLayout(layout: SlideLayout) {
         orbitCoreBody: '',
         orbitNodes: [makeOrbitNode(), makeOrbitNode(), makeOrbitNode()],
       };
-    case 'occupancy-chart':
-      return {
-        kickerEyebrow: '',
-        kickerLabel: '',
-        title: '',
-        occupancyUnit: '',
-        occupancyZones: [makeOccupancyZone('Zone 1'), makeOccupancyZone('Zone 2'), makeOccupancyZone('Zone 3')],
-      };
     case 'freeform':
       return { elements: [] };
     default:
@@ -180,6 +169,71 @@ export function createStyledSlide(style: SlideStyleKind): Slide {
   };
 }
 
+/** A real duplicate — carries over every field's actual content, unlike
+ *  addSlide/addStyledSlide above which always start from an empty template.
+ *  Every nested array item gets a fresh id (stats/items/points/orbitNodes/
+ *  views/hotspots/stages/seatingZones/rows/gallery images/elements), not
+ *  just the slide itself — a naive `{ ...slide, id: makeId('slide') }` would
+ *  leave the clone's hotspots, stages, and seating rows sharing ids with the
+ *  original, which is fine until either copy is edited, at which point two
+ *  unrelated hotspots on two different slides answer to the same id.
+ *
+ *  Same-slide cross-references (a hotspot's stageIds, a seating row's
+ *  hotspotIds, a hotspot's targetViewId) are rewritten to the clone's own
+ *  new ids so they still resolve correctly inside the clone. A hotspot's
+ *  targetSlideId is left untouched — it points at another slide entirely,
+ *  and still means the same destination after duplication. */
+export function cloneSlide(slide: Slide): Slide {
+  const views = slide.fields.views;
+  let clonedViews: LinkedView[] | undefined;
+
+  if (views) {
+    // Two passes: mint every new id first, then rewrite same-slide pointers
+    // through the resulting maps — a hotspot's stageIds needs the *other*
+    // stage's new id, which doesn't exist until that stage's been visited.
+    const viewIdMap = new Map(views.map((v) => [v.id, makeId('view')]));
+    const stageIdMap = new Map(views.flatMap((v) => v.stages ?? []).map((s) => [s.id, makeId('stage')]));
+    const hotspotIdMap = new Map(views.flatMap((v) => v.hotspots ?? []).map((h) => [h.id, makeId('hotspot')]));
+
+    clonedViews = views.map((v) => ({
+      ...v,
+      id: viewIdMap.get(v.id)!,
+      stages: v.stages?.map((s) => ({ ...s, id: stageIdMap.get(s.id)! })),
+      hotspots: v.hotspots?.map((h) => ({
+        ...h,
+        id: hotspotIdMap.get(h.id)!,
+        targetViewId: h.targetViewId ? (viewIdMap.get(h.targetViewId) ?? h.targetViewId) : undefined,
+        stageIds: h.stageIds?.map((id) => stageIdMap.get(id) ?? id),
+        listEntry: h.listEntry ? { ...h.listEntry, id: makeId('list') } : undefined,
+        gallery: h.gallery?.map((g) => ({ ...g, id: makeId('gal') })),
+      })),
+      seatingZones: v.seatingZones?.map((z) => ({
+        ...z,
+        id: makeId('szone'),
+        rows: z.rows.map((r) => ({
+          ...r,
+          id: makeId('srow'),
+          hotspotIds: r.hotspotIds?.map((id) => hotspotIdMap.get(id) ?? id),
+        })),
+      })),
+    }));
+  }
+
+  return {
+    ...slide,
+    id: makeId('slide'),
+    fields: {
+      ...slide.fields,
+      stats: slide.fields.stats?.map((s) => ({ ...s, id: makeId('stat') })),
+      items: slide.fields.items?.map((it) => ({ ...it, id: makeId('item') })),
+      points: slide.fields.points?.map((pt) => ({ ...pt, id: makeId('point') })),
+      orbitNodes: slide.fields.orbitNodes?.map((n) => ({ ...n, id: makeId('orbit') })),
+      views: clonedViews,
+      elements: slide.fields.elements?.map((el) => ({ ...el, id: makeId('elem') })),
+    },
+  };
+}
+
 export const LAYOUT_LABELS: Record<SlideLayout, string> = {
   blank: 'Blank',
   'title-only': 'Title Only',
@@ -194,7 +248,6 @@ export const LAYOUT_LABELS: Record<SlideLayout, string> = {
   'site-locus': 'Site Location',
   'material-compare': 'Materials Compare',
   orbit: 'Orbit Diagram',
-  'occupancy-chart': 'Occupancy Chart',
   freeform: 'Freeform (Imported)',
 };
 

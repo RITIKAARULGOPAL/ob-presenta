@@ -149,3 +149,33 @@ export function IconScreen(props: SVGProps<SVGSVGElement>) {
     </Base>
   );
 }
+
+/** Theme → Light. A sun with eight rays. */
+export function IconSun(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.5v2M12 19.5v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2.5 12h2M19.5 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" />
+    </Base>
+  );
+}
+
+/** Theme → Dark. A crescent, drawn as one path so it stays a silhouette at
+ *  12px rather than turning into a smudge. */
+export function IconMoon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="M20 14.2A8.2 8.2 0 019.8 4a8.2 8.2 0 1010.2 10.2z" />
+    </Base>
+  );
+}
+
+/** Theme → System. A monitor: "whatever this machine is set to". */
+export function IconMonitor(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <rect x="2.5" y="4" width="19" height="13" rx="1.8" />
+      <path d="M8.5 20.5h7M12 17v3.5" />
+    </Base>
+  );
+}

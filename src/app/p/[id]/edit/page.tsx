@@ -10,6 +10,7 @@ import { SlideRenderer } from '@/components/SlideRenderer';
 import { ScaledStage } from '@/components/ScaledStage';
 import { PropertiesPanel } from '@/components/PropertiesPanel';
 import { ConceptLibraryDropdown } from '@/components/ConceptLibraryDropdown';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { exportToPdf, exportToPptx } from '@/lib/exportDeck';
 import { DESIGN_PILLARS } from '@/lib/conceptLibrary';
 import { conceptSlide } from '@/lib/conceptSlides';
@@ -196,23 +197,23 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
   if (notFound) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-4 text-slate-600">
+      <div className="flex h-screen flex-col items-center justify-center gap-4 text-ui-ink-2">
         <p>Couldn&apos;t find that project.</p>
-        <Link href="/" className="text-[#0b72c2] underline">Back to Presenta</Link>
+        <Link href="/" className="text-ui-accent underline">Back to Presenta</Link>
       </div>
     );
   }
 
   if (!project || project.id !== id) {
-    return <div className="flex h-screen items-center justify-center text-slate-400">Loading…</div>;
+    return <div className="flex h-screen items-center justify-center text-ui-ink-3">Loading…</div>;
   }
 
   const saveBanner = saveError ? (
-    <div className="shrink-0 bg-red-50 px-4 py-2 text-[12px] text-red-700">
+    <div className="shrink-0 bg-ui-danger-soft px-4 py-2 text-[12px] text-ui-danger-ink">
       <strong className="font-semibold">Changes aren&apos;t being saved.</strong> {saveError}
     </div>
   ) : logoSaveUnavailable ? (
-    <div className="shrink-0 bg-amber-50 px-4 py-2 text-[12px] text-amber-800">
+    <div className="shrink-0 bg-ui-warn-soft px-4 py-2 text-[12px] text-ui-warn-ink">
       <strong className="font-semibold">Slides are saving, but the client logo, accent colour, font choice and deck-wide typography defaults aren&apos;t.</strong>{' '}
       The database is missing those columns — run migrations 0003_add_client_logo.sql, 0004_add_font_family.sql and 0005_add_typography.sql to enable them.
     </div>
@@ -226,24 +227,24 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : saveStatus === 'error' ? 'Save failed' : null;
 
   return (
-    <div className="flex h-screen flex-col bg-slate-100">
+    <div className="flex h-screen flex-col bg-ui-bg">
       {saveBanner}
-      <header className="flex flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-2.5">
+      <header className="flex flex-shrink-0 items-center justify-between border-b border-ui-line bg-ui-surface px-4 py-2.5">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-full bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-white">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#5fa8e8]" />
+          <div className="flex items-center gap-2 rounded-full bg-ui-pill px-3.5 py-1.5 text-xs font-semibold text-ui-pill-ink">
+            <span className="h-1.5 w-1.5 rounded-full bg-ui-accent" />
             {project.name}
-            <span className="font-normal text-white/60">· by {project.preparedBy}</span>
+            <span className="font-normal text-ui-pill-ink/60">· by {project.preparedBy}</span>
           </div>
           {saveStatusLabel && (
             <span
               className={`flex items-center gap-1.5 text-[11px] font-medium ${
-                saveStatus === 'error' ? 'text-red-500' : 'text-slate-500'
+                saveStatus === 'error' ? 'text-ui-danger' : 'text-ui-ink-2'
               }`}
             >
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
-                  saveStatus === 'saving' ? 'animate-pulse bg-amber-400' : saveStatus === 'error' ? 'bg-red-500' : 'bg-emerald-500'
+                  saveStatus === 'saving' ? 'animate-pulse bg-amber-400' : saveStatus === 'error' ? 'bg-ui-danger' : 'bg-emerald-500'
                 }`}
               />
               {saveStatusLabel}
@@ -251,26 +252,27 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/" className="rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200">
+          <ThemeToggle />
+          <Link href="/" className="rounded-full bg-ui-raised px-4 py-2 text-xs font-semibold text-ui-ink-2 hover:bg-ui-raised-hover">
             ⌂ Home
           </Link>
-          <div className="flex items-center overflow-hidden rounded-full bg-slate-100">
+          <div className="flex items-center overflow-hidden rounded-full bg-ui-raised">
             <button
               onClick={() => undo()}
               disabled={!canUndo}
               title="Undo (Ctrl+Z)"
               aria-label="Undo"
-              className="px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-transparent"
+              className="px-3 py-2 text-xs font-semibold text-ui-ink-2 hover:bg-ui-raised-hover disabled:opacity-40 disabled:hover:bg-transparent"
             >
               ↶
             </button>
-            <span className="h-4 w-px bg-slate-300" />
+            <span className="h-4 w-px bg-ui-line-strong" />
             <button
               onClick={() => redo()}
               disabled={!canRedo}
               title="Redo (Ctrl+Y)"
               aria-label="Redo"
-              className="px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-transparent"
+              className="px-3 py-2 text-xs font-semibold text-ui-ink-2 hover:bg-ui-raised-hover disabled:opacity-40 disabled:hover:bg-transparent"
             >
               ↷
             </button>
@@ -278,19 +280,19 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           <div className="relative">
             <button
               onClick={() => setShowAddMenu((v) => !v)}
-              className="rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+              className="rounded-full bg-ui-raised px-4 py-2 text-xs font-semibold text-ui-ink-2 hover:bg-ui-raised-hover"
             >
               + Add slide
             </button>
             {showConceptPicker && <ConceptLibraryDropdown onClose={() => setShowConceptPicker(false)} />}
             {showAddMenu && (
-              <div className="absolute right-0 top-10 z-10 w-48 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
+              <div className="absolute right-0 top-10 z-10 w-48 rounded-lg border border-ui-line bg-ui-surface p-1.5 shadow-float">
                 <button
                   onClick={() => {
                     setShowConceptPicker(true);
                     setShowAddMenu(false);
                   }}
-                  className="mb-1 flex w-full items-center gap-2 rounded-md border-b border-slate-100 px-3 py-2 text-left text-xs font-semibold text-[#0b72c2] hover:bg-slate-50"
+                  className="mb-1 flex w-full items-center gap-2 rounded-md border-b border-ui-line-soft px-3 py-2 text-left text-xs font-semibold text-ui-accent hover:bg-ui-raised"
                 >
                   <IconBulb className="h-3.5 w-3.5 flex-shrink-0" /> Concept library…
                 </button>
@@ -299,40 +301,40 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                     addSlide('title-content');
                     setShowAddMenu(false);
                   }}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-ui-ink-2 hover:bg-ui-raised"
                 >
-                  <IconTextBlock className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" /> Title + Content
+                  <IconTextBlock className="h-3.5 w-3.5 flex-shrink-0 text-ui-ink-3" /> Title + Content
                 </button>
                 <button
                   onClick={() => {
                     addSlide('merge-diagram');
                     setShowAddMenu(false);
                   }}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-ui-ink-2 hover:bg-ui-raised"
                 >
-                  <IconStar className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" /> Merge Diagram
+                  <IconStar className="h-3.5 w-3.5 flex-shrink-0 text-ui-ink-3" /> Merge Diagram
                 </button>
                 <button
                   onClick={() => {
                     addSlide('stat-hero');
                     setShowAddMenu(false);
                   }}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-ui-ink-2 hover:bg-ui-raised"
                 >
-                  <IconBars className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" /> Stat Hero
+                  <IconBars className="h-3.5 w-3.5 flex-shrink-0 text-ui-ink-3" /> Stat Hero
                 </button>
                 <button
                   onClick={() => {
                     addSlide('linked-views');
                     setShowAddMenu(false);
                   }}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-ui-ink-2 hover:bg-ui-raised"
                 >
-                  <IconLink className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" /> Linked Views
+                  <IconLink className="h-3.5 w-3.5 flex-shrink-0 text-ui-ink-3" /> Linked Views
                 </button>
                 {ECOM_PILLAR && (
                   <>
-                    <div className="my-1 border-t border-slate-100" />
+                    <div className="my-1 border-t border-ui-line-soft" />
                     {ECOM_PILLAR.concepts.map((concept) => (
                       <button
                         key={concept.id}
@@ -340,9 +342,9 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                           addSlides([conceptSlide(ECOM_PILLAR, concept)]);
                           setShowAddMenu(false);
                         }}
-                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-ui-ink-2 hover:bg-ui-raised"
                       >
-                        <IconImage className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" /> {concept.title}
+                        <IconImage className="h-3.5 w-3.5 flex-shrink-0 text-ui-ink-3" /> {concept.title}
                       </button>
                     ))}
                   </>
@@ -354,30 +356,30 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             <button
               onClick={() => setShowExportMenu((v) => !v)}
               disabled={!!exportStatus}
-              className="rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+              className="rounded-full bg-ui-raised px-4 py-2 text-xs font-semibold text-ui-ink-2 hover:bg-ui-raised-hover disabled:opacity-50"
             >
               {exportStatus ? exportStatus : '⬇ Export'}
             </button>
             {showExportMenu && !exportStatus && (
-              <div className="absolute right-0 top-10 z-10 w-40 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
+              <div className="absolute right-0 top-10 z-10 w-40 rounded-lg border border-ui-line bg-ui-surface p-1.5 shadow-float">
                 <button
                   onClick={() => handleExport('pdf')}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-ui-ink-2 hover:bg-ui-raised"
                 >
-                  <IconFile className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" /> Export as PDF
+                  <IconFile className="h-3.5 w-3.5 flex-shrink-0 text-ui-ink-3" /> Export as PDF
                 </button>
                 <button
                   onClick={() => handleExport('pptx')}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-ui-ink-2 hover:bg-ui-raised"
                 >
-                  <IconScreen className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" /> Export as PPTX
+                  <IconScreen className="h-3.5 w-3.5 flex-shrink-0 text-ui-ink-3" /> Export as PPTX
                 </button>
               </div>
             )}
           </div>
           <button
             onClick={() => router.push(`/p/${project.id}/present`)}
-            className="rounded-full bg-[#0b72c2] px-4 py-2 text-xs font-semibold text-white hover:bg-[#095f9f]"
+            className="rounded-full bg-ui-accent px-4 py-2 text-xs font-semibold text-ui-accent-on hover:bg-ui-accent-hover"
           >
             ▷ Presenter
           </button>
@@ -390,7 +392,9 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           <ScaledStage
             pannable
             zoomFactor={zoomFactor}
-            stageClassName="overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-slate-200"
+            // The slide keeps its own white ground in both themes — it is the page that
+            // gets exported, not part of the chrome. Only the frame follows the theme.
+            stageClassName="overflow-hidden rounded-lg bg-white shadow-float ring-1 ring-ui-line"
           >
             {currentSlide && <SlideRenderer slide={currentSlide} editable animate />}
           </ScaledStage>
@@ -398,7 +402,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         <PropertiesPanel />
       </div>
 
-      <div className="flex flex-shrink-0 items-center justify-between border-t border-slate-200 bg-white px-4 py-1.5 text-[11px] text-slate-400">
+      <div className="flex flex-shrink-0 items-center justify-between border-t border-ui-line bg-ui-surface px-4 py-1.5 text-[11px] text-ui-ink-3">
         <span className="flex-1" />
         <span className="text-center">
           Editor mode — click any headline or field to edit it · ↑↓ change slide · Ctrl/⌘+D duplicate · Ctrl/⌘+Z undo
@@ -408,14 +412,14 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             onClick={() => setZoomFactor((z) => clamp(z - ZOOM_STEP, ZOOM_MIN, ZOOM_MAX))}
             title="Zoom out (Ctrl/⌘+-)"
             aria-label="Zoom out"
-            className="flex h-5 w-5 items-center justify-center rounded text-slate-500 hover:bg-slate-100"
+            className="flex h-5 w-5 items-center justify-center rounded text-ui-ink-2 hover:bg-ui-raised-hover"
           >
             −
           </button>
           <button
             onClick={() => setZoomFactor(ZOOM_DEFAULT)}
             title="Reset zoom (Ctrl/⌘+0)"
-            className="w-10 rounded text-slate-500 hover:bg-slate-100"
+            className="w-10 rounded text-ui-ink-2 hover:bg-ui-raised-hover"
           >
             {Math.round(zoomFactor * 100)}%
           </button>
@@ -423,7 +427,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             onClick={() => setZoomFactor((z) => clamp(z + ZOOM_STEP, ZOOM_MIN, ZOOM_MAX))}
             title="Zoom in (Ctrl/⌘+=)"
             aria-label="Zoom in"
-            className="flex h-5 w-5 items-center justify-center rounded text-slate-500 hover:bg-slate-100"
+            className="flex h-5 w-5 items-center justify-center rounded text-ui-ink-2 hover:bg-ui-raised-hover"
           >
             +
           </button>

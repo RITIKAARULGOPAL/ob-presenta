@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import { Geist, Geist_Mono, Archivo, Fraunces, Big_Shoulders, Playfair_Display, IBM_Plex_Sans, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 
@@ -62,10 +63,21 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
+    // data-theme is what every colour in globals.css hangs off. The server has
+    // no way to know which one this visitor wants, so it renders light and the
+    // script below corrects it while the HTML is still parsing — before the
+    // first paint, which is the difference between "dark mode" and "dark mode
+    // after a white flash". suppressHydrationWarning is what lets React accept
+    // the attribute the script wrote instead of re-asserting the one in JSX.
     <html
       lang="en"
+      data-theme="light"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${archivo.variable} ${fraunces.variable} ${bigShoulders.variable} ${playfairDisplay.variable} ${plexSans.variable} ${sourceSerif.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

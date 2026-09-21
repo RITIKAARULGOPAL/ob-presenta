@@ -1,12 +1,84 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ---- App chrome theme -----------------------------------------------------
+   Two themes for everything AROUND a slide — the home screen, the editor
+   header, rail, properties panel and menus. A slide itself is a printed page:
+   it paints its own white (or ink) ground from its own --ink/--line/--accent
+   scope (SlideRenderer) and is deliberately NOT themed here, so what you see
+   on the canvas is what lands in the PDF/PPTX whichever mode you edit in.
 
-  /* Deck-wide radius/shadow scale — a designer-deck polish pass, not a new
-     theme system. Ink-tinted rather than pure black so shadows read as soft
-     depth instead of a default browser drop-shadow. */
+   Every chrome colour is a --app-* variable, surfaced to Tailwind as `ui-*`
+   utilities below (bg-ui-surface, text-ui-ink-2, border-ui-line…). Switching
+   themes then re-points variables instead of re-writing class names, which is
+   also why nothing in the app hard-codes a slate-/white- colour any more.
+
+   :root carries light and [data-theme="dark"] carries dark — one block each,
+   no prefers-color-scheme copy of the palette to keep in step with them. The
+   OS preference still decides for a first-time visitor, but it is resolved to
+   an explicit data-theme in <head> before first paint (THEME_INIT_SCRIPT in
+   src/lib/theme.ts), which is also what makes `dark:` and `color-scheme`
+   agree with the toggle instead of with the OS. */
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces, back to front */
+  --app-bg: #f1f5f9;
+  --app-surface: #ffffff;
+  --app-raised: #f8fafc;
+  --app-raised-hover: #eef2f7;
+
+  /* Lines: soft for inner dividers, strong for hover/emphasis */
+  --app-line: #e2e8f0;
+  --app-line-soft: #f1f5f9;
+  --app-line-strong: #cbd5e1;
+
+  /* Text, most to least prominent */
+  --app-ink: #0f172a;
+  --app-ink-2: #475569;
+  --app-ink-3: #64748b;
+
+  /* The product blue. --app-accent-on is what stays readable ON it. */
+  --app-accent: #0b72c2;
+  --app-accent-hover: #095f9f;
+  --app-accent-on: #ffffff;
+  --app-accent-soft: #e8f2fb;
+  --app-accent-line: #0b72c2;
+
+  /* The dark pill in the editor header, which is dark in BOTH themes */
+  --app-pill: #1e293b;
+  --app-pill-ink: #ffffff;
+
+  /* Status */
+  --app-danger: #dc2626;
+  --app-danger-soft: #fef2f2;
+  --app-danger-ink: #b91c1c;
+  --app-warn-soft: #fffbeb;
+  --app-warn-ink: #92400e;
+
+  --app-shadow-card: 0 1px 2px rgb(15 23 42 / 0.06), 0 1px 3px rgb(15 23 42 / 0.04);
+  --app-shadow-float: 0 4px 12px rgb(15 23 42 / 0.1), 0 1px 3px rgb(15 23 42 / 0.05);
+  --app-shadow-modal: 0 8px 28px rgb(15 23 42 / 0.16), 0 2px 6px rgb(15 23 42 / 0.06);
+
+  /* The home screen is its own room: a full-bleed brand backdrop rather than
+     a panel, so it gets its own small set. Dark mode keeps the deep navy the
+     landing page always had; light mode is the same composition in daylight. */
+  --app-hero-bg: #f4f7fb;
+  --app-hero-glow:
+    radial-gradient(1100px 700px at 85% 8%, rgb(11 114 194 / 0.12), transparent 60%),
+    radial-gradient(900px 600px at 90% 95%, rgb(15 23 42 / 0.05), transparent 55%);
+  --app-hero-ink: #0f172a;
+  --app-hero-ink-2: #475569;
+  --app-hero-ink-3: #64748b;
+  --app-hero-card: #ffffff;
+  --app-hero-card-hover: #f8fbff;
+  --app-hero-line: #dbe3ee;
+  --app-hero-line-strong: #b9c7da;
+
+  /* Deck-wide radius/shadow scale — a designer-deck polish pass, not part of
+     the chrome theme above. Ink-tinted rather than pure black so shadows read
+     as soft depth instead of a default browser drop-shadow. Slides reference
+     these directly via var(), so they stay the same in both themes. */
   --radius-sm: 8px;
   --radius-md: 14px;
   --radius-lg: 22px;
@@ -15,24 +87,113 @@
   --shadow-lg: 0 20px 48px rgba(20, 26, 43, 0.14), 0 6px 16px rgba(20, 26, 43, 0.08);
 }
 
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --app-bg: #0b1119;
+  --app-surface: #121a25;
+  --app-raised: #18212e;
+  --app-raised-hover: #1f2b3a;
+
+  --app-line: #24303f;
+  --app-line-soft: #1b2533;
+  --app-line-strong: #3a4a60;
+
+  --app-ink: #e8edf5;
+  --app-ink-2: #a3b0c2;
+  --app-ink-3: #7b8a9f;
+
+  --app-accent: #4ea6ec;
+  --app-accent-hover: #74bcf5;
+  --app-accent-on: #06131f;
+  --app-accent-soft: #14283a;
+  --app-accent-line: #2f6f9e;
+
+  --app-pill: #223046;
+  --app-pill-ink: #ffffff;
+
+  --app-danger: #f87171;
+  --app-danger-soft: #2a1618;
+  --app-danger-ink: #fca5a5;
+  --app-warn-soft: #2a2110;
+  --app-warn-ink: #fcd34d;
+
+  --app-shadow-card: 0 1px 2px rgb(0 0 0 / 0.5), 0 1px 3px rgb(0 0 0 / 0.35);
+  --app-shadow-float: 0 4px 14px rgb(0 0 0 / 0.55), 0 1px 3px rgb(0 0 0 / 0.4);
+  --app-shadow-modal: 0 10px 34px rgb(0 0 0 / 0.65), 0 2px 8px rgb(0 0 0 / 0.45);
+
+  --app-hero-bg: #0c1420;
+  --app-hero-glow:
+    radial-gradient(1100px 700px at 85% 8%, rgb(11 114 194 / 0.16), transparent 60%),
+    radial-gradient(900px 600px at 90% 95%, rgb(255 255 255 / 0.05), transparent 55%);
+  --app-hero-ink: #ffffff;
+  --app-hero-ink-2: rgb(255 255 255 / 0.72);
+  --app-hero-ink-3: rgb(255 255 255 / 0.55);
+  --app-hero-card: rgb(255 255 255 / 0.07);
+  --app-hero-card-hover: rgb(255 255 255 / 0.12);
+  --app-hero-line: rgb(255 255 255 / 0.16);
+  --app-hero-line-strong: rgb(255 255 255 / 0.3);
+}
+
+/* Tailwind's own `dark:` ships as a prefers-color-scheme variant, which would
+   quietly ignore the in-app toggle — anyone reaching for `dark:` would get the
+   OS answer on a page the user had explicitly set the other way. Re-point it
+   at the same attribute everything else here reads. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--app-bg);
+  --color-foreground: var(--app-ink);
+
+  --color-ui-bg: var(--app-bg);
+  --color-ui-surface: var(--app-surface);
+  --color-ui-raised: var(--app-raised);
+  --color-ui-raised-hover: var(--app-raised-hover);
+
+  --color-ui-line: var(--app-line);
+  --color-ui-line-soft: var(--app-line-soft);
+  --color-ui-line-strong: var(--app-line-strong);
+
+  --color-ui-ink: var(--app-ink);
+  --color-ui-ink-2: var(--app-ink-2);
+  --color-ui-ink-3: var(--app-ink-3);
+
+  --color-ui-accent: var(--app-accent);
+  --color-ui-accent-hover: var(--app-accent-hover);
+  --color-ui-accent-on: var(--app-accent-on);
+  --color-ui-accent-soft: var(--app-accent-soft);
+  --color-ui-accent-line: var(--app-accent-line);
+
+  --color-ui-pill: var(--app-pill);
+  --color-ui-pill-ink: var(--app-pill-ink);
+
+  --color-ui-danger: var(--app-danger);
+  --color-ui-danger-soft: var(--app-danger-soft);
+  --color-ui-danger-ink: var(--app-danger-ink);
+  --color-ui-warn-soft: var(--app-warn-soft);
+  --color-ui-warn-ink: var(--app-warn-ink);
+
+  --color-hero-bg: var(--app-hero-bg);
+  --color-hero-ink: var(--app-hero-ink);
+  --color-hero-ink-2: var(--app-hero-ink-2);
+  --color-hero-ink-3: var(--app-hero-ink-3);
+  --color-hero-card: var(--app-hero-card);
+  --color-hero-card-hover: var(--app-hero-card-hover);
+  --color-hero-line: var(--app-hero-line);
+  --color-hero-line-strong: var(--app-hero-line-strong);
+
+  --shadow-card: var(--app-shadow-card);
+  --shadow-float: var(--app-shadow-float);
+  --shadow-modal: var(--app-shadow-modal);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-archivo);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--app-bg);
+  color: var(--app-ink);
   font-family: Arial, Helvetica, sans-serif;
 }
 

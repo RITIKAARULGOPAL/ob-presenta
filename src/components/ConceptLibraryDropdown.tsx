@@ -12,7 +12,7 @@ import type { Slide } from '@/types/slide';
  *  stylised icon. Same trick as the slide rail: scale down an oversized copy. */
 function Thumb({ slide }: { slide: Slide }) {
   return (
-    <div className="pointer-events-none aspect-video w-full overflow-hidden rounded border border-slate-200 bg-white">
+    <div className="pointer-events-none aspect-video w-full overflow-hidden rounded border border-ui-line bg-white">
       <div className="h-full w-full origin-top-left scale-[0.18]" style={{ width: '555%', height: '555%' }}>
         <SlideRenderer slide={slide} editable={false} />
       </div>
@@ -37,13 +37,13 @@ function GalleryItem({
       onClick={onPick}
       title={inDeck ? `${label} — already in the deck, go to it` : `Add “${label}”`}
       className={`group flex flex-col gap-1 rounded-md border p-1.5 text-left transition ${
-        inDeck ? 'border-[#0b72c2] bg-[#eff6fd]' : 'border-transparent hover:border-slate-300 hover:bg-slate-50'
+        inDeck ? 'border-ui-accent-line bg-ui-accent-soft' : 'border-transparent hover:border-ui-line-strong hover:bg-ui-raised'
       }`}
     >
       <Thumb slide={slide} />
       <span className="flex items-center gap-1 px-0.5">
-        <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-slate-700">{label}</span>
-        {inDeck && <span className="shrink-0 text-[9px] font-bold uppercase text-[#0b72c2]">in deck</span>}
+        <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-ui-ink-2">{label}</span>
+        {inDeck && <span className="shrink-0 text-[9px] font-bold uppercase text-ui-accent">in deck</span>}
       </span>
     </button>
   );
@@ -105,9 +105,9 @@ export function ConceptLibraryDropdown({ onClose }: { onClose: () => void }) {
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="fixed right-3 top-14 z-50 flex max-h-[74vh] w-[620px] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl">
+      <div className="fixed right-3 top-14 z-50 flex max-h-[74vh] w-[620px] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-lg border border-ui-line bg-ui-surface shadow-modal">
         {/* Pillars */}
-        <div className="w-[130px] shrink-0 overflow-y-auto border-r border-slate-100 bg-slate-50 py-1 sm:w-[168px]">
+        <div className="w-[130px] shrink-0 overflow-y-auto border-r border-ui-line-soft bg-ui-raised py-1 sm:w-[168px]">
           {libraryPillars.map((p) => {
             const count = p.concepts.filter((c) => inDeck.has(c.id)).length;
             return (
@@ -116,12 +116,12 @@ export function ConceptLibraryDropdown({ onClose }: { onClose: () => void }) {
                 type="button"
                 onClick={() => setPillarId(p.id)}
                 className={`flex w-full items-center gap-1.5 px-2.5 py-2 text-left transition ${
-                  p.id === pillar.id ? 'bg-white font-semibold text-[#0b72c2]' : 'text-slate-600 hover:bg-slate-100'
+                  p.id === pillar.id ? 'bg-ui-surface font-semibold text-ui-accent' : 'text-ui-ink-2 hover:bg-ui-raised-hover'
                 }`}
               >
-                <span className="font-mono text-[9px] text-slate-400">{p.numeral}</span>
+                <span className="font-mono text-[9px] text-ui-ink-3">{p.numeral}</span>
                 <span className="min-w-0 flex-1 truncate text-[11px]">{p.title}</span>
-                {count > 0 && <span className="shrink-0 text-[9px] font-bold text-[#0b72c2]">{count}</span>}
+                {count > 0 && <span className="shrink-0 text-[9px] font-bold text-ui-accent">{count}</span>}
               </button>
             );
           })}
@@ -129,14 +129,14 @@ export function ConceptLibraryDropdown({ onClose }: { onClose: () => void }) {
 
         {/* Thumbnails for the selected pillar */}
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="shrink-0 border-b border-slate-100 px-3.5 py-2.5">
+          <div className="shrink-0 border-b border-ui-line-soft px-3.5 py-2.5">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="truncate text-[12px] font-semibold text-slate-800">{pillar.title}</span>
-              <span className="shrink-0 text-[10px] text-slate-400">
+              <span className="truncate text-[12px] font-semibold text-ui-ink">{pillar.title}</span>
+              <span className="shrink-0 text-[10px] text-ui-ink-3">
                 {inDeck.size} of {totalLibraryConcepts} added
               </span>
             </div>
-            <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
+            <p className="mt-0.5 text-[11px] leading-snug text-ui-ink-2">
               {pillar.question} Click a layout to add it — a scaffold to rewrite.
             </p>
           </div>
@@ -161,18 +161,18 @@ export function ConceptLibraryDropdown({ onClose }: { onClose: () => void }) {
             </div>
           </div>
 
-          <div className="flex shrink-0 gap-2 border-t border-slate-100 bg-slate-50 px-3 py-2">
+          <div className="flex shrink-0 gap-2 border-t border-ui-line-soft bg-ui-raised px-3 py-2">
             <button
               type="button"
               onClick={() => addSlides([designSequenceSlide()])}
-              className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 hover:border-slate-300"
+              className="rounded-md border border-ui-line bg-ui-surface px-2.5 py-1.5 text-[11px] font-medium text-ui-ink-2 hover:border-ui-line-strong"
             >
               + Design sequence
             </button>
             <button
               type="button"
               onClick={() => addSlides([keyIdeaSlide()])}
-              className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 hover:border-slate-300"
+              className="rounded-md border border-ui-line bg-ui-surface px-2.5 py-1.5 text-[11px] font-medium text-ui-ink-2 hover:border-ui-line-strong"
             >
               + Closing idea
             </button>

@@ -39,22 +39,22 @@ export function SlideRail() {
   const multiSelected = selectedSlideIds.length > 1;
 
   return (
-    <div className="flex w-48 flex-shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-slate-50">
+    <div className="flex w-48 flex-shrink-0 flex-col overflow-y-auto border-r border-ui-line bg-ui-raised">
       {multiSelected && (
-        <div className="flex flex-shrink-0 items-center justify-between gap-1 border-b border-slate-200 bg-white px-2 py-1.5">
-          <span className="text-[11px] font-semibold text-slate-600">{selectedSlideIds.length} selected</span>
+        <div className="flex flex-shrink-0 items-center justify-between gap-1 border-b border-ui-line bg-ui-surface px-2 py-1.5">
+          <span className="text-[11px] font-semibold text-ui-ink-2">{selectedSlideIds.length} selected</span>
           <span className="flex gap-1">
             <button
               onClick={() => toggleSkipMany(selectedSlideIds)}
               title="Skip/include all selected"
-              className="flex h-5 w-5 items-center justify-center rounded text-[10px] text-slate-600 hover:bg-slate-100"
+              className="flex h-5 w-5 items-center justify-center rounded text-[10px] text-ui-ink-2 hover:bg-ui-raised-hover"
             >
               ⃠
             </button>
             <button
               onClick={() => duplicateSlides(selectedSlideIds)}
               title="Duplicate all selected (Ctrl/Cmd+D)"
-              className="flex h-5 w-5 items-center justify-center rounded text-[10px] text-slate-600 hover:bg-slate-100"
+              className="flex h-5 w-5 items-center justify-center rounded text-[10px] text-ui-ink-2 hover:bg-ui-raised-hover"
             >
               ⧉
             </button>
@@ -62,7 +62,7 @@ export function SlideRail() {
               <button
                 onClick={() => removeSlides(selectedSlideIds)}
                 title="Delete all selected (Delete/Backspace)"
-                className="flex h-5 w-5 items-center justify-center rounded text-xs text-slate-600 hover:bg-red-100 hover:text-red-600"
+                className="flex h-5 w-5 items-center justify-center rounded text-xs text-ui-ink-2 hover:bg-ui-danger-soft hover:text-ui-danger"
               >
                 ✕
               </button>
@@ -70,7 +70,7 @@ export function SlideRail() {
             <button
               onClick={() => clearSlideSelection()}
               title="Clear selection (Escape)"
-              className="flex h-5 w-5 items-center justify-center rounded text-xs text-slate-400 hover:bg-slate-100"
+              className="flex h-5 w-5 items-center justify-center rounded text-xs text-ui-ink-3 hover:bg-ui-raised-hover"
             >
               ⌫
             </button>
@@ -124,12 +124,12 @@ export function SlideRail() {
                 }
               }}
               className={`group relative aspect-video cursor-pointer overflow-hidden rounded-md border-2 text-left transition ${
-                slide.id === currentSlideId ? 'border-[#0b72c2]' : 'border-transparent hover:border-slate-300'
-              } ${isSelected ? 'ring-2 ring-[#0b72c2] ring-offset-1' : ''} ${isDragging ? 'opacity-40' : ''}`}
+                slide.id === currentSlideId ? 'border-ui-accent-line' : 'border-transparent hover:border-ui-line-strong'
+              } ${isSelected ? 'ring-2 ring-ui-accent ring-offset-1' : ''} ${isDragging ? 'opacity-40' : ''}`}
             >
               {showDropLine && (
                 <span
-                  className={`pointer-events-none absolute inset-x-0 z-10 h-0.5 rounded bg-[#0b72c2] ${
+                  className={`pointer-events-none absolute inset-x-0 z-10 h-0.5 rounded bg-ui-accent ${
                     dropTarget?.position === 'before' ? '-top-[7px]' : '-bottom-[7px]'
                   }`}
                 />
@@ -176,7 +176,7 @@ export function SlideRail() {
                 title="Click to multi-select (or Ctrl/Cmd-click the slide, Shift-click for a range, Ctrl/Cmd+A for all)"
                 className={`absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-full border text-[9px] transition ${
                   isSelected
-                    ? 'border-[#0b72c2] bg-[#0b72c2] text-white opacity-100'
+                    ? 'border-ui-accent-line bg-ui-accent text-ui-accent-on opacity-100'
                     : 'border-white/70 bg-black/30 text-transparent opacity-0 group-hover:opacity-100'
                 }`}
               >
@@ -191,7 +191,7 @@ export function SlideRail() {
                   }}
                   aria-label={slide.skipped ? `Include slide in the deck` : `Skip slide ${numbers[i]}`}
                   title={slide.skipped ? 'Include again' : 'Skip in Presenter and export'}
-                  className="flex h-5 w-5 items-center justify-center rounded bg-black/50 text-[10px] text-white hover:bg-[#0b72c2]"
+                  className="flex h-5 w-5 items-center justify-center rounded bg-black/50 text-[10px] text-white hover:bg-ui-accent"
                 >
                   {slide.skipped ? '↺' : '⃠'}
                 </button>
@@ -202,7 +202,7 @@ export function SlideRail() {
                   }}
                   aria-label={`Duplicate slide ${i + 1}`}
                   title="Duplicate slide (Ctrl/Cmd+D)"
-                  className="flex h-5 w-5 items-center justify-center rounded bg-black/50 text-[10px] text-white hover:bg-[#0b72c2]"
+                  className="flex h-5 w-5 items-center justify-center rounded bg-black/50 text-[10px] text-white hover:bg-ui-accent"
                 >
                   ⧉
                 </button>

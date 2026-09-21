@@ -32,6 +32,81 @@ or re-explain anything.
 
 ---
 
+## 2026-09-21 (cont'd) — Dark and light mode
+
+**Context:** asked to "build dark and light mode for the app." Done on top of
+the Phase G entry below, on a fresh branch off `main` at `069f72d`.
+
+**Done:**
+- **Chrome colours are now a token set** at the top of
+  [globals.css](src/app/globals.css): `--app-*` defined once under `:root`
+  and once under `[data-theme="dark"]`, registered in `@theme inline` as
+  `ui-*`/`hero-*` Tailwind utilities (`bg-ui-surface`, `text-ui-ink-2`,
+  `border-ui-line`…). Switching themes re-points variables instead of
+  swapping class names. Upstream's `--radius-*`/`--shadow-*` deck scale is
+  kept as-is alongside it — that belongs to slides, not to chrome.
+- **Light/System/Dark control** ([ThemeToggle.tsx](src/components/ThemeToggle.tsx),
+  store in [theme.ts](src/lib/theme.ts)) in the editor header and the
+  home screen's top-right. The choice persists in `localStorage`, 'system'
+  keeps following the OS live, and another tab switching is picked up. Read
+  via `useSyncExternalStore` — the theme is external state (storage + a media
+  query), not something a component should hold a copy of.
+- **No flash on load:** [layout.tsx](src/app/layout.tsx) runs a blocking
+  inline script in `<head>` resolving the choice to `data-theme` before first
+  paint — the approach in
+  `node_modules/next/dist/docs/01-app/02-guides/preventing-flash-before-hydration.md`,
+  including its note that Strict Mode's dev remount wipes the attribute
+  (hence the `useLayoutEffect` in ThemeToggle that re-applies it).
+- Converted every chrome literal in [page.tsx](src/app/page.tsx),
+  [edit/page.tsx](src/app/p/[id]/edit/page.tsx),
+  [SlideRail.tsx](src/components/SlideRail.tsx),
+  [PropertiesPanel.tsx](src/components/PropertiesPanel.tsx),
+  [ConceptLibraryDropdown.tsx](src/components/ConceptLibraryDropdown.tsx) and
+  [AccentPicker.tsx](src/components/AccentPicker.tsx) — including all the
+  Phase G additions (undo/redo pills, save-status, zoom bar, multi-select
+  toolbar, the new panel sections).
+
+**Deliberately NOT themed — read this before "finishing the job":**
+- **A slide is not chrome.** `SlideRenderer` paints its own white/ink ground
+  from its own `--ink`/`--line`/`--accent` scope, and that is what
+  `exportDeck` rasterizes. Theming it would make the canvas stop matching the
+  exported PDF/PPTX. Same for anything drawn on a slide: the adjust overlays,
+  the rail's thumbnail badges, the concept-library thumbnails.
+- **[SpaceDetailOverlay.tsx](src/components/SpaceDetailOverlay.tsx)** looks
+  like a modal but is styled entirely from the *slide's* token scope
+  (`var(--ink)`, `var(--line)`, `var(--accent-soft)`). Converting only its
+  `bg-white` would put dark-navy slide ink on a dark card. Re-basing it on
+  chrome tokens is a design decision, not a colour swap — left alone.
+- **[Lightbox.tsx](src/components/Lightbox.tsx) and Presenter** stay black in
+  both themes: a photo viewer and a projection surface both want a dark
+  surround regardless of app theme.
+- `SeatingTable`/`HotspotSidePanel` render inside a slide, so they stay
+  literal too.
+
+**Left off / next up:**
+- Verified: `npm run build` passes; `npx eslint` is 17 errors/6 warnings,
+  byte-identical to the `069f72d` baseline (all pre-existing, none in the
+  theme work). Driven in Chromium at 1860×940 — editor and home in both
+  themes, each toggle option, an OS flip under 'system', and a reload.
+- The editor page overflows horizontally at 1440px wide (body scrollWidth
+  1824, so the properties panel sits off-screen). **Pre-existing on
+  `069f72d`** — measured both with and without this branch — not caused by
+  the theme work, but worth fixing.
+- Light mode is the palette the app always had, with one deliberate change:
+  muted chrome label text `slate-400` → `slate-500` (`--app-ink-3`), 2.6:1 →
+  4.8:1 on white. One variable if you want the lighter grey back.
+
+**Watch out for:**
+- `@custom-variant dark` in globals.css re-points Tailwind's built-in `dark:`
+  at `[data-theme="dark"]`. Without it, `dark:` would silently follow the OS
+  and ignore the toggle. Prefer the tokens over `dark:` anyway.
+- Add a new chrome colour by adding a variable in **both** `:root` and
+  `[data-theme="dark"]` and registering it in `@theme inline` — not by
+  reaching for a literal. New slide-surface code is the exception and should
+  keep using the slide's own `--ink`/`--line`/`--accent`.
+
+---
+
 ## 2026-09-21
 
 **Context:** kicked off Phase G ("tighten the editing experience" — the

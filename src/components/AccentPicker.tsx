@@ -49,7 +49,7 @@ export function AccentPicker({
   const reading = !!logo && !settled;
   const noneFound = !!logo && settled && swatches.length === 0;
 
-  const labelTone = tone === 'panel' ? 'text-slate-400' : 'text-slate-500';
+  const labelTone = tone === 'panel' ? 'text-ui-ink-3' : 'text-ui-ink-2';
   const active = value ?? DEFAULT_ACCENT;
 
   return (
@@ -69,7 +69,7 @@ export function AccentPicker({
               title={hex}
               style={{ backgroundColor: hex }}
               className={`h-7 w-7 rounded-full border-2 transition ${
-                active.toLowerCase() === hex.toLowerCase() ? 'border-slate-900 ring-2 ring-slate-300' : 'border-white shadow-sm hover:scale-110'
+                active.toLowerCase() === hex.toLowerCase() ? 'border-ui-ink ring-2 ring-ui-line-strong' : 'border-ui-surface shadow-card hover:scale-110'
               }`}
             />
           ))}
@@ -81,11 +81,11 @@ export function AccentPicker({
           type="color"
           value={active}
           onChange={(e) => onChange(e.target.value)}
-          className="h-7 w-10 cursor-pointer rounded border border-slate-200 p-0.5"
+          className="h-7 w-10 cursor-pointer rounded border border-ui-line p-0.5"
         />
         <span className={`font-mono text-[11px] ${labelTone}`}>{active}</span>
         {value && (
-          <button type="button" onClick={() => onChange(undefined)} className={`text-[11px] font-medium hover:text-red-500 ${labelTone}`}>
+          <button type="button" onClick={() => onChange(undefined)} className={`text-[11px] font-medium hover:text-ui-danger ${labelTone}`}>
             Reset
           </button>
         )}
@@ -94,7 +94,7 @@ export function AccentPicker({
       {/* Titles render in the accent on white slides, so a light accent can be
           effectively unreadable. Say so, and offer the fix in one click. */}
       {contrastRatio(active, '#ffffff') < 3 && (
-        <p className="mt-2 text-[11px] leading-relaxed text-amber-600">
+        <p className="mt-2 text-[11px] leading-relaxed text-ui-warn-ink">
           This is very light for headline text on white slides.{' '}
           <button type="button" onClick={() => onChange(shadeWithBlack(active, 0.45))} className="font-semibold underline">
             Use a deeper shade

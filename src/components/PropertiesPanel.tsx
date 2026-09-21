@@ -36,12 +36,12 @@ function TypeAxisRow<K extends string>({
 }) {
   return (
     <div className="mt-3 first:mt-0">
-      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-ui-ink-3">{label}</div>
       <div className="flex flex-wrap gap-1.5">
         <button
           onClick={() => onChange(undefined)}
           className={`rounded-md border px-2 py-1 text-[11px] font-medium transition ${
-            value === undefined ? 'border-[#0b72c2] bg-[#e8f2fb] text-[#0b72c2]' : 'border-slate-200 text-slate-500 hover:border-slate-300'
+            value === undefined ? 'border-ui-accent-line bg-ui-accent-soft text-ui-accent' : 'border-ui-line text-ui-ink-3 hover:border-ui-line-strong'
           }`}
         >
           Default
@@ -51,7 +51,7 @@ function TypeAxisRow<K extends string>({
             key={o.key}
             onClick={() => onChange(o.key)}
             className={`rounded-md border px-2 py-1 text-[11px] font-medium transition ${
-              value === o.key ? 'border-[#0b72c2] bg-[#e8f2fb] text-[#0b72c2]' : 'border-slate-200 text-slate-500 hover:border-slate-300'
+              value === o.key ? 'border-ui-accent-line bg-ui-accent-soft text-ui-accent' : 'border-ui-line text-ui-ink-3 hover:border-ui-line-strong'
             }`}
           >
             {o.label}
@@ -85,12 +85,12 @@ export function PropertiesPanel() {
   if (!slide) return null;
 
   return (
-    <aside className="flex w-72 flex-shrink-0 flex-col overflow-y-auto border-l border-slate-200 bg-white px-5 py-6">
-      <div className="mb-1 text-xs font-bold uppercase tracking-wider text-[#0b72c2]">Slide</div>
-      <div className="mb-6 font-display text-base font-bold text-slate-900">Properties</div>
+    <aside className="flex w-72 flex-shrink-0 flex-col overflow-y-auto border-l border-ui-line bg-ui-surface px-5 py-6">
+      <div className="mb-1 text-xs font-bold uppercase tracking-wider text-ui-accent">Slide</div>
+      <div className="mb-6 font-display text-base font-bold text-ui-ink">Properties</div>
 
       <div className="mb-6">
-        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ui-ink-3">
           <IconLayers className="h-3.5 w-3.5" /> Slide Style
         </h4>
         <div className="flex flex-wrap gap-2">
@@ -99,7 +99,7 @@ export function PropertiesPanel() {
               key={k}
               onClick={() => changeStyle(k)}
               className={`rounded-md border px-2.5 py-1.5 text-xs font-medium transition ${
-                slide.style === k ? 'border-[#0b72c2] bg-[#e8f2fb] text-[#0b72c2]' : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                slide.style === k ? 'border-ui-accent-line bg-ui-accent-soft text-ui-accent' : 'border-ui-line text-ui-ink-2 hover:border-ui-line-strong'
               }`}
             >
               {STYLE_LABELS[k]}
@@ -108,8 +108,8 @@ export function PropertiesPanel() {
         </div>
       </div>
 
-      <div className="mb-2 border-t border-slate-100 pt-6">
-        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+      <div className="mb-2 border-t border-ui-line-soft pt-6">
+        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ui-ink-3">
           <IconGrid className="h-3.5 w-3.5" /> Slide Layout
         </h4>
         <div className="flex flex-wrap gap-2">
@@ -120,8 +120,8 @@ export function PropertiesPanel() {
               title="Clears this slide's fields to match"
               className={`rounded-md border px-2.5 py-1.5 text-xs font-medium transition ${
                 slide.layout === k && slide.style === 'standard'
-                  ? 'border-[#0b72c2] bg-[#e8f2fb] text-[#0b72c2]'
-                  : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                  ? 'border-ui-accent-line bg-ui-accent-soft text-ui-accent'
+                  : 'border-ui-line text-ui-ink-2 hover:border-ui-line-strong'
               }`}
             >
               {LAYOUT_LABELS[k]}
@@ -130,14 +130,14 @@ export function PropertiesPanel() {
         </div>
       </div>
 
-      <div className="mb-2 border-t border-slate-100 pt-6">
-        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+      <div className="mb-2 border-t border-ui-line-soft pt-6">
+        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ui-ink-3">
           <IconDroplet className="h-3.5 w-3.5" /> Background
         </h4>
         <div className="flex items-center gap-2">
           <label
             title="Background colour"
-            className="relative h-7 w-7 flex-shrink-0 cursor-pointer overflow-hidden rounded-md border border-slate-200"
+            className="relative h-7 w-7 flex-shrink-0 cursor-pointer overflow-hidden rounded-md border border-ui-line"
             style={{ backgroundColor: slide.background?.color ?? '#ffffff' }}
           >
             <input
@@ -161,14 +161,14 @@ export function PropertiesPanel() {
           />
           <button
             onClick={() => bgFileRef.current?.click()}
-            className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300"
+            className="rounded-md border border-ui-line px-2.5 py-1.5 text-xs font-medium text-ui-ink-2 transition hover:border-ui-line-strong"
           >
             {slide.background?.imageUrl ? 'Replace image' : 'Choose image'}
           </button>
           {(slide.background?.color || slide.background?.imageUrl) && (
             <button
               onClick={resetSlideBackground}
-              className="ml-auto text-[11px] font-medium text-slate-400 hover:text-slate-600"
+              className="ml-auto text-[11px] font-medium text-ui-ink-3 hover:text-ui-ink-2"
             >
               Reset
             </button>
@@ -176,7 +176,7 @@ export function PropertiesPanel() {
         </div>
         {slide.background?.imageUrl && (
           <div className="mt-3">
-            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-ui-ink-3">
               Image darken (for text legibility)
             </div>
             <input
@@ -186,19 +186,19 @@ export function PropertiesPanel() {
               step={0.05}
               value={slide.background.imageOpacity ?? 0}
               onChange={(e) => setSlideBackground({ imageOpacity: Number(e.target.value) })}
-              className="w-full accent-[#0b72c2]"
+              className="w-full accent-ui-accent"
             />
           </div>
         )}
-        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+        <p className="mt-2 text-[11px] leading-relaxed text-ui-ink-3">
           Replaces this slide&apos;s default background. Text colour doesn&apos;t
           auto-adjust — pick a Section Starter/Design style above for light text
           on a dark background.
         </p>
       </div>
 
-      <div className="mb-2 border-t border-slate-100 pt-6">
-        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+      <div className="mb-2 border-t border-ui-line-soft pt-6">
+        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ui-ink-3">
           <IconImage className="h-3.5 w-3.5" /> Logo &amp; Copyright
         </h4>
         <div className="flex flex-wrap gap-2">
@@ -209,7 +209,7 @@ export function PropertiesPanel() {
                 key={o.key}
                 onClick={() => setBrandOverride(o.key === 'default' ? undefined : o.key)}
                 className={`rounded-md border px-2.5 py-1.5 text-xs font-medium transition ${
-                  selected ? 'border-[#0b72c2] bg-[#e8f2fb] text-[#0b72c2]' : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                  selected ? 'border-ui-accent-line bg-ui-accent-soft text-ui-accent' : 'border-ui-line text-ui-ink-2 hover:border-ui-line-strong'
                 }`}
               >
                 {o.label}
@@ -219,12 +219,12 @@ export function PropertiesPanel() {
         </div>
       </div>
 
-      <div className="mb-2 border-t border-slate-100 pt-6">
-        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+      <div className="mb-2 border-t border-ui-line-soft pt-6">
+        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ui-ink-3">
           <IconLink className="h-3.5 w-3.5" /> Linked Slides
         </h4>
         {linkTargets.length === 0 ? (
-          <p className="text-[11px] leading-relaxed text-slate-400">
+          <p className="text-[11px] leading-relaxed text-ui-ink-3">
             Add a Linked Views or Design slide to link one here.
           </p>
         ) : (
@@ -243,10 +243,10 @@ export function PropertiesPanel() {
                     onChange={() =>
                       setLinkedSlideIds(on ? linkedIds.filter((id) => id !== target.id) : [...linkedIds, target.id])
                     }
-                    className="accent-[#0b72c2]"
+                    className="accent-ui-accent"
                   />
-                  <span className="truncate text-[12px] text-slate-600">{target.fields.title || 'Untitled slide'}</span>
-                  <span className="ml-auto shrink-0 text-[10px] uppercase text-slate-400">
+                  <span className="truncate text-[12px] text-ui-ink-2">{target.fields.title || 'Untitled slide'}</span>
+                  <span className="ml-auto shrink-0 text-[10px] uppercase text-ui-ink-3">
                     {target.layout === 'linked-views' ? 'views' : target.style === 'design' ? 'design' : 'slide'}
                   </span>
                 </label>
@@ -256,15 +256,15 @@ export function PropertiesPanel() {
         )}
       </div>
 
-      <div className="mb-2 border-t border-slate-100 pt-6">
-        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+      <div className="mb-2 border-t border-ui-line-soft pt-6">
+        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ui-ink-3">
           <IconDroplet className="h-3.5 w-3.5" /> Accent Colour
         </h4>
         <AccentPicker logo={project?.clientLogo} value={project?.accentColor} onChange={setAccentColor} tone="panel" />
       </div>
 
-      <div className="mb-2 border-t border-slate-100 pt-6">
-        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+      <div className="mb-2 border-t border-ui-line-soft pt-6">
+        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ui-ink-3">
           <IconType className="h-3.5 w-3.5" /> Typography
         </h4>
         <div className="flex flex-wrap gap-2">
@@ -273,11 +273,11 @@ export function PropertiesPanel() {
             title="Inherit the project's own headline face"
             className={`flex flex-col items-center gap-1 rounded-md border px-3 py-1.5 transition ${
               slide.typographyOverride?.font === undefined
-                ? 'border-[#0b72c2] bg-[#e8f2fb] text-[#0b72c2]'
-                : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                ? 'border-ui-accent-line bg-ui-accent-soft text-ui-accent'
+                : 'border-ui-line text-ui-ink-2 hover:border-ui-line-strong'
             }`}
           >
-            <span className="text-lg leading-none text-slate-300">—</span>
+            <span className="text-lg leading-none text-ui-ink-3">—</span>
             <span className="text-[10px] font-medium">Default</span>
           </button>
           {FONT_PAIRINGS.map((f) => {
@@ -288,7 +288,7 @@ export function PropertiesPanel() {
                 onClick={() => setSlideTypographyOverride({ font: f.key })}
                 title={f.label}
                 className={`flex flex-col items-center gap-1 rounded-md border px-3 py-1.5 transition ${
-                  selected ? 'border-[#0b72c2] bg-[#e8f2fb] text-[#0b72c2]' : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                  selected ? 'border-ui-accent-line bg-ui-accent-soft text-ui-accent' : 'border-ui-line text-ui-ink-2 hover:border-ui-line-strong'
                 }`}
               >
                 <span style={{ fontFamily: f.cssVar }} className="text-lg font-bold leading-none">
@@ -300,7 +300,7 @@ export function PropertiesPanel() {
           })}
         </div>
 
-        <div className="mt-4 border-t border-slate-100 pt-4">
+        <div className="mt-4 border-t border-ui-line-soft pt-4">
           <TypeAxisRow
             label="Size"
             options={TYPE_SCALES.map((s) => ({ key: s.key, label: s.label }))}

@@ -388,7 +388,13 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
       <div className="flex min-h-0 flex-1">
         <SlideRail />
-        <main ref={stageAreaRef} className="min-h-0 flex-1 bg-ui-canvas p-8">
+        {/* min-w-0 matters: ScaledStage lays its slide out at a literal 1280px and
+            only shrinks it visually with transform: scale(), and a transform does
+            not change layout size. Without this, a flex item refuses to shrink
+            below that 1280px min-content width and the whole editor overflows
+            sideways, pushing the properties panel off-screen. The stage has its
+            own overflow-auto, so it scrolls internally instead. */}
+        <main ref={stageAreaRef} className="min-h-0 min-w-0 flex-1 bg-ui-canvas p-8">
           <ScaledStage
             pannable
             zoomFactor={zoomFactor}

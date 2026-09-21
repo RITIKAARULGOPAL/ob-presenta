@@ -76,6 +76,17 @@ review; all four are done.
   dark panels); the `amber-400`/`emerald-500` save-status dots are still
   literals (they read fine on both surfaces — tidying, not a fix).
 
+- **Fixed the horizontal overflow** flagged as pre-existing in the entry
+  below. Root cause: `ScaledStage` in `pannable` mode lays its slide out at a
+  literal `width: 1280px` and only shrinks it *visually* with
+  `transform: scale()` — and a transform does not change layout size. That
+  gave `<main>` a 1280px min-content width, which a flex item will not shrink
+  below, so 1280 + rail 192 + panel 288 + padding 64 = the 1824px body width
+  measured earlier. One class (`min-w-0` on the stage `<main>` in
+  [edit/page.tsx](src/app/p/[id]/edit/page.tsx)) lets it shrink; the stage's
+  own `overflow-auto` then scrolls internally as intended. Verified
+  `scrollWidth === innerWidth` at both 1440 and 1280, panel fully on screen.
+
 **Watch out for:**
 - Measuring a focus ring immediately after a synthetic `Tab` gives a false
   reading: Tailwind's `transition` utility animates `outline-color`, so
@@ -141,10 +152,8 @@ the Phase G entry below, on a fresh branch off `main` at `069f72d`.
   byte-identical to the `069f72d` baseline (all pre-existing, none in the
   theme work). Driven in Chromium at 1860×940 — editor and home in both
   themes, each toggle option, an OS flip under 'system', and a reload.
-- The editor page overflows horizontally at 1440px wide (body scrollWidth
-  1824, so the properties panel sits off-screen). **Pre-existing on
-  `069f72d`** — measured both with and without this branch — not caused by
-  the theme work, but worth fixing.
+- ~~The editor page overflows horizontally at 1440px wide.~~ **Fixed** — see
+  the comfort-pass entry above.
 - Light mode is the palette the app always had, with one deliberate change:
   muted chrome label text `slate-400` → `slate-500` (`--app-ink-3`), 2.6:1 →
   4.8:1 on white. One variable if you want the lighter grey back.

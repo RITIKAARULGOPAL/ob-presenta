@@ -36,6 +36,13 @@
      session tiring; this softens the jump without dimming the slide itself. */
   --app-canvas: #f1f5f9;
 
+  /* Chrome radius, three steps. Deliberately NOT --radius-*: the deck owns
+     that name (the --radius-sm/md/lg further down are referenced by slides
+     via var()), and clobbering it would reshape every exported card. */
+  --app-radius-sm: 6px;
+  --app-radius-md: 10px;
+  --app-radius-lg: 14px;
+
   /* Lines: soft for inner dividers, strong for hover/emphasis */
   --app-line: #e2e8f0;
   --app-line-soft: #f1f5f9;
@@ -201,6 +208,34 @@
   --shadow-card: var(--app-shadow-card);
   --shadow-float: var(--app-shadow-float);
   --shadow-modal: var(--app-shadow-modal);
+
+  --radius-ui-sm: var(--app-radius-sm);
+  --radius-ui-md: var(--app-radius-md);
+  --radius-ui-lg: var(--app-radius-lg);
+
+  /* ---- Chrome type scale -------------------------------------------------
+     Six steps, replacing nine ad-hoc sizes (text-[9px] through text-4xl, with
+     text-xs and text-[12px] both in use for the same 12px). Named by role so
+     a size is chosen once: micro for meta, label for section headers and
+     compact controls, ctl for the default control, body for reading, title
+     and display for headings. Distinct names rather than sm/md/lg so they
+     cannot be confused with the ui-* colour utilities. */
+  --text-micro: 11px;
+  --text-micro--line-height: 1.45;
+  --text-label: 12px;
+  --text-label--line-height: 1.4;
+  --text-ctl: 13px;
+  --text-ctl--line-height: 1.35;
+  --text-body: 15px;
+  --text-body--line-height: 1.55;
+  --text-title: 20px;
+  --text-title--line-height: 1.25;
+  --text-display: 28px;
+  --text-display--line-height: 1.15;
+
+  /* One easing for hover/press across the chrome. The theme switch stays
+     instant on purpose — see the note above the token blocks. */
+  --ease-ui: cubic-bezier(0.2, 0.6, 0.3, 1);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);

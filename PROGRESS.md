@@ -32,6 +32,62 @@ or re-explain anything.
 
 ---
 
+## 2026-09-21 (cont'd 3) — UI/UX rework, phases 1-3
+
+**Context:** asked to make the app feel like a designer-friendly modern tool.
+Chosen together: a fresh, denser pro-tool direction; full UX rework; the whole
+app. Reviewed as a mockup first —
+[canvas](https://claude.ai/artifact/NjkSTkpHmtT3Kvrx7XtJik), six artboards —
+and approved with one condition: **do not deviate from the Presenta idea and
+features.** Nothing may become unreachable; the plan carries a parity
+checklist.
+
+Six phases. This is 1 to 3; the review checkpoint is now.
+
+**Done:**
+- **Tokens** ([globals.css](src/app/globals.css)). A six-step type scale
+  (`text-micro` … `text-display`) replacing nine ad-hoc sizes — `text-[9px]`
+  through `text-4xl`, with `text-xs` and `text-[12px]` both in use for the
+  same 12px. Three chrome radii as `rounded-ui-sm/md/lg`, deliberately NOT
+  `--radius-*`: **the deck owns that name** and slides reference
+  `var(--radius-md)` directly, so taking it would reshape exported cards.
+  Plus one `--ease-ui`.
+- **Primitives** (`src/components/ui/`): `Button`/`IconButton`/`ToolbarDivider`,
+  `Menu`/`MenuItem`/`MenuLabel`/`MenuSeparator`/`Kbd`, `SegmentedControl`.
+  `ThemeToggle` now sits on `SegmentedControl` — it always was one.
+- **Editor shell** ([edit/page.tsx](src/app/p/[id]/edit/page.tsx)) rebuilt as
+  two rows: a 48px header for the *deck* (name, save status, undo/redo, theme,
+  add, export, present) and a 44px toolbar for the *current slide*. Zoom
+  floats on the canvas instead of owning a full-width footer. The two
+  hand-rolled dropdowns are gone — `Menu` handles Escape, click-outside and
+  focus return, which neither did.
+- **Slide Style and Slide Layout moved out of the properties panel** into
+  toolbar menus that say what is currently set. 18 always-visible pills
+  became two triggers.
+
+**Watch out for:**
+- **I deleted the Background section by accident** doing that move, and only
+  caught it because eslint flagged the orphaned `setSlideBackground`. The
+  end-anchor of the deletion was "the next section whose icon is `IconImage`"
+  — but Background uses `IconDroplet`, so the cut ran past it into Logo &
+  Copyright. Restored from `git show HEAD:`. If you cut a region out of a
+  file by matching markup, **diff the section list before and after** — the
+  parity checklist exists for exactly this.
+
+**Left off / next up:**
+- Phase 4 is the real IA work: contextual inspector with `Disclosure` groups,
+  the layout picker as a searchable dialog with real slide previews, and ⌘K
+  over `editorStore`'s ~50 named actions. The footer shortcut hint stays until
+  ⌘K can carry it — removing discoverability before replacing it is a
+  regression.
+- Then Phase 5 (home grid) and 6 (concept library, Presenter last — it is
+  used live in front of clients).
+- Verified: build clean; eslint 17 errors/6 warnings, identical to the
+  `98b4056` baseline; both themes driven in Chromium at 1440 wide;
+  `scrollWidth === innerWidth` still holds.
+
+---
+
 ## 2026-09-21 (cont'd 2) — Dark/light comfort pass
 
 **Context:** follow-up to the dark/light entry below, after the user asked what

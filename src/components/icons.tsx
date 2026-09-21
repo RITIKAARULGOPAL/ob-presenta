@@ -179,3 +179,125 @@ export function IconMonitor(props: SVGProps<SVGSVGElement>) {
     </Base>
   );
 }
+
+// ---- Chrome icons (editor shell) -------------------------------------------
+// Added with the UI rework. Same Base as everything above: 24-unit viewBox,
+// currentColor, sized by the caller.
+
+/** Undo — an arrow curving back on itself. */
+export function IconUndo(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10a6 6 0 0 1 0 12h-3" />
+    </Base>
+  );
+}
+
+/** Redo — the mirror of IconUndo. */
+export function IconRedo(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="m15 14 5-5-5-5" />
+      <path d="M20 9H10a6 6 0 0 0 0 12h3" />
+    </Base>
+  );
+}
+
+/** Presenter — a play triangle. Filled, unlike the stroke icons around it,
+ *  so it reads as the primary action it sits on. */
+export function IconPlay(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+      <path d="M7 4.5 19 12 7 19.5z" />
+    </svg>
+  );
+}
+
+/** Export — a download tray. */
+export function IconDownload(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="M12 3v12" />
+      <path d="m7 11 5 5 5-5" />
+      <path d="M4 20h16" />
+    </Base>
+  );
+}
+
+/** Add. */
+export function IconPlus(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="M12 5v14M5 12h14" />
+    </Base>
+  );
+}
+
+/** Zoom out / remove. */
+export function IconMinus(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="M5 12h14" />
+    </Base>
+  );
+}
+
+/** Disclosure and menu affordance, pointing down. */
+export function IconChevronDown(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </Base>
+  );
+}
+
+/** Disclosure affordance, collapsed. */
+export function IconChevronRight(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="m9 6 6 6-6 6" />
+    </Base>
+  );
+}
+
+/** Search. */
+export function IconSearch(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.6-3.6" />
+    </Base>
+  );
+}
+
+/** Duplicate — two stacked sheets. */
+export function IconCopy(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <rect x="8.5" y="8.5" width="12" height="12" rx="2" />
+      <path d="M15.5 5.5h-9a2 2 0 0 0-2 2v9" />
+    </Base>
+  );
+}
+
+/** Skip — an eye struck through, for "not shown in Presenter or export". */
+export function IconEyeOff(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="M4 4l16 16" />
+      <path d="M9.9 5.3A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7a11 11 0 0 1-2.4 3.4" />
+      <path d="M6.3 7.8C4 9.3 3 11.3 3 12c0 2.5 4 7 9 7a9.3 9.3 0 0 0 3.6-.7" />
+    </Base>
+  );
+}
+
+/** Include again — the counterpart to IconEyeOff. */
+export function IconEye(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="M3 12c0-2.5 4-7 9-7s9 4.5 9 7-4 7-9 7-9-4.5-9-7z" />
+      <circle cx="12" cy="12" r="2.8" />
+    </Base>
+  );
+}

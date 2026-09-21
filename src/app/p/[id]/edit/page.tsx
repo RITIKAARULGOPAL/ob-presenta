@@ -14,7 +14,15 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { exportToPdf, exportToPptx } from '@/lib/exportDeck';
 import { DESIGN_PILLARS } from '@/lib/conceptLibrary';
 import { conceptSlide } from '@/lib/conceptSlides';
-import { IconBulb, IconTextBlock, IconStar, IconBars, IconLink, IconFile, IconScreen, IconImage } from '@/components/icons';
+import {
+  IconBulb, IconTextBlock, IconStar, IconBars, IconLink, IconFile, IconScreen, IconImage,
+  IconUndo, IconRedo, IconPlay, IconDownload, IconPlus, IconMinus, IconChevronDown,
+  IconCopy, IconEyeOff, IconEye, IconTrash, IconGrid, IconLayers,
+} from '@/components/icons';
+import { Button, IconButton, ToolbarDivider } from '@/components/ui/Button';
+import { Menu, MenuItem, MenuLabel, MenuSeparator, Kbd } from '@/components/ui/Menu';
+import { LAYOUT_LABELS, STYLE_LABELS } from '@/lib/slideDefaults';
+import type { SlideLayout, SlideStyleKind } from '@/types/slide';
 import { clamp } from '@/lib/imageTransform';
 
 const ECOM_PILLAR = DESIGN_PILLARS.find((p) => p.id === 'ecom-express');
@@ -27,9 +35,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const { id } = use(params);
   const router = useRouter();
   const [notFound, setNotFound] = useState(false);
-  const [showAddMenu, setShowAddMenu] = useState(false);
   const [showConceptPicker, setShowConceptPicker] = useState(false);
-  const [showExportMenu, setShowExportMenu] = useState(false);
   const [exportStatus, setExportStatus] = useState('');
   const [zoomFactor, setZoomFactor] = useState(ZOOM_DEFAULT);
   const stageAreaRef = useRef<HTMLDivElement>(null);
@@ -55,6 +61,9 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const saveError = useEditorStore((s) => s.saveError);
   const saveStatus = useEditorStore((s) => s.saveStatus);
   const logoSaveUnavailable = useEditorStore((s) => s.logoSaveUnavailable);
+  const changeLayout = useEditorStore((s) => s.changeLayout);
+  const changeStyle = useEditorStore((s) => s.changeStyle);
+  const toggleSkip = useEditorStore((s) => s.toggleSkip);
 
   useEffect(() => {
     // The home page preloads a just-created project straight into the store
@@ -182,7 +191,6 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
   async function handleExport(kind: 'pdf' | 'pptx') {
     if (!project) return;
-    setShowExportMenu(false);
     try {
       const run = kind === 'pdf' ? exportToPdf : exportToPptx;
       await run(project, (current, total) => setExportStatus(`Rendering slide ${current} of ${total}…`));
@@ -226,165 +234,170 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const saveStatusLabel =
     saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : saveStatus === 'error' ? 'Save failed' : null;
 
+  const layouts = Object.keys(LAYOUT_LABELS) as SlideLayout[];
+  const styles = Object.keys(STYLE_LABELS) as SlideStyleKind[];
+  const shownIndex = project.slides.filter((sl) => !sl.skipped).findIndex((sl) => sl.id === currentSlide?.id);
+
   return (
     <div className="flex h-screen flex-col bg-ui-bg">
       {saveBanner}
-      <header className="flex flex-shrink-0 items-center justify-between border-b border-ui-line bg-ui-surface px-4 py-2.5">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-full bg-ui-pill px-3.5 py-1.5 text-xs font-semibold text-ui-pill-ink">
-            <span className="h-1.5 w-1.5 rounded-full bg-ui-accent" />
-            {project.name}
-            <span className="font-normal text-ui-pill-ink/60">· by {project.preparedBy}</span>
-          </div>
-          {saveStatusLabel && (
-            <span
-              className={`flex items-center gap-1.5 text-[11px] font-medium ${
-                saveStatus === 'error' ? 'text-ui-danger' : 'text-ui-ink-2'
-              }`}
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  saveStatus === 'saving' ? 'animate-pulse bg-amber-400' : saveStatus === 'error' ? 'bg-ui-danger' : 'bg-emerald-500'
-                }`}
-              />
-              {saveStatusLabel}
-            </span>
-          )}
+
+      {/* Row 1 — the deck: what this file is, and what you do with the whole
+          of it. Nothing here changes a slide. */}
+      <header className="flex h-12 flex-shrink-0 items-center gap-2 border-b border-ui-line bg-ui-surface px-3">
+        <Link
+          href="/"
+          aria-label="All presentations"
+          title="All presentations"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-ui-sm bg-ui-accent font-display text-label font-extrabold text-ui-accent-on"
+        >
+          P
+        </Link>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-ctl font-semibold tracking-[-0.01em] text-ui-ink">{project.name}</span>
+          <span className="hidden shrink-0 text-micro text-ui-ink-3 sm:inline">by {project.preparedBy}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <Link href="/" className="rounded-full bg-ui-raised px-4 py-2 text-xs font-semibold text-ui-ink-2 hover:bg-ui-raised-hover">
-            ⌂ Home
-          </Link>
-          <div className="flex items-center overflow-hidden rounded-full bg-ui-raised">
-            <button
-              onClick={() => undo()}
-              disabled={!canUndo}
-              title="Undo (Ctrl+Z)"
-              aria-label="Undo"
-              className="px-3 py-2 text-xs font-semibold text-ui-ink-2 hover:bg-ui-raised-hover disabled:opacity-40 disabled:hover:bg-transparent"
-            >
-              ↶
-            </button>
-            <span className="h-4 w-px bg-ui-line-strong" />
-            <button
-              onClick={() => redo()}
-              disabled={!canRedo}
-              title="Redo (Ctrl+Y)"
-              aria-label="Redo"
-              className="px-3 py-2 text-xs font-semibold text-ui-ink-2 hover:bg-ui-raised-hover disabled:opacity-40 disabled:hover:bg-transparent"
-            >
-              ↷
-            </button>
-          </div>
-          <div className="relative">
-            <button
-              onClick={() => setShowAddMenu((v) => !v)}
-              className="rounded-full bg-ui-raised px-4 py-2 text-xs font-semibold text-ui-ink-2 hover:bg-ui-raised-hover"
-            >
-              + Add slide
-            </button>
-            {showConceptPicker && <ConceptLibraryDropdown onClose={() => setShowConceptPicker(false)} />}
-            {showAddMenu && (
-              <div className="absolute right-0 top-10 z-10 w-48 rounded-lg border border-ui-line bg-ui-surface p-1.5 shadow-float">
-                <button
-                  onClick={() => {
-                    setShowConceptPicker(true);
-                    setShowAddMenu(false);
-                  }}
-                  className="mb-1 flex w-full items-center gap-2 rounded-md border-b border-ui-line-soft px-3 py-2 text-left text-xs font-semibold text-ui-accent hover:bg-ui-raised"
-                >
-                  <IconBulb className="h-3.5 w-3.5 flex-shrink-0" /> Concept library…
-                </button>
-                <button
-                  onClick={() => {
-                    addSlide('title-content');
-                    setShowAddMenu(false);
-                  }}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-ui-ink-2 hover:bg-ui-raised"
-                >
-                  <IconTextBlock className="h-3.5 w-3.5 flex-shrink-0 text-ui-ink-3" /> Title + Content
-                </button>
-                <button
-                  onClick={() => {
-                    addSlide('merge-diagram');
-                    setShowAddMenu(false);
-                  }}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-ui-ink-2 hover:bg-ui-raised"
-                >
-                  <IconStar className="h-3.5 w-3.5 flex-shrink-0 text-ui-ink-3" /> Merge Diagram
-                </button>
-                <button
-                  onClick={() => {
-                    addSlide('stat-hero');
-                    setShowAddMenu(false);
-                  }}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-ui-ink-2 hover:bg-ui-raised"
-                >
-                  <IconBars className="h-3.5 w-3.5 flex-shrink-0 text-ui-ink-3" /> Stat Hero
-                </button>
-                <button
-                  onClick={() => {
-                    addSlide('linked-views');
-                    setShowAddMenu(false);
-                  }}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-ui-ink-2 hover:bg-ui-raised"
-                >
-                  <IconLink className="h-3.5 w-3.5 flex-shrink-0 text-ui-ink-3" /> Linked Views
-                </button>
-                {ECOM_PILLAR && (
-                  <>
-                    <div className="my-1 border-t border-ui-line-soft" />
-                    {ECOM_PILLAR.concepts.map((concept) => (
-                      <button
-                        key={concept.id}
-                        onClick={() => {
-                          addSlides([conceptSlide(ECOM_PILLAR, concept)]);
-                          setShowAddMenu(false);
-                        }}
-                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-ui-ink-2 hover:bg-ui-raised"
-                      >
-                        <IconImage className="h-3.5 w-3.5 flex-shrink-0 text-ui-ink-3" /> {concept.title}
-                      </button>
-                    ))}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="relative">
-            <button
-              onClick={() => setShowExportMenu((v) => !v)}
-              disabled={!!exportStatus}
-              className="rounded-full bg-ui-raised px-4 py-2 text-xs font-semibold text-ui-ink-2 hover:bg-ui-raised-hover disabled:opacity-50"
-            >
-              {exportStatus ? exportStatus : '⬇ Export'}
-            </button>
-            {showExportMenu && !exportStatus && (
-              <div className="absolute right-0 top-10 z-10 w-40 rounded-lg border border-ui-line bg-ui-surface p-1.5 shadow-float">
-                <button
-                  onClick={() => handleExport('pdf')}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-ui-ink-2 hover:bg-ui-raised"
-                >
-                  <IconFile className="h-3.5 w-3.5 flex-shrink-0 text-ui-ink-3" /> Export as PDF
-                </button>
-                <button
-                  onClick={() => handleExport('pptx')}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium text-ui-ink-2 hover:bg-ui-raised"
-                >
-                  <IconScreen className="h-3.5 w-3.5 flex-shrink-0 text-ui-ink-3" /> Export as PPTX
-                </button>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={() => router.push(`/p/${project.id}/present`)}
-            className="rounded-full bg-ui-accent px-4 py-2 text-xs font-semibold text-ui-accent-on hover:bg-ui-accent-hover"
+        {saveStatusLabel && (
+          <span
+            className={`flex shrink-0 items-center gap-1.5 text-micro font-medium ${
+              saveStatus === 'error' ? 'text-ui-danger' : 'text-ui-ink-3'
+            }`}
           >
-            ▷ Presenter
-          </button>
-        </div>
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                saveStatus === 'saving'
+                  ? 'animate-pulse bg-amber-400'
+                  : saveStatus === 'error'
+                    ? 'bg-ui-danger'
+                    : 'bg-emerald-500'
+              }`}
+            />
+            {saveStatusLabel}
+          </span>
+        )}
+
+        <span className="flex-1" />
+
+        <IconButton label="Undo" title="Undo (Ctrl/⌘+Z)" icon={<IconUndo className="h-[15px] w-[15px]" />} onClick={() => undo()} disabled={!canUndo} />
+        <IconButton label="Redo" title="Redo (Ctrl/⌘+Y)" icon={<IconRedo className="h-[15px] w-[15px]" />} onClick={() => redo()} disabled={!canRedo} />
+        <ToolbarDivider />
+        <ThemeToggle />
+        <ToolbarDivider />
+
+        <Menu
+          width="w-60"
+          trigger={({ onClick, ...a11y }) => (
+            <Button variant="ghost" icon={<IconPlus className="h-[15px] w-[15px]" />} trailing={<IconChevronDown className="h-3 w-3 opacity-60" />} onClick={onClick} {...a11y}>
+              Add slide
+            </Button>
+          )}
+        >
+          <MenuItem icon={<IconBulb className="h-[15px] w-[15px]" />} tone="accent" onClick={() => setShowConceptPicker(true)}>
+            Concept library…
+          </MenuItem>
+          <MenuSeparator />
+          <MenuItem icon={<IconTextBlock className="h-[15px] w-[15px]" />} onClick={() => addSlide('title-content')}>Title + Content</MenuItem>
+          <MenuItem icon={<IconStar className="h-[15px] w-[15px]" />} onClick={() => addSlide('merge-diagram')}>Merge Diagram</MenuItem>
+          <MenuItem icon={<IconBars className="h-[15px] w-[15px]" />} onClick={() => addSlide('stat-hero')}>Stat Hero</MenuItem>
+          <MenuItem icon={<IconLink className="h-[15px] w-[15px]" />} onClick={() => addSlide('linked-views')}>Linked Views</MenuItem>
+          {ECOM_PILLAR && (
+            <>
+              <MenuSeparator />
+              <MenuLabel>{ECOM_PILLAR.title}</MenuLabel>
+              {ECOM_PILLAR.concepts.map((concept) => (
+                <MenuItem key={concept.id} icon={<IconImage className="h-[15px] w-[15px]" />} onClick={() => addSlides([conceptSlide(ECOM_PILLAR, concept)])}>
+                  {concept.title}
+                </MenuItem>
+              ))}
+            </>
+          )}
+        </Menu>
+
+        <Menu
+          width="w-48"
+          trigger={({ onClick, ...a11y }) => (
+            <Button variant="ghost" icon={<IconDownload className="h-[15px] w-[15px]" />} trailing={<IconChevronDown className="h-3 w-3 opacity-60" />} onClick={onClick} disabled={!!exportStatus} {...a11y}>
+              {exportStatus || 'Export'}
+            </Button>
+          )}
+        >
+          <MenuItem icon={<IconFile className="h-[15px] w-[15px]" />} onClick={() => handleExport('pdf')}>Export as PDF</MenuItem>
+          <MenuItem icon={<IconScreen className="h-[15px] w-[15px]" />} onClick={() => handleExport('pptx')}>Export as PPTX</MenuItem>
+        </Menu>
+
+        <Button variant="primary" icon={<IconPlay className="h-3 w-3" />} onClick={() => router.push(`/p/${project.id}/present`)}>
+          Present
+        </Button>
       </header>
+
+      {/* Row 2 — the current slide. Layout and Style used to be 18 pills in
+          the right panel, always expanded whether or not you were changing
+          them; as menu triggers they take one line and say what is set. */}
+      <div className="flex h-11 flex-shrink-0 items-center gap-1.5 border-b border-ui-line bg-ui-surface px-3">
+        {currentSlide && (
+          <>
+            <Menu
+              align="start"
+              width="w-56"
+              trigger={({ onClick, ...a11y }) => (
+                <Button variant="raised" icon={<IconGrid className="h-[15px] w-[15px]" />} trailing={<IconChevronDown className="h-3 w-3 opacity-60" />} onClick={onClick} {...a11y}>
+                  {LAYOUT_LABELS[currentSlide.layout]}
+                </Button>
+              )}
+            >
+              <MenuLabel>Slide layout</MenuLabel>
+              {layouts.map((k) => (
+                <MenuItem
+                  key={k}
+                  selected={currentSlide.layout === k && currentSlide.style === 'standard'}
+                  onClick={() => changeLayout(k)}
+                >
+                  {LAYOUT_LABELS[k]}
+                </MenuItem>
+              ))}
+            </Menu>
+
+            <Menu
+              align="start"
+              width="w-52"
+              trigger={({ onClick, ...a11y }) => (
+                <Button variant="raised" icon={<IconLayers className="h-[15px] w-[15px]" />} trailing={<IconChevronDown className="h-3 w-3 opacity-60" />} onClick={onClick} {...a11y}>
+                  {STYLE_LABELS[currentSlide.style]}
+                </Button>
+              )}
+            >
+              <MenuLabel>Slide style</MenuLabel>
+              {styles.map((k) => (
+                <MenuItem key={k} selected={currentSlide.style === k} onClick={() => changeStyle(k)}>
+                  {STYLE_LABELS[k]}
+                </MenuItem>
+              ))}
+            </Menu>
+
+            <ToolbarDivider />
+
+            <IconButton label="Duplicate slide" title="Duplicate slide (Ctrl/⌘+D)" icon={<IconCopy className="h-[15px] w-[15px]" />} onClick={() => duplicateSlide(currentSlide.id)} />
+            <IconButton
+              label={currentSlide.skipped ? 'Include slide again' : 'Skip slide'}
+              title={currentSlide.skipped ? 'Include in Presenter and export' : 'Skip in Presenter and export'}
+              icon={currentSlide.skipped ? <IconEye className="h-[15px] w-[15px]" /> : <IconEyeOff className="h-[15px] w-[15px]" />}
+              active={currentSlide.skipped}
+              onClick={() => toggleSkip(currentSlide.id)}
+            />
+            {project.slides.length > 1 && (
+              <IconButton variant="danger" label="Delete slide" title="Delete slide (Delete)" icon={<IconTrash className="h-[15px] w-[15px]" />} onClick={() => removeSlide(currentSlide.id)} />
+            )}
+          </>
+        )}
+
+        <span className="flex-1" />
+
+        <span className="shrink-0 text-micro text-ui-ink-3">
+          {currentSlide?.skipped
+            ? 'Skipped · not in Presenter or export'
+            : `Slide ${shownIndex + 1} of ${project.slides.filter((sl) => !sl.skipped).length}`}
+        </span>
+      </div>
 
       <div className="flex min-h-0 flex-1">
         <SlideRail />
@@ -394,7 +407,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             below that 1280px min-content width and the whole editor overflows
             sideways, pushing the properties panel off-screen. The stage has its
             own overflow-auto, so it scrolls internally instead. */}
-        <main ref={stageAreaRef} className="min-h-0 min-w-0 flex-1 bg-ui-canvas p-8">
+        <main ref={stageAreaRef} className="relative min-h-0 min-w-0 flex-1 bg-ui-canvas p-8">
           <ScaledStage
             pannable
             zoomFactor={zoomFactor}
@@ -404,40 +417,47 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           >
             {currentSlide && <SlideRenderer slide={currentSlide} editable animate />}
           </ScaledStage>
+
+          {/* Zoom belongs to the canvas, so it floats on it rather than living
+              in a full-width footer bar the rest of the app had to pay for. */}
+          <div className="absolute bottom-4 right-5 flex items-center gap-0.5 rounded-ui-md border border-ui-line bg-ui-surface p-1 shadow-float">
+            <IconButton
+              size="sm"
+              label="Zoom out"
+              title="Zoom out (Ctrl/⌘+-)"
+              icon={<IconMinus className="h-3.5 w-3.5" />}
+              onClick={() => setZoomFactor((z) => clamp(z - ZOOM_STEP, ZOOM_MIN, ZOOM_MAX))}
+            />
+            <button
+              type="button"
+              onClick={() => setZoomFactor(ZOOM_DEFAULT)}
+              title="Reset zoom (Ctrl/⌘+0)"
+              className="h-7 w-12 rounded-ui-sm text-label font-semibold text-ui-ink-2 transition-colors duration-150 ease-ui hover:bg-ui-raised hover:text-ui-ink"
+            >
+              {Math.round(zoomFactor * 100)}%
+            </button>
+            <IconButton
+              size="sm"
+              label="Zoom in"
+              title="Zoom in (Ctrl/⌘+=)"
+              icon={<IconPlus className="h-3.5 w-3.5" />}
+              onClick={() => setZoomFactor((z) => clamp(z + ZOOM_STEP, ZOOM_MIN, ZOOM_MAX))}
+            />
+          </div>
         </main>
         <PropertiesPanel />
       </div>
 
-      <div className="flex flex-shrink-0 items-center justify-between border-t border-ui-line bg-ui-surface px-4 py-1.5 text-[11px] text-ui-ink-3">
-        <span className="flex-1" />
-        <span className="text-center">
-          Editor mode — click any headline or field to edit it · ↑↓ change slide · Ctrl/⌘+D duplicate · Ctrl/⌘+Z undo
-        </span>
-        <span className="flex flex-1 items-center justify-end gap-1">
-          <button
-            onClick={() => setZoomFactor((z) => clamp(z - ZOOM_STEP, ZOOM_MIN, ZOOM_MAX))}
-            title="Zoom out (Ctrl/⌘+-)"
-            aria-label="Zoom out"
-            className="flex h-5 w-5 items-center justify-center rounded text-ui-ink-2 hover:bg-ui-raised-hover"
-          >
-            −
-          </button>
-          <button
-            onClick={() => setZoomFactor(ZOOM_DEFAULT)}
-            title="Reset zoom (Ctrl/⌘+0)"
-            className="w-10 rounded text-ui-ink-2 hover:bg-ui-raised-hover"
-          >
-            {Math.round(zoomFactor * 100)}%
-          </button>
-          <button
-            onClick={() => setZoomFactor((z) => clamp(z + ZOOM_STEP, ZOOM_MIN, ZOOM_MAX))}
-            title="Zoom in (Ctrl/⌘+=)"
-            aria-label="Zoom in"
-            className="flex h-5 w-5 items-center justify-center rounded text-ui-ink-2 hover:bg-ui-raised-hover"
-          >
-            +
-          </button>
-        </span>
+      {showConceptPicker && <ConceptLibraryDropdown onClose={() => setShowConceptPicker(false)} />}
+
+      {/* The shortcuts still need somewhere to be discoverable. This goes when
+          the command palette lands and can carry them properly. */}
+      <div className="flex h-7 flex-shrink-0 items-center justify-center gap-3 border-t border-ui-line bg-ui-surface px-3 text-micro text-ui-ink-3">
+        <span>Click any headline or field to edit it</span>
+        <span className="text-ui-line-strong">·</span>
+        <span className="flex items-center gap-1"><Kbd>↑</Kbd><Kbd>↓</Kbd> change slide</span>
+        <span className="flex items-center gap-1"><Kbd>⌘</Kbd><Kbd>D</Kbd> duplicate</span>
+        <span className="flex items-center gap-1"><Kbd>⌘</Kbd><Kbd>Z</Kbd> undo</span>
       </div>
     </div>
   );

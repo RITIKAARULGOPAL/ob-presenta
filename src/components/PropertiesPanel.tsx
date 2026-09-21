@@ -3,14 +3,10 @@
 import { useRef } from 'react';
 import { useEditorStore } from '@/lib/editorStore';
 import { AccentPicker } from './AccentPicker';
-import { LAYOUT_LABELS, STYLE_LABELS } from '@/lib/slideDefaults';
 import { FONT_PAIRINGS, TYPE_SCALES, HEADLINE_WEIGHTS, BODY_FONTS, TRACKINGS } from '@/lib/fonts';
 import { fileToSlideImage } from '@/lib/imageFile';
-import { IconLayers, IconGrid, IconImage, IconLink, IconDroplet, IconType } from './icons';
-import type { Brand, SlideLayout, SlideStyleKind } from '@/types/slide';
-
-const LAYOUTS = Object.keys(LAYOUT_LABELS) as SlideLayout[];
-const STYLES = Object.keys(STYLE_LABELS) as SlideStyleKind[];
+import { IconImage, IconLink, IconDroplet, IconType } from './icons';
+import type { Brand } from '@/types/slide';
 
 const BRAND_OPTIONS: { key: Brand | 'default'; label: string }[] = [
   { key: 'default', label: 'Project default' },
@@ -65,8 +61,6 @@ function TypeAxisRow<K extends string>({
 export function PropertiesPanel() {
   const slide = useEditorStore((s) => s.currentSlide());
   const project = useEditorStore((s) => s.project);
-  const changeLayout = useEditorStore((s) => s.changeLayout);
-  const changeStyle = useEditorStore((s) => s.changeStyle);
   const setBrandOverride = useEditorStore((s) => s.setBrandOverride);
   const setAccentColor = useEditorStore((s) => s.setAccentColor);
   const setSlideTypographyOverride = useEditorStore((s) => s.setSlideTypographyOverride);
@@ -89,48 +83,10 @@ export function PropertiesPanel() {
       <div className="mb-1 text-xs font-bold uppercase tracking-wider text-ui-accent">Slide</div>
       <div className="mb-6 font-display text-base font-bold text-ui-ink">Properties</div>
 
-      <div className="mb-6">
-        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ui-ink-3">
-          <IconLayers className="h-3.5 w-3.5" /> Slide Style
-        </h4>
-        <div className="flex flex-wrap gap-2">
-          {STYLES.map((k) => (
-            <button
-              key={k}
-              onClick={() => changeStyle(k)}
-              className={`rounded-md border px-2.5 py-1.5 text-xs font-medium transition ${
-                slide.style === k ? 'border-ui-accent-line bg-ui-accent-soft text-ui-accent' : 'border-ui-line text-ui-ink-2 hover:border-ui-line-strong'
-              }`}
-            >
-              {STYLE_LABELS[k]}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="mb-2 border-t border-ui-line-soft pt-6">
-        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ui-ink-3">
-          <IconGrid className="h-3.5 w-3.5" /> Slide Layout
-        </h4>
-        <div className="flex flex-wrap gap-2">
-          {LAYOUTS.map((k) => (
-            <button
-              key={k}
-              onClick={() => changeLayout(k)}
-              title="Clears this slide's fields to match"
-              className={`rounded-md border px-2.5 py-1.5 text-xs font-medium transition ${
-                slide.layout === k && slide.style === 'standard'
-                  ? 'border-ui-accent-line bg-ui-accent-soft text-ui-accent'
-                  : 'border-ui-line text-ui-ink-2 hover:border-ui-line-strong'
-              }`}
-            >
-              {LAYOUT_LABELS[k]}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="mb-2 border-t border-ui-line-soft pt-6">
+      {/* Slide Style and Slide Layout used to live here as 18 always-visible
+          pills. They are menu triggers in the editor toolbar now — one line
+          that says what is set, instead of a grid that never changes. */}
+      <div className="mb-2">
         <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ui-ink-3">
           <IconDroplet className="h-3.5 w-3.5" /> Background
         </h4>

@@ -39,7 +39,7 @@ export function SlideRail() {
   const multiSelected = selectedSlideIds.length > 1;
 
   return (
-    <div className="flex w-48 flex-shrink-0 flex-col overflow-y-auto border-r border-ui-line bg-ui-raised">
+    <div className="flex w-48 flex-shrink-0 flex-col overflow-y-auto border-r border-ui-line bg-ui-canvas">
       {multiSelected && (
         <div className="flex flex-shrink-0 items-center justify-between gap-1 border-b border-ui-line bg-ui-surface px-2 py-1.5">
           <span className="text-[11px] font-semibold text-ui-ink-2">{selectedSlideIds.length} selected</span>

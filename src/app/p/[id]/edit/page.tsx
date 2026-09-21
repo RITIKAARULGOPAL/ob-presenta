@@ -388,7 +388,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
       <div className="flex min-h-0 flex-1">
         <SlideRail />
-        <main ref={stageAreaRef} className="min-h-0 flex-1 p-8">
+        <main ref={stageAreaRef} className="min-h-0 flex-1 bg-ui-canvas p-8">
           <ScaledStage
             pannable
             zoomFactor={zoomFactor}

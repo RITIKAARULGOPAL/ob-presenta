@@ -28,6 +28,14 @@
   --app-raised: #f8fafc;
   --app-raised-hover: #eef2f7;
 
+  /* The workspace behind a slide — the editor stage and the rail. It is the
+     one surface that does NOT follow the elevation ladder: in dark mode it is
+     *lighter* than the panels, because its job is to sit behind a bright white
+     page rather than to read as raised. Near-black against a white slide is
+     ~19:1 across most of the screen, which is what makes a long editing
+     session tiring; this softens the jump without dimming the slide itself. */
+  --app-canvas: #f1f5f9;
+
   /* Lines: soft for inner dividers, strong for hover/emphasis */
   --app-line: #e2e8f0;
   --app-line-soft: #f1f5f9;
@@ -37,6 +45,11 @@
   --app-ink: #0f172a;
   --app-ink-2: #475569;
   --app-ink-3: #64748b;
+
+  /* Keyboard focus. Its own token rather than the accent: on dark it has to
+     stay visible against --app-surface, where the accent is already used as a
+     fill and would not read as a ring. */
+  --app-focus: #0b72c2;
 
   /* The product blue. --app-accent-on is what stays readable ON it. */
   --app-accent: #0b72c2;
@@ -94,6 +107,7 @@
   --app-surface: #121a25;
   --app-raised: #18212e;
   --app-raised-hover: #1f2b3a;
+  --app-canvas: #222b38;
 
   --app-line: #24303f;
   --app-line-soft: #1b2533;
@@ -102,6 +116,7 @@
   --app-ink: #e8edf5;
   --app-ink-2: #a3b0c2;
   --app-ink-3: #7b8a9f;
+  --app-focus: #8ac8fb;
 
   --app-accent: #4ea6ec;
   --app-accent-hover: #74bcf5;
@@ -146,6 +161,7 @@
   --color-foreground: var(--app-ink);
 
   --color-ui-bg: var(--app-bg);
+  --color-ui-canvas: var(--app-canvas);
   --color-ui-surface: var(--app-surface);
   --color-ui-raised: var(--app-raised);
   --color-ui-raised-hover: var(--app-raised-hover);
@@ -195,6 +211,45 @@ body {
   background: var(--app-bg);
   color: var(--app-ink);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ---- Keyboard focus ------------------------------------------------------
+   Roughly fifty places in the app clear the browser's default outline with
+   `outline-none`, and until now nothing replaced it — so tabbing through the
+   editor showed no focus at all, in either theme.
+
+   `:focus-visible` (not `:focus`) is what makes this liveable: it fires for
+   keyboard and assistive-tech focus but not for a mouse click, so buttons do
+   not sprout a ring every time they are pressed.
+
+   [contenteditable] is deliberately excluded. Every headline and body field on
+   a slide is contenteditable, and a ring around each one as you tab through a
+   deck would be noise on the artifact itself — the caret already says where
+   you are. */
+:where(button, a, input, select, textarea, [role="radio"], [role="button"]):not([contenteditable]):focus-visible {
+  outline: 2px solid var(--app-focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ---- Windows High Contrast ------------------------------------------------
+   forced-colors replaces the palette wholesale with the user's own, which is
+   exactly what someone using it asked for. The job here is to stop our own
+   styling from fighting it: keep real borders on chrome (several controls lean
+   on a background colour alone to show their edge, and those backgrounds are
+   discarded), and let the focus ring follow the system colour.
+
+   The slide surface is left alone on purpose — a deck is a document with
+   authored colour, and the same reasoning that keeps it out of dark mode keeps
+   it out of here. */
+@media (forced-colors: active) {
+  :where(button, a, input, select, [role="radio"], [role="button"]) {
+    border: 1px solid CanvasText;
+  }
+  :where(button, a, input, select, [role="radio"], [role="button"]):focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
 }
 
 /* ---- Diagram motion -------------------------------------------------------

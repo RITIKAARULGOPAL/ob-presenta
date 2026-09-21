@@ -32,6 +32,59 @@ or re-explain anything.
 
 ---
 
+## 2026-09-21 (cont'd 2) — Dark/light comfort pass
+
+**Context:** follow-up to the dark/light entry below, after the user asked what
+to look at to make a theme genuinely comfortable. Four things came out of that
+review; all four are done.
+
+**Done:**
+- **Softened the canvas surround in dark** — new `--app-canvas` token in
+  [globals.css](src/app/globals.css), applied to the editor stage
+  ([edit/page.tsx](src/app/p/[id]/edit/page.tsx)) and the rail
+  ([SlideRail.tsx](src/components/SlideRail.tsx)). It is the one surface that
+  deliberately breaks the elevation ladder: in dark it is *lighter* than the
+  panels (`#222b38` vs `#121a25`), because its job is to sit behind a bright
+  white page. Near-black behind a white slide was ~19:1 across most of the
+  screen, which is what made long editing sessions tiring. Light is unchanged
+  in practice (the rail moves `#f8fafc` → `#f1f5f9`, imperceptible).
+- **`<meta name="theme-color">`** now driven from `applyTheme()` and the inline
+  script in [theme.ts](src/lib/theme.ts), *not* from Next's
+  `viewport.themeColor`. That API only keys off `prefers-color-scheme`, so it
+  would show the wrong colour for anyone who overrode their OS in the toggle.
+- **A real `:focus-visible` ring.** `outline-none` appears ~52 times with
+  nothing replacing it, so tabbing through the editor showed no focus at all.
+  New `--app-focus` token (a dedicated colour, not the accent, so it still
+  reads on `--app-surface` in dark) plus one scoped rule. `[contenteditable]`
+  is excluded on purpose — a ring around every slide field would be noise on
+  the artifact.
+- **`forced-colors` block** for Windows High Contrast: keeps real borders on
+  chrome controls whose edge is otherwise carried by a background colour, and
+  hands the focus ring to `Highlight`. The slide surface is left out, same
+  reasoning as dark mode.
+
+**Left off / next up:**
+- Verified: build passes; `npx eslint` is 17 errors/6 warnings, identical to
+  the `dbdcacb` baseline. Checked in Chromium in both themes — canvas/rail
+  colours, exactly one `theme-color` meta with the right value per theme,
+  focus ring resolving to `#0b72c2`/`#8ac8fb`, and the slide surface still
+  `rgb(255,255,255)` in dark (the export regression that matters).
+- **The dark canvas value `#222b38` is a first pass and should be judged by
+  eye at low screen brightness**, which is exactly when it matters. It is one
+  variable if it wants to be lighter or darker.
+- Not done, considered: `::selection` colours (browser default is muddy on
+  dark panels); the `amber-400`/`emerald-500` save-status dots are still
+  literals (they read fine on both surfaces — tidying, not a fix).
+
+**Watch out for:**
+- Measuring a focus ring immediately after a synthetic `Tab` gives a false
+  reading: Tailwind's `transition` utility animates `outline-color`, so
+  `getComputedStyle` in the same tick returns the pre-focus colour mid-
+  interpolation. Wait ~300ms before asserting. Cost real time here — it looked
+  exactly like a broken cascade.
+
+---
+
 ## 2026-09-21 (cont'd) — Dark and light mode
 
 **Context:** asked to "build dark and light mode for the app." Done on top of

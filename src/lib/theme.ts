@@ -20,6 +20,19 @@ export const THEME_STORAGE_KEY = 'presenta-theme';
 
 const DARK_QUERY = '(prefers-color-scheme: dark)';
 
+/** What mobile browsers paint their own chrome (status bar, address bar) with,
+ *  per theme. Next's `viewport.themeColor` can emit these as static <meta>
+ *  tags, but only keyed on prefers-color-scheme — which is the OS, not the
+ *  choice made here, so it would show the wrong colour for anyone who has
+ *  overridden their OS. Driving the tag from applyTheme() instead keeps it
+ *  honest.
+ *
+ *  These mirror --app-bg in globals.css. Reading the computed value instead
+ *  would avoid the duplication, but THEME_INIT_SCRIPT has to run before the
+ *  stylesheet is guaranteed to be parsed, so the two literals earn their
+ *  keep — change them together. */
+const THEME_COLOR: Record<Theme, string> = { light: '#f1f5f9', dark: '#0b1119' };
+
 function isChoice(value: unknown): value is ThemeChoice {
   return value === 'light' || value === 'dark' || value === 'system';
 }
@@ -102,6 +115,14 @@ export function setThemeChoice(choice: ThemeChoice): void {
 /** The single place the attribute is written. */
 export function applyTheme(theme: Theme): void {
   document.documentElement.dataset.theme = theme;
+
+  let meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.setAttribute('name', 'theme-color');
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute('content', THEME_COLOR[theme]);
 }
 
 /** Runs blocking in <head>, before the first paint, so a dark-mode visitor
@@ -115,4 +136,6 @@ export const THEME_INIT_SCRIPT = `(function(){try{var c=localStorage.getItem(${J
   THEME_STORAGE_KEY,
 )});if(c!=='light'&&c!=='dark')c=matchMedia(${JSON.stringify(
   DARK_QUERY,
-)}).matches?'dark':'light';document.documentElement.dataset.theme=c;}catch(e){document.documentElement.dataset.theme='light';}})();`;
+)}).matches?'dark':'light';document.documentElement.dataset.theme=c;var m=document.createElement('meta');m.name='theme-color';m.content=${JSON.stringify(
+  THEME_COLOR,
+)}[c];document.head.appendChild(m);}catch(e){document.documentElement.dataset.theme='light';}})();`;

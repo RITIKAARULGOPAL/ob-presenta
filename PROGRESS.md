@@ -71,6 +71,14 @@ a Google Sheet (not a repo xlsx), plus a shared image folder.
 - **13-tab workbook** built by [build_sheet.py](docs/template-system/build_sheet.py),
   with a CSV mirror of every tab in `docs/template-system/data/` so the engine
   can read them from git without a Drive round-trip.
+- **[docs/template-system/README.md](docs/template-system/README.md) is the
+  handoff doc** — written for whichever session builds the engine, on whichever
+  account. Read-in-this-order list, the algorithm to port, the four invariants
+  that bite (sticky exclusion; `down` is not the same as listing under `O`;
+  every layout value is a real `SlideLayout`; the matrices are derived), the
+  four worked decks to test a port against, and the 8 missing layouts. Git is
+  the cross-account channel here, not the Google Sheet: the Sheet is for
+  humans, `data/*.csv` + `model_rules.py` are what an agent should read.
 - **Image library** ([gen_images.py](docs/template-system/gen_images.py)):
   18 original diagrams that go *on* slides (zoning, adjacency, circulation,
   journey, sun path, stacking, workstation/meeting mix, ABW settings, access

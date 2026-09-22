@@ -1,0 +1,21 @@
+Topic,Detail
+Presenta — Typology + Concept-Driven Template Population System,
+,
+What this is,"The content layer for Presenta's template engine: a library of slide types, a typology model, a design-concept model, and the rules that turn a project's attributes into one deck."
+How to read it,"Start at 01 Typologies and 03 Design Concepts (the two things a user picks), then 04 Slide Library (what can be generated), then 08 Rules (how the picks become a deck)."
+,
+The one structural decision,"'IT', 'GCC', 'Startup' and 'Managed Workspace' are four different KINDS of thing — a sector, an occupancy model, a company stage and a real-estate model. So there are 16 typology labels sitting on 5 independent axes (tab 02). Rules read the axes."
+Why 'Premium' is not a concept,"It composes with every character theme — Premium Biophilic and Premium Industrial are both coherent. It is a grade on axis E (tab 03, lower block), not a 13th theme."
+,
+Level scale,"M = Mandatory, always in the deck"
+,"R = Recommended, in by default, author may remove"
+,"O = Optional, out by default, offered in the picker"
+,"X = Excluded, not offered at all — irrelevant or misleading here"
+,
+Resolution order,baseline -> typology -> project nature -> concept -> grade -> scale. Highest level wins. An X from typology or nature is final; a concept can re-earn a slide the typology only demoted.
+,
+"Generated, not hand-filled","Tabs 05, 06, 09 and 12 are rendered from tab 08. Edit the rules, re-run docs/template-system/build_sheet.py, re-upload. Editing a matrix cell by hand will be overwritten."
+Source of truth,docs/template-system/*.py in the ob-presenta repo. CSV mirrors of every tab are in docs/template-system/data/.
+Images,public/template-library/ — indexed in tab 11.
+,
+Counts,106 slide types · 16 typologies · 12 concepts · 4 grades · 5 axes · 23 layout rows

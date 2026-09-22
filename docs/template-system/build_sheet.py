@@ -450,6 +450,7 @@ def main():
                    f"{len(MT.CONCEPTS)} concepts · {len(MT.GRADES)} grades · "
                    f"{len(MT.AXES)} axes · {len(rows)} layout rows"],
     ]
+    dump_csv("readme", ["Topic", "Detail"], readme)
     ws = sheet(wb, "00 README", ["Topic", "Detail"], readme, [34, 104],
                note="00 · README — read this first.")
     wb.move_sheet("00 README", offset=-len(wb.sheetnames) + 1)

@@ -1,0 +1,107 @@
+Slide ID,Slide,Section,Baseline,IT,GCC,Startup,Managed Workspace,Managed Office,BFSI,Consulting,Legal,E-commerce,Healthcare,R&D,Manufacturing,Media,Education,Government,Experience Centre,Universal?
+S001,Cover / Title,Cover & Credentials,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,Yes - common to all
+S002,Agenda / Contents,Cover & Credentials,R,R,M,O,R,R,R,R,R,R,R,R,R,O,R,R,O,Varies by level
+S003,About Us,Cover & Credentials,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,Yes - common to all
+S004,Credentials by Numbers,Cover & Credentials,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,Varies by level
+S005,Client Logo Wall,Cover & Credentials,O,O,O,X,O,O,O,O,O,O,O,O,O,O,O,O,O,Typology-specific
+S006,Our Team,Cover & Credentials,O,O,O,X,O,O,O,O,O,O,O,O,O,O,O,O,O,Typology-specific
+S007,Why Us / Differentiators,Cover & Credentials,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,Varies by level
+S008,Selected Work / Case Study,Cover & Credentials,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,Varies by level
+S010,Section Divider - Understanding,Understanding the Brief,R,R,R,O,R,R,R,R,R,R,R,R,R,R,R,R,O,Varies by level
+S011,Brief Recap / Mandate,Understanding the Brief,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,Yes - common to all
+S012,Project Snapshot,Understanding the Brief,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,Yes - common to all
+S013,Brand Landscape,Understanding the Brief,R,R,R,O,O,R,R,R,R,R,R,R,O,M,O,O,R,Varies by level
+S014,Workplace Aspirations,Understanding the Brief,R,R,R,R,O,R,R,R,R,R,R,R,R,R,R,R,R,Varies by level
+S015,User Profiles / Personas,Understanding the Brief,R,R,R,R,O,R,R,R,R,R,R,R,R,R,R,R,R,Varies by level
+S016,Work Styles Mix,Understanding the Brief,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,Varies by level
+S017,Headcount & Growth,Understanding the Brief,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,O,Varies by level
+S018,Attendance & Utilisation,Understanding the Brief,O,M,M,O,O,O,O,M,X,R,O,O,O,O,O,O,X,Typology-specific
+S019,Employee Journey,Understanding the Brief,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,Varies by level
+S020,Benchmarks & References,Understanding the Brief,O,O,R,O,O,O,O,O,O,O,O,O,O,O,O,O,O,Varies by level
+S021,Design Brief Summary,Understanding the Brief,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,Varies by level
+S030,Section Divider - Site,Site & Context,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,Varies by level
+S031,Site Locus / Location,Site & Context,R,R,R,O,R,R,R,R,R,R,R,R,R,R,R,R,R,Varies by level
+S032,Building & Floor Plate,Site & Context,R,R,R,O,R,R,R,R,R,R,R,R,R,R,R,R,R,Varies by level
+S033,Existing Condition Survey,Site & Context,O,O,O,X,O,O,O,O,O,O,O,O,R,O,O,O,O,Typology-specific
+S034,Constraints & Opportunities,Site & Context,R,R,R,O,R,R,R,R,R,R,R,R,R,R,R,R,R,Varies by level
+S035,Daylight & Orientation,Site & Context,O,O,O,X,O,O,O,O,O,O,O,O,O,O,O,O,O,Typology-specific
+S036,Base Build & Services Review,Site & Context,O,O,O,X,O,O,O,O,O,O,O,M,O,O,O,O,O,Typology-specific
+S040,Section Divider - Approach,Strategy & Concept,R,R,R,O,R,R,R,R,R,R,R,R,R,R,R,R,R,Varies by level
+S041,Design Approach / Process,Strategy & Concept,R,R,R,O,R,R,R,R,R,R,R,R,R,R,R,R,R,Varies by level
+S042,Design Concept - The Big Idea,Strategy & Concept,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,Yes - common to all
+S043,Concept Narrative,Strategy & Concept,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,Yes - common to all
+S044,Mood Board,Strategy & Concept,R,R,R,R,R,R,R,R,O,R,R,R,O,M,O,O,R,Varies by level
+S045,Design Cues / Keywords,Strategy & Concept,O,O,O,O,O,O,O,O,O,O,O,O,O,R,O,O,O,Varies by level
+S046,Concept Applied - Option Compare,Strategy & Concept,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,Varies by level
+S047,Design Principles,Strategy & Concept,O,O,O,X,O,O,O,O,O,O,O,O,O,O,O,O,O,Typology-specific
+S048,Workplace Strategy Model,Strategy & Concept,O,R,O,O,O,O,O,M,O,O,O,O,O,O,O,O,O,Varies by level
+S049,Space Standards / Kit of Parts,Strategy & Concept,O,O,M,X,R,R,O,O,O,O,O,O,O,O,O,M,O,Typology-specific
+S050,Concept-to-Space Map,Strategy & Concept,O,O,O,X,O,O,O,O,O,O,O,O,O,O,O,O,O,Typology-specific
+S060,Section Divider - Planning,Planning,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,Varies by level
+S061,Space Programme / Area Statement,Planning,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,Yes - common to all
+S062,Zoning Strategy,Planning,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,Yes - common to all
+S063,Adjacency Diagram,Planning,R,R,R,O,R,R,R,R,O,R,R,R,R,O,O,R,O,Varies by level
+S064,Circulation Strategy,Planning,R,R,R,O,R,R,R,R,R,R,R,R,R,R,R,R,O,Varies by level
+S065,Key Plan / Floor Plate,Planning,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,Yes - common to all
+S066,Furniture Layout Plan,Planning,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,Yes - common to all
+S067,Seating Capacity / Occupancy,Planning,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,O,Varies by level
+S068,Workstation Mix & Ratios,Planning,R,R,R,O,M,R,R,R,O,R,R,R,R,O,O,R,X,Typology-specific
+S069,Meeting Room Mix,Planning,O,R,O,O,R,O,O,O,O,O,O,O,O,O,O,O,O,Varies by level
+S070,Stacking Plan,Planning,O,O,O,X,O,O,O,O,O,O,O,O,O,O,O,O,X,Typology-specific
+S071,Zone Walkthrough,Planning,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,R,Varies by level
+S080,Section Divider - Design,Design - Space by Space,R,R,R,O,R,R,R,R,R,R,R,R,R,R,R,R,R,Varies by level
+S081,Reception & Arrival,Design - Space by Space,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,Yes - common to all
+S082,Client Waiting / Lounge,Design - Space by Space,O,O,O,O,O,O,M,M,M,O,O,O,O,O,O,O,O,Varies by level
+S083,Open Workspace / Workhall,Design - Space by Space,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,O,Varies by level
+S084,Cabins & Leadership,Design - Space by Space,R,R,R,O,M,R,R,M,M,R,R,R,R,R,R,R,X,Typology-specific
+S085,Meeting Rooms,Design - Space by Space,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,Yes - common to all
+S086,Boardroom,Design - Space by Space,O,O,O,O,O,O,M,M,O,O,O,O,O,O,O,O,O,Varies by level
+S087,Huddle & Phone Booths,Design - Space by Space,O,M,O,O,M,O,O,O,O,O,O,O,O,O,O,O,O,Varies by level
+S088,Collaboration & Breakout,Design - Space by Space,R,R,R,R,R,R,R,R,O,R,R,R,R,R,R,R,R,Varies by level
+S089,Cafeteria & Pantry,Design - Space by Space,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,Yes - common to all
+S090,Training / Town Hall,Design - Space by Space,O,O,M,O,O,O,O,O,O,M,O,O,O,O,M,O,O,Varies by level
+S091,Wellness & Mother's Room,Design - Space by Space,O,O,O,O,O,O,O,O,O,R,M,O,O,O,O,O,O,Varies by level
+S092,Washrooms,Design - Space by Space,O,O,O,O,O,O,O,O,O,O,O,O,R,O,M,R,O,Varies by level
+S093,"Support, Utility & Server",Design - Space by Space,O,O,O,O,O,M,O,O,R,O,O,O,O,O,O,O,O,Varies by level
+S094,Trading / Dealing Floor,Design - Space by Space,O,X,X,X,X,X,M,X,X,X,X,X,X,X,X,X,X,Typology-specific
+S095,Lab / Workshop Interface,Design - Space by Space,O,X,X,X,X,X,X,X,X,X,R,M,X,X,X,X,X,Typology-specific
+S096,Studio / Content Space,Design - Space by Space,O,X,X,X,X,X,X,X,X,X,X,X,X,M,R,X,X,Typology-specific
+S097,Community & Event Space,Design - Space by Space,O,X,X,X,M,O,X,X,X,X,X,X,X,X,X,X,X,Typology-specific
+S098,Experience / Demo Zone,Design - Space by Space,O,O,O,X,X,X,X,X,X,X,X,X,X,X,X,X,M,Typology-specific
+S099,Operations Control Tower,Design - Space by Space,O,X,X,X,X,X,X,X,X,M,X,X,X,X,X,X,X,Typology-specific
+S100,Public Interface Counter,Design - Space by Space,O,X,X,X,X,X,O,X,X,X,X,X,X,X,X,M,X,Typology-specific
+S110,Section Divider - Materials,Materials & Detail,O,O,O,X,O,O,O,O,O,O,O,O,O,O,O,O,O,Typology-specific
+S111,Material Palette,Materials & Detail,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,Yes - common to all
+S112,Colour Palette,Materials & Detail,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,Varies by level
+S113,Furniture Selection,Materials & Detail,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,Varies by level
+S114,Lighting Design,Materials & Detail,R,R,R,O,R,R,R,R,R,R,R,R,R,M,R,R,M,Varies by level
+S115,Acoustic Strategy,Materials & Detail,O,O,O,O,O,O,O,O,M,O,O,O,O,O,R,O,O,Varies by level
+S116,Signage & Wayfinding,Materials & Detail,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,R,Varies by level
+S117,Graphics & Storytelling,Materials & Detail,O,O,O,X,O,O,O,O,O,O,O,O,O,R,O,O,M,Typology-specific
+S118,Planting & Greenscaping,Materials & Detail,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,Varies by level
+S119,Art Programme,Materials & Detail,O,O,O,X,O,O,O,O,O,O,O,O,X,R,O,X,M,Typology-specific
+S120,Ceiling & Flooring,Materials & Detail,O,O,O,X,O,O,O,O,O,O,O,O,R,O,O,O,O,Typology-specific
+S121,Detail Junctions,Materials & Detail,O,O,R,X,O,O,R,R,R,O,O,O,O,O,O,O,R,Typology-specific
+S130,Section Divider - Technical,Technical & Compliance,O,O,O,X,O,O,O,O,O,O,O,O,O,O,O,O,O,Typology-specific
+S131,MEP & Services Coordination,Technical & Compliance,O,O,O,O,O,O,O,O,O,O,O,M,O,O,O,O,O,Varies by level
+S132,AV & Technology Standard,Technical & Compliance,O,M,M,O,O,O,O,O,O,O,O,O,O,O,O,O,M,Varies by level
+S133,"IT, Power & Data",Technical & Compliance,O,R,M,O,O,O,R,O,O,R,O,R,O,O,O,O,O,Varies by level
+S134,Smart Workplace,Technical & Compliance,O,O,O,X,O,O,O,O,O,O,O,O,O,O,O,O,R,Typology-specific
+S135,Fire & Life Safety,Technical & Compliance,R,R,R,O,R,R,M,R,R,R,R,R,R,O,R,M,R,Varies by level
+S136,Accessibility,Technical & Compliance,R,R,R,O,R,R,R,R,R,R,M,R,M,O,R,M,R,Varies by level
+S137,Security & Access Control,Technical & Compliance,O,O,M,X,O,O,M,O,O,O,R,M,O,O,O,O,O,Typology-specific
+S138,Sustainability Approach,Technical & Compliance,O,O,O,O,O,O,O,O,O,O,R,O,O,O,O,O,O,Varies by level
+S139,Green Certification Pathway,Technical & Compliance,O,O,R,X,O,O,O,O,O,O,O,O,O,O,O,O,O,Typology-specific
+S150,Section Divider - Commercials,Commercials & Delivery,R,R,R,O,R,R,R,R,R,R,R,R,R,R,R,R,R,Varies by level
+S151,Budget Summary,Commercials & Delivery,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,Yes - common to all
+S152,Cost per Seat,Commercials & Delivery,R,R,R,M,R,R,R,R,R,R,R,R,R,R,R,R,R,Varies by level
+S153,BOQ Highlights,Commercials & Delivery,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,R,O,Varies by level
+S154,Value Engineering Options,Commercials & Delivery,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,O,Varies by level
+S155,Project Timeline,Commercials & Delivery,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,Yes - common to all
+S156,Delivery Model & Team,Commercials & Delivery,R,R,R,O,R,M,R,R,R,R,R,R,R,O,R,R,R,Varies by level
+S157,Site Safety & Quality,Commercials & Delivery,O,O,O,O,O,R,O,O,O,R,R,R,M,O,R,O,O,Varies by level
+S158,Operations & Handover,Commercials & Delivery,O,O,R,O,M,M,O,O,O,O,O,O,O,O,O,O,O,Varies by level
+S159,Warranty & Post-Handover,Commercials & Delivery,O,O,O,O,R,M,O,O,O,O,O,O,O,O,O,O,O,Varies by level
+S160,Risks & Assumptions,Commercials & Delivery,O,O,R,O,O,O,R,O,O,O,O,R,O,O,O,R,O,Varies by level
+S161,Next Steps,Commercials & Delivery,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,Yes - common to all
+S162,Thank You / Contact,Commercials & Delivery,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,M,Yes - common to all

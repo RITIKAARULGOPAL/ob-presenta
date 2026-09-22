@@ -1,0 +1,250 @@
+Slide ID,Asset slot,Kind,File,Required,Ratio,Min px,Source
+S001,brand mark (ob-white.png),brand,brand/ob-white.png,yes,free,native,Officebanao / SKV
+S001,brand mark (ob.png),brand,brand/ob.png,yes,free,native,Officebanao / SKV
+S001,brand mark (skv.png),brand,brand/skv.png,yes,free,native,Officebanao / SKV
+S001,Hero image or hero video,photo-slot,,no,16:9,1600x900,Supplied per project — not shippable
+S001,accent colour pulled from the logo,photo-slot,,no,free,400px wide,Supplied per project — not shippable
+S001,client logo,photo-slot,,yes,free,400px wide,Supplied per project — not shippable
+S001,template thumbnail,thumbnail,thumbnails/s001.svg,no,16:9,800x450,Generated — layout wireframe
+S002,template thumbnail,thumbnail,thumbnails/s002.svg,no,16:9,800x450,Generated — layout wireframe
+S003,brand mark (ob-white.png),brand,brand/ob-white.png,yes,free,native,Officebanao / SKV
+S003,brand mark (ob.png),brand,brand/ob.png,yes,free,native,Officebanao / SKV
+S003,brand mark (skv.png),brand,brand/skv.png,yes,free,native,Officebanao / SKV
+S003,template thumbnail,thumbnail,thumbnails/s003.svg,no,16:9,800x450,Generated — layout wireframe
+S004,template thumbnail,thumbnail,thumbnails/s004.svg,no,16:9,800x450,Generated — layout wireframe
+S005,Client logo files,photo-slot,,yes,free,400px wide,Supplied per project — not shippable
+S005,Per-logo typology tag for filtering,photo-slot,,no,free,400px wide,Supplied per project — not shippable
+S005,template thumbnail,thumbnail,thumbnails/s005.svg,no,16:9,800x450,Generated — layout wireframe
+S006,Team photos,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S006,template thumbnail,thumbnail,thumbnails/s006.svg,no,16:9,800x450,Generated — layout wireframe
+S007,template thumbnail,thumbnail,thumbnails/s007.svg,no,16:9,800x450,Generated — layout wireframe
+S008,Case study images,photo-slot,,yes,16:9,1600x900,Supplied per project — not shippable
+S008,template thumbnail,thumbnail,thumbnails/s008.svg,no,16:9,800x450,Generated — layout wireframe
+S010,template thumbnail,thumbnail,thumbnails/s010.svg,no,16:9,800x450,Generated — layout wireframe
+S011,template thumbnail,thumbnail,thumbnails/s011.svg,no,16:9,800x450,Generated — layout wireframe
+S012,template thumbnail,thumbnail,thumbnails/s012.svg,no,16:9,800x450,Generated — layout wireframe
+S013,Existing office photos,photo-slot,,no,16:9,1920x1080,Supplied per project — not shippable
+S013,brand imagery,photo-slot,,yes,16:9,1600x900,Supplied per project — not shippable
+S013,product imagery,photo-slot,,no,16:9,1600x900,Supplied per project — not shippable
+S013,Brand Landscape element,reference-photo,reference/ecom-express/s2-img1.png,no,varies,varies,E-Com Express client deck (already in repo)
+S013,Brand Landscape element,reference-photo,reference/ecom-express/s2-img2.jpg,no,varies,varies,E-Com Express client deck (already in repo)
+S013,Brand Landscape element,reference-photo,reference/ecom-express/s2-img3.png,no,varies,varies,E-Com Express client deck (already in repo)
+S013,Brand Landscape element,reference-photo,reference/ecom-express/s2-img4.png,no,varies,varies,E-Com Express client deck (already in repo)
+S013,Brand Landscape element,reference-photo,reference/ecom-express/s2-img5.jpg,no,varies,varies,E-Com Express client deck (already in repo)
+S013,Brand Landscape element,reference-photo,reference/ecom-express/s2-img6.png,no,varies,varies,E-Com Express client deck (already in repo)
+S013,full reference slide,reference-slide,reference/ecom-express/slide-2.png,no,16:9,1920x1080,E-Com Express client deck
+S013,template thumbnail,thumbnail,thumbnails/s013.svg,no,16:9,800x450,Generated — layout wireframe
+S014,Workplace Aspirations element,reference-photo,reference/ecom-express/s1-img1.jpg,no,varies,varies,E-Com Express client deck (already in repo)
+S014,Workplace Aspirations element,reference-photo,reference/ecom-express/s1-img2.jpg,no,varies,varies,E-Com Express client deck (already in repo)
+S014,Workplace Aspirations element,reference-photo,reference/ecom-express/s1-img3.jpg,no,varies,varies,E-Com Express client deck (already in repo)
+S014,Workplace Aspirations element,reference-photo,reference/ecom-express/s1-img4.jpg,no,varies,varies,E-Com Express client deck (already in repo)
+S014,Workplace Aspirations element,reference-photo,reference/ecom-express/s1-img5.jpg,no,varies,varies,E-Com Express client deck (already in repo)
+S014,Workplace Aspirations element,reference-photo,reference/ecom-express/s1-img6.png,no,varies,varies,E-Com Express client deck (already in repo)
+S014,full reference slide,reference-slide,reference/ecom-express/slide-1.png,no,16:9,1920x1080,E-Com Express client deck
+S014,template thumbnail,thumbnail,thumbnails/s014.svg,no,16:9,800x450,Generated — layout wireframe
+S015,Persona photos,photo-slot,,no,16:9,1920x1080,Supplied per project — not shippable
+S015,template thumbnail,thumbnail,thumbnails/s015.svg,no,16:9,800x450,Generated — layout wireframe
+S016,work styles split,diagram,diagrams/work-styles-split.png,no,16:9,1600x900,Generated — original artwork
+S016,template thumbnail,thumbnail,thumbnails/s016.svg,no,16:9,800x450,Generated — layout wireframe
+S017,template thumbnail,thumbnail,thumbnails/s017.svg,no,16:9,800x450,Generated — layout wireframe
+S018,attendance pattern,diagram,diagrams/attendance-pattern.png,no,16:9,1600x900,Generated — original artwork
+S018,template thumbnail,thumbnail,thumbnails/s018.svg,no,16:9,800x450,Generated — layout wireframe
+S019,employee journey,diagram,diagrams/employee-journey.png,no,16:9,1600x900,Generated — original artwork
+S019,template thumbnail,thumbnail,thumbnails/s019.svg,no,16:9,800x450,Generated — layout wireframe
+S020,Images of each benchmark,photo-slot,,no,16:9,1600x900,Supplied per project — not shippable
+S020,template thumbnail,thumbnail,thumbnails/s020.svg,no,16:9,800x450,Generated — layout wireframe
+S021,template thumbnail,thumbnail,thumbnails/s021.svg,no,16:9,800x450,Generated — layout wireframe
+S030,template thumbnail,thumbnail,thumbnails/s030.svg,no,16:9,800x450,Generated — layout wireframe
+S031,orientation sun path,diagram,diagrams/orientation-sun-path.png,no,16:9,1600x900,Generated — original artwork
+S031,building photo,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S031,template thumbnail,thumbnail,thumbnails/s031.svg,no,16:9,800x450,Generated — layout wireframe
+S032,Floor plan from the landlord or survey,photo-slot,,yes,16:9,2400x1350,Supplied per project — not shippable
+S032,template thumbnail,thumbnail,thumbnails/s032.svg,no,16:9,800x450,Generated — layout wireframe
+S033,Site survey photos,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S033,key plan,photo-slot,,yes,16:9,2400x1350,Supplied per project — not shippable
+S033,template thumbnail,thumbnail,thumbnails/s033.svg,no,16:9,800x450,Generated — layout wireframe
+S034,base-build drawings,photo-slot,,no,16:9,2400x1350,Supplied per project — not shippable
+S034,template thumbnail,thumbnail,thumbnails/s034.svg,no,16:9,800x450,Generated — layout wireframe
+S035,daylight penetration,diagram,diagrams/daylight-penetration.png,no,16:9,1600x900,Generated — original artwork
+S035,orientation sun path,diagram,diagrams/orientation-sun-path.png,no,16:9,1600x900,Generated — original artwork
+S035,Floor plan,photo-slot,,yes,16:9,2400x1350,Supplied per project — not shippable
+S035,template thumbnail,thumbnail,thumbnails/s035.svg,no,16:9,800x450,Generated — layout wireframe
+S036,Base-build services drawings,photo-slot,,yes,16:9,2400x1350,Supplied per project — not shippable
+S036,template thumbnail,thumbnail,thumbnails/s036.svg,no,16:9,800x450,Generated — layout wireframe
+S040,template thumbnail,thumbnail,thumbnails/s040.svg,no,16:9,800x450,Generated — layout wireframe
+S041,design sequence,diagram,diagrams/design-sequence.png,no,16:9,1600x900,Generated — original artwork
+S041,template thumbnail,thumbnail,thumbnails/s041.svg,no,16:9,800x450,Generated — layout wireframe
+S042,A background image at low opacity,photo-slot,,no,16:9,1600x900,Supplied per project — not shippable
+S042,template thumbnail,thumbnail,thumbnails/s042.svg,no,16:9,800x450,Generated — layout wireframe
+S043,a concept image,photo-slot,,yes,16:9,1600x900,Supplied per project — not shippable
+S043,template thumbnail,thumbnail,thumbnails/s043.svg,no,16:9,800x450,Generated — layout wireframe
+S044,Biophilic board,concept-board,concept-boards/c01-biophilic.png,no,16:9,1600x900,Generated — concept C01
+S044,Brand-Immersive / Playful board,concept-board,concept-boards/c06-brand-immersive.png,no,16:9,1600x900,Generated — concept C06
+S044,Collaborative (ABW) board,concept-board,concept-boards/c03-collaborative.png,no,16:9,1600x900,Generated — concept C03
+S044,Contemporary / Minimal board,concept-board,concept-boards/c02-contemporary.png,no,16:9,1600x900,Generated — concept C02
+S044,Heritage & Local Context board,concept-board,concept-boards/c05-heritage-&-local-context.png,no,16:9,1600x900,Generated — concept C05
+S044,Industrial / Raw board,concept-board,concept-boards/c04-industrial.png,no,16:9,1600x900,Generated — concept C04
+S044,Monochrome / Editorial board,concept-board,concept-boards/c11-monochrome.png,no,16:9,1600x900,Generated — concept C11
+S044,Resimercial / Homely board,concept-board,concept-boards/c12-resimercial.png,no,16:9,1600x900,Generated — concept C12
+S044,Sustainable / Certified Green board,concept-board,concept-boards/c08-sustainable.png,no,16:9,1600x900,Generated — concept C08
+S044,Tech-Forward / Smart board,concept-board,concept-boards/c09-tech-forward.png,no,16:9,1600x900,Generated — concept C09
+S044,Warm Minimal (Japandi) board,concept-board,concept-boards/c10-warm-minimal.png,no,16:9,1600x900,Generated — concept C10
+S044,Wellness-First board,concept-board,concept-boards/c07-wellness-first.png,no,16:9,1600x900,Generated — concept C07
+S044,Per-image caption naming what it is being referenced for,photo-slot,,no,16:9,1600x900,Supplied per project — not shippable
+S044,Reference images,photo-slot,,yes,16:9,1600x900,Supplied per project — not shippable
+S044,template thumbnail,thumbnail,thumbnails/s044.svg,no,16:9,800x450,Generated — layout wireframe
+S045,Source imagery per cue,photo-slot,,no,16:9,1600x900,Supplied per project — not shippable
+S045,Design Cues element,reference-photo,reference/ecom-express/s3-img1.jpg,no,varies,varies,E-Com Express client deck (already in repo)
+S045,Design Cues element,reference-photo,reference/ecom-express/s3-img2.jpg,no,varies,varies,E-Com Express client deck (already in repo)
+S045,Design Cues element,reference-photo,reference/ecom-express/s3-img3.png,no,varies,varies,E-Com Express client deck (already in repo)
+S045,Design Cues element,reference-photo,reference/ecom-express/s3-img4.png,no,varies,varies,E-Com Express client deck (already in repo)
+S045,Design Cues element,reference-photo,reference/ecom-express/s3-img5.png,no,varies,varies,E-Com Express client deck (already in repo)
+S045,Design Cues element,reference-photo,reference/ecom-express/s3-img6.png,no,varies,varies,E-Com Express client deck (already in repo)
+S045,Design Cues element,reference-photo,reference/ecom-express/s3-img7.png,no,varies,varies,E-Com Express client deck (already in repo)
+S045,full reference slide,reference-slide,reference/ecom-express/slide-3.png,no,16:9,1920x1080,E-Com Express client deck
+S045,template thumbnail,thumbnail,thumbnails/s045.svg,no,16:9,800x450,Generated — layout wireframe
+S046,Two comparable images,photo-slot,,yes,16:9,1600x900,Supplied per project — not shippable
+S046,template thumbnail,thumbnail,thumbnails/s046.svg,no,16:9,800x450,Generated — layout wireframe
+S047,template thumbnail,thumbnail,thumbnails/s047.svg,no,16:9,800x450,Generated — layout wireframe
+S048,abw settings menu,diagram,diagrams/abw-settings-menu.png,no,16:9,1600x900,Generated — original artwork
+S048,template thumbnail,thumbnail,thumbnails/s048.svg,no,16:9,800x450,Generated — layout wireframe
+S049,template thumbnail,thumbnail,thumbnails/s049.svg,no,16:9,800x450,Generated — layout wireframe
+S050,Key plan,photo-slot,,yes,16:9,2400x1350,Supplied per project — not shippable
+S050,template thumbnail,thumbnail,thumbnails/s050.svg,no,16:9,800x450,Generated — layout wireframe
+S060,template thumbnail,thumbnail,thumbnails/s060.svg,no,16:9,800x450,Generated — layout wireframe
+S061,area allocation,diagram,diagrams/area-allocation.png,no,16:9,1600x900,Generated — original artwork
+S061,template thumbnail,thumbnail,thumbnails/s061.svg,no,16:9,800x450,Generated — layout wireframe
+S062,zoning strategy,diagram,diagrams/zoning-strategy.png,no,16:9,1600x900,Generated — original artwork
+S062,Floor plan,photo-slot,,yes,16:9,2400x1350,Supplied per project — not shippable
+S062,template thumbnail,thumbnail,thumbnails/s062.svg,no,16:9,800x450,Generated — layout wireframe
+S063,adjacency diagram,diagram,diagrams/adjacency-diagram.png,no,16:9,1600x900,Generated — original artwork
+S063,template thumbnail,thumbnail,thumbnails/s063.svg,no,16:9,800x450,Generated — layout wireframe
+S064,circulation strategy,diagram,diagrams/circulation-strategy.png,no,16:9,1600x900,Generated — original artwork
+S064,Floor plan,photo-slot,,yes,16:9,2400x1350,Supplied per project — not shippable
+S064,template thumbnail,thumbnail,thumbnails/s064.svg,no,16:9,800x450,Generated — layout wireframe
+S065,Final floor plan,photo-slot,,yes,16:9,2400x1350,Supplied per project — not shippable
+S065,template thumbnail,thumbnail,thumbnails/s065.svg,no,16:9,800x450,Generated — layout wireframe
+S066,Furniture layout drawing,photo-slot,,yes,16:9,2400x1350,Supplied per project — not shippable
+S066,template thumbnail,thumbnail,thumbnails/s066.svg,no,16:9,800x450,Generated — layout wireframe
+S067,key plan,photo-slot,,yes,16:9,2400x1350,Supplied per project — not shippable
+S067,template thumbnail,thumbnail,thumbnails/s067.svg,no,16:9,800x450,Generated — layout wireframe
+S068,workstation mix,diagram,diagrams/workstation-mix.png,no,16:9,1600x900,Generated — original artwork
+S068,template thumbnail,thumbnail,thumbnails/s068.svg,no,16:9,800x450,Generated — layout wireframe
+S069,meeting room mix,diagram,diagrams/meeting-room-mix.png,no,16:9,1600x900,Generated — original artwork
+S069,template thumbnail,thumbnail,thumbnails/s069.svg,no,16:9,800x450,Generated — layout wireframe
+S070,stacking plan,diagram,diagrams/stacking-plan.png,no,16:9,1600x900,Generated — original artwork
+S070,template thumbnail,thumbnail,thumbnails/s070.svg,no,16:9,800x450,Generated — layout wireframe
+S071,Key plan,photo-slot,,yes,16:9,2400x1350,Supplied per project — not shippable
+S071,Per-zone walkthrough video,photo-slot,,no,16:9,1080p,Supplied per project — not shippable
+S071,per-zone renders,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S071,template thumbnail,thumbnail,thumbnails/s071.svg,no,16:9,800x450,Generated — layout wireframe
+S080,template thumbnail,thumbnail,thumbnails/s080.svg,no,16:9,800x450,Generated — layout wireframe
+S081,Reception render,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S081,template thumbnail,thumbnail,thumbnails/s081.svg,no,16:9,800x450,Generated — layout wireframe
+S082,Lounge render,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S082,template thumbnail,thumbnail,thumbnails/s082.svg,no,16:9,800x450,Generated — layout wireframe
+S083,Workhall render,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S083,template thumbnail,thumbnail,thumbnails/s083.svg,no,16:9,800x450,Generated — layout wireframe
+S084,Cabin render,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S084,template thumbnail,thumbnail,thumbnails/s084.svg,no,16:9,800x450,Generated — layout wireframe
+S085,Meeting room render,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S085,template thumbnail,thumbnail,thumbnails/s085.svg,no,16:9,800x450,Generated — layout wireframe
+S086,Boardroom render,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S086,template thumbnail,thumbnail,thumbnails/s086.svg,no,16:9,800x450,Generated — layout wireframe
+S087,Booth render or product image,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S087,distribution on plan,photo-slot,,no,16:9,2400x1350,Supplied per project — not shippable
+S087,template thumbnail,thumbnail,thumbnails/s087.svg,no,16:9,800x450,Generated — layout wireframe
+S088,abw settings menu,diagram,diagrams/abw-settings-menu.png,no,16:9,1600x900,Generated — original artwork
+S088,Breakout render,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S088,template thumbnail,thumbnail,thumbnails/s088.svg,no,16:9,800x450,Generated — layout wireframe
+S089,Cafeteria render,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S089,template thumbnail,thumbnail,thumbnails/s089.svg,no,16:9,800x450,Generated — layout wireframe
+S090,Training room render,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S090,template thumbnail,thumbnail,thumbnails/s090.svg,no,16:9,800x450,Generated — layout wireframe
+S091,Wellness room render,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S091,template thumbnail,thumbnail,thumbnails/s091.svg,no,16:9,800x450,Generated — layout wireframe
+S092,Washroom render or fixture schedule,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S092,template thumbnail,thumbnail,thumbnails/s092.svg,no,16:9,800x450,Generated — layout wireframe
+S093,template thumbnail,thumbnail,thumbnails/s093.svg,no,16:9,800x450,Generated — layout wireframe
+S094,Dealing floor render,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S094,template thumbnail,thumbnail,thumbnails/s094.svg,no,16:9,800x450,Generated — layout wireframe
+S095,Lab interface render,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S095,template thumbnail,thumbnail,thumbnails/s095.svg,no,16:9,800x450,Generated — layout wireframe
+S096,Studio render,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S096,template thumbnail,thumbnail,thumbnails/s096.svg,no,16:9,800x450,Generated — layout wireframe
+S097,Community space render,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S097,template thumbnail,thumbnail,thumbnails/s097.svg,no,16:9,800x450,Generated — layout wireframe
+S098,Experience zone render,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S098,content plan,photo-slot,,no,16:9,2400x1350,Supplied per project — not shippable
+S098,template thumbnail,thumbnail,thumbnails/s098.svg,no,16:9,800x450,Generated — layout wireframe
+S099,Control room render,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S099,template thumbnail,thumbnail,thumbnails/s099.svg,no,16:9,800x450,Generated — layout wireframe
+S100,Public counter render,photo-slot,,yes,16:9,1920x1080,Supplied per project — not shippable
+S100,template thumbnail,thumbnail,thumbnails/s100.svg,no,16:9,800x450,Generated — layout wireframe
+S110,template thumbnail,thumbnail,thumbnails/s110.svg,no,16:9,800x450,Generated — layout wireframe
+S111,Biophilic board,concept-board,concept-boards/c01-biophilic.png,no,16:9,1600x900,Generated — concept C01
+S111,Brand-Immersive / Playful board,concept-board,concept-boards/c06-brand-immersive.png,no,16:9,1600x900,Generated — concept C06
+S111,Collaborative (ABW) board,concept-board,concept-boards/c03-collaborative.png,no,16:9,1600x900,Generated — concept C03
+S111,Contemporary / Minimal board,concept-board,concept-boards/c02-contemporary.png,no,16:9,1600x900,Generated — concept C02
+S111,Heritage & Local Context board,concept-board,concept-boards/c05-heritage-&-local-context.png,no,16:9,1600x900,Generated — concept C05
+S111,Industrial / Raw board,concept-board,concept-boards/c04-industrial.png,no,16:9,1600x900,Generated — concept C04
+S111,Monochrome / Editorial board,concept-board,concept-boards/c11-monochrome.png,no,16:9,1600x900,Generated — concept C11
+S111,Resimercial / Homely board,concept-board,concept-boards/c12-resimercial.png,no,16:9,1600x900,Generated — concept C12
+S111,Sustainable / Certified Green board,concept-board,concept-boards/c08-sustainable.png,no,16:9,1600x900,Generated — concept C08
+S111,Tech-Forward / Smart board,concept-board,concept-boards/c09-tech-forward.png,no,16:9,1600x900,Generated — concept C09
+S111,Warm Minimal (Japandi) board,concept-board,concept-boards/c10-warm-minimal.png,no,16:9,1600x900,Generated — concept C10
+S111,Wellness-First board,concept-board,concept-boards/c07-wellness-first.png,no,16:9,1600x900,Generated — concept C07
+S111,Material swatch images,photo-slot,,yes,16:9,1600x900,Supplied per project — not shippable
+S111,template thumbnail,thumbnail,thumbnails/s111.svg,no,16:9,800x450,Generated — layout wireframe
+S112,template thumbnail,thumbnail,thumbnails/s112.svg,no,16:9,800x450,Generated — layout wireframe
+S113,Furniture product images,photo-slot,,yes,16:9,1600x900,Supplied per project — not shippable
+S113,template thumbnail,thumbnail,thumbnails/s113.svg,no,16:9,800x450,Generated — layout wireframe
+S114,template thumbnail,thumbnail,thumbnails/s114.svg,no,16:9,800x450,Generated — layout wireframe
+S115,acoustic zoning,diagram,diagrams/acoustic-zoning.png,no,16:9,1600x900,Generated — original artwork
+S115,acoustic zoning plan,photo-slot,,no,16:9,2400x1350,Supplied per project — not shippable
+S115,template thumbnail,thumbnail,thumbnails/s115.svg,no,16:9,800x450,Generated — layout wireframe
+S116,Signage location plan,photo-slot,,no,16:9,2400x1350,Supplied per project — not shippable
+S116,template thumbnail,thumbnail,thumbnails/s116.svg,no,16:9,800x450,Generated — layout wireframe
+S117,Content plan,photo-slot,,no,16:9,2400x1350,Supplied per project — not shippable
+S117,template thumbnail,thumbnail,thumbnails/s117.svg,no,16:9,800x450,Generated — layout wireframe
+S118,Planting plan,photo-slot,,yes,16:9,2400x1350,Supplied per project — not shippable
+S118,template thumbnail,thumbnail,thumbnails/s118.svg,no,16:9,800x450,Generated — layout wireframe
+S119,template thumbnail,thumbnail,thumbnails/s119.svg,no,16:9,800x450,Generated — layout wireframe
+S120,Reflected ceiling plan,photo-slot,,no,16:9,2400x1350,Supplied per project — not shippable
+S120,template thumbnail,thumbnail,thumbnails/s120.svg,no,16:9,800x450,Generated — layout wireframe
+S121,Detail drawings,photo-slot,,yes,16:9,2400x1350,Supplied per project — not shippable
+S121,template thumbnail,thumbnail,thumbnails/s121.svg,no,16:9,800x450,Generated — layout wireframe
+S130,template thumbnail,thumbnail,thumbnails/s130.svg,no,16:9,800x450,Generated — layout wireframe
+S131,Coordinated services drawings,photo-slot,,no,16:9,2400x1350,Supplied per project — not shippable
+S131,template thumbnail,thumbnail,thumbnails/s131.svg,no,16:9,800x450,Generated — layout wireframe
+S132,template thumbnail,thumbnail,thumbnails/s132.svg,no,16:9,800x450,Generated — layout wireframe
+S133,template thumbnail,thumbnail,thumbnails/s133.svg,no,16:9,800x450,Generated — layout wireframe
+S134,template thumbnail,thumbnail,thumbnails/s134.svg,no,16:9,800x450,Generated — layout wireframe
+S135,template thumbnail,thumbnail,thumbnails/s135.svg,no,16:9,800x450,Generated — layout wireframe
+S136,template thumbnail,thumbnail,thumbnails/s136.svg,no,16:9,800x450,Generated — layout wireframe
+S137,access hierarchy,diagram,diagrams/access-hierarchy.png,no,16:9,1600x900,Generated — original artwork
+S137,key plan,photo-slot,,yes,16:9,2400x1350,Supplied per project — not shippable
+S137,template thumbnail,thumbnail,thumbnails/s137.svg,no,16:9,800x450,Generated — layout wireframe
+S138,template thumbnail,thumbnail,thumbnails/s138.svg,no,16:9,800x450,Generated — layout wireframe
+S139,template thumbnail,thumbnail,thumbnails/s139.svg,no,16:9,800x450,Generated — layout wireframe
+S150,template thumbnail,thumbnail,thumbnails/s150.svg,no,16:9,800x450,Generated — layout wireframe
+S151,template thumbnail,thumbnail,thumbnails/s151.svg,no,16:9,800x450,Generated — layout wireframe
+S152,template thumbnail,thumbnail,thumbnails/s152.svg,no,16:9,800x450,Generated — layout wireframe
+S153,template thumbnail,thumbnail,thumbnails/s153.svg,no,16:9,800x450,Generated — layout wireframe
+S154,template thumbnail,thumbnail,thumbnails/s154.svg,no,16:9,800x450,Generated — layout wireframe
+S155,programme timeline,diagram,diagrams/programme-timeline.png,no,16:9,1600x900,Generated — original artwork
+S155,template thumbnail,thumbnail,thumbnails/s155.svg,no,16:9,800x450,Generated — layout wireframe
+S156,delivery model,diagram,diagrams/delivery-model.png,no,16:9,1600x900,Generated — original artwork
+S156,template thumbnail,thumbnail,thumbnails/s156.svg,no,16:9,800x450,Generated — layout wireframe
+S157,template thumbnail,thumbnail,thumbnails/s157.svg,no,16:9,800x450,Generated — layout wireframe
+S158,training plan,photo-slot,,no,16:9,2400x1350,Supplied per project — not shippable
+S158,template thumbnail,thumbnail,thumbnails/s158.svg,no,16:9,800x450,Generated — layout wireframe
+S159,template thumbnail,thumbnail,thumbnails/s159.svg,no,16:9,800x450,Generated — layout wireframe
+S160,template thumbnail,thumbnail,thumbnails/s160.svg,no,16:9,800x450,Generated — layout wireframe
+S161,template thumbnail,thumbnail,thumbnails/s161.svg,no,16:9,800x450,Generated — layout wireframe
+S162,brand mark (ob-white.png),brand,brand/ob-white.png,yes,free,native,Officebanao / SKV
+S162,brand mark (ob.png),brand,brand/ob.png,yes,free,native,Officebanao / SKV
+S162,brand mark (skv.png),brand,brand/skv.png,yes,free,native,Officebanao / SKV
+S162,A closing hero image,photo-slot,,no,16:9,1600x900,Supplied per project — not shippable
+S162,logos,photo-slot,,yes,free,400px wide,Supplied per project — not shippable
+S162,template thumbnail,thumbnail,thumbnails/s162.svg,no,16:9,800x450,Generated — layout wireframe

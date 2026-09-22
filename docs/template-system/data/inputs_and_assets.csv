@@ -1,0 +1,290 @@
+Input / asset,Required or optional,Used by # slides,Slides,Supplied by
+Section number,Required,8,S010 S030 S040 S060 S080 S110 S130 S150,Design team
+AV specification,Optional,5,S085 S086 S090 S097 S098,Design team
+Floor plan,Required,3,S035 S062 S064,Design team
+a second angle,Optional,3,S081 S083 S086,Design team
+key plan,Required,3,S033 S067 S137,Design team
+Capacity per configuration,Optional,2,S090 S097,Design team
+Key plan,Required,2,S050 S071,Design team
+Landlord fit-out guide,Optional,2,S034 S036,Design team
+acoustic ratings,Optional,2,S085 S096,Design team
+alternates,Optional,2,S113 S153,Design team
+dimensions,Optional,2,S083 S084,Design team
+3D detail views,Optional,1,S121,Design team
+A background image at low opacity,Optional,1,S042,Design team / client
+A closing hero image,Optional,1,S162,Design team / client
+A label per option,Optional,1,S046,Design team
+AV specification by room type,Required,1,S132,Design team
+Access control zoning,Required,1,S137,Design team
+Accessibility compliance review,Required,1,S136,Design team
+Acoustic ratings,Optional,1,S087,Design team
+Acoustic treatment schedule,Required,1,S115,Design team
+Agreed next steps,Required,1,S161,Design team
+Agreed objectives,Required,1,S021,Design team
+An example of each applied,Optional,1,S047,Design team
+Approval status,Optional,1,S135,Design team
+Area,Required,1,S012,Design team
+Area programme,Required,1,S061,Design team
+Art references or commissions,Required,1,S119,Design team
+Artist profiles,Optional,1,S119,Design team
+Aspiration statements,Required,1,S014,Design team
+Assumption and risk register,Required,1,S160,Design team
+Attendance or badge data,Required,1,S018,Client
+BOQ,Required,1,S153,Design team
+BOQ note,Optional,1,S071,Design team
+Base-build services drawings,Required,1,S036,Design team
+Benchmark comparison,Optional,1,S151,Design team
+Benchmark comparison per line,Optional,1,S061,Design team
+Benchmark projects and figures,Required,1,S020,Client
+Benchmark range,Optional,1,S152,Design team
+Boardroom render,Required,1,S086,Design team / client
+Booth render or product image,Required,1,S087,Design team / client
+Brand (OB / SKV / both),Required,1,S003,Client
+Brand colour reference,Optional,1,S112,Client
+Breakout render,Required,1,S088,Design team / client
+Brief document or meeting notes,Required,1,S011,Client
+Budget band,Optional,1,S012,Client
+CCTV layout,Optional,1,S137,Design team
+Cabin render,Required,1,S084,Design team / client
+Cabin-grade schedule,Optional,1,S084,Design team
+Cafeteria render,Required,1,S089,Design team / client
+Case study images,Required,1,S008,Design team / client
+Ceiling and flooring schedule,Required,1,S120,Design team
+Certification target,Optional,1,S138,Design team
+Certifications,Optional,1,S157,Design team
+Change-management outline,Optional,1,S048,Design team
+Chosen workplace model,Required,1,S048,Design team
+Client brand guidelines,Required,1,S013,Client
+Client logo files,Required,1,S005,Design team / client
+Client name,Required,1,S001,Design team
+Client quote,Optional,1,S008,Design team
+Client-side milestones mapped onto each step,Optional,1,S041,Design team
+Code compliance calculation,Optional,1,S092,Design team
+Colour palette,Required,1,S112,Design team
+Column grid dimensions,Optional,1,S032,Design team
+Community space render,Required,1,S097,Design team / client
+Concept narrative,Required,1,S043,Design team
+Contact details,Required,1,S162,Design team
+Content plan,Optional,1,S117,Design team
+Control room render,Required,1,S099,Design team / client
+Coordinated services drawings,Optional,1,S131,Design team
+Cost estimate by package,Required,1,S151,Client
+Cost per seat,Required,1,S152,Client
+Credential figures for the brand,Required,1,S004,Client
+Credit-by-credit scorecard,Optional,1,S139,Design team
+Critical path,Optional,1,S155,Design team
+Current and projected headcount,Required,1,S017,Client
+Daylight simulation,Optional,1,S035,Design team
+Dealing floor render,Required,1,S094,Design team / client
+Decision dates,Optional,1,S161,Design team
+Defects liability period,Optional,1,S159,Design team
+Delivery team structure,Required,1,S156,Design team
+Department and role breakdown,Required,1,S015,Design team
+Department interaction data,Required,1,S063,Client
+Department-wise split,Optional,1,S017,Design team
+Design keywords,Required,1,S045,Design team
+Detail drawings,Required,1,S121,Design team
+Diagram of the concept logic,Optional,1,S043,Design team
+Differentiator list,Required,1,S007,Design team
+Dilapidation notes,Optional,1,S033,Design team
+Dimensioned typical layouts,Optional,1,S049,Design team
+Direct quotes from the briefing,Optional,1,S011,Client
+Egress distances,Optional,1,S064,Design team
+Excel import of the capacity sheet,Optional,1,S067,Design team
+Existing office photos,Optional,1,S013,Design team / client
+Experience zone render,Required,1,S098,Design team / client
+Figures filtered to this typology,Optional,1,S004,Client
+Final floor plan,Required,1,S065,Design team
+Final section list,Required,1,S002,Design team
+Fire strategy,Required,1,S135,Design team
+Floor allocation,Required,1,S070,Design team
+Floor plan from the landlord or survey,Required,1,S032,Design team
+Founding year,Optional,1,S003,Design team
+Furniture layout drawing,Required,1,S066,Design team
+Furniture product images,Required,1,S113,Design team / client
+Furniture specification,Optional,1,S082,Design team
+Graphic concepts,Required,1,S117,Design team
+Handover scope,Required,1,S158,Design team
+Hero image or hero video,Optional,1,S001,Design team / client
+Images of each benchmark,Optional,1,S020,Design team / client
+Impact assessment per option,Optional,1,S154,Design team
+Interaction frequency survey,Optional,1,S063,Design team
+Irrigation strategy,Optional,1,S118,Design team
+Journey stages,Required,1,S019,Design team
+Lab interface render,Required,1,S095,Design team / client
+Lighting and AV specification,Optional,1,S096,Design team
+Lighting layout,Required,1,S114,Design team
+Locus map,Required,1,S031,Design team
+Lounge render,Required,1,S082,Design team / client
+Lux calculations,Optional,1,S114,Design team
+MEP scope,Required,1,S131,Design team
+Material callouts,Optional,1,S081,Design team
+Material swatch images,Required,1,S111,Design team / client
+Meeting room render,Required,1,S085,Design team / client
+Meeting room schedule,Required,1,S069,Design team
+Meeting-pattern or calendar data,Optional,1,S069,Client
+Mitigation owner per risk,Optional,1,S160,Design team
+NRC and STC ratings,Optional,1,S115,Design team
+Named individuals,Optional,1,S156,Design team
+Notes per row,Optional,1,S067,Design team
+O&M documentation list,Optional,1,S158,Design team
+Per-department breakdown,Optional,1,S016,Design team
+Per-image caption naming what it is being referenced for,Optional,1,S044,Design team / client
+Per-logo typology tag for filtering,Optional,1,S005,Design team / client
+Per-person relevant project credits,Optional,1,S006,Design team
+Per-stage pain points from the current office,Optional,1,S019,Design team
+Per-zone area and headcount,Optional,1,S062,Client
+Per-zone concept summary,Optional,1,S050,Design team
+Per-zone counts,Optional,1,S066,Design team
+Per-zone walkthrough video,Optional,1,S071,Design team / client
+Persona photos,Optional,1,S015,Design team / client
+Planting plan,Required,1,S118,Design team
+Platform selection,Optional,1,S134,Design team
+Platform standard,Optional,1,S132,Design team
+Power and cooling load,Optional,1,S094,Design team
+Power and data requirements,Required,1,S133,Client
+Principle list,Required,1,S047,Design team
+Priority ranking across objectives,Optional,1,S021,Design team
+Project programme,Required,1,S155,Design team
+Proof point per differentiator,Optional,1,S007,Design team
+Provision schedule,Optional,1,S091,Design team
+Public counter render,Required,1,S100,Design team / client
+Queuing calculation,Optional,1,S100,Design team
+Rate basis,Optional,1,S153,Design team
+Reception render,Required,1,S081,Design team / client
+Reference images,Required,1,S044,Design team / client
+Reflected ceiling plan,Optional,1,S120,Design team
+Required and achieved counts per zone,Required,1,S067,Design team
+Room numbering,Optional,1,S065,Design team
+SLA,Optional,1,S159,Design team
+Safety and quality process,Required,1,S157,Design team
+Screen wall specification,Optional,1,S099,Design team
+Seating count,Optional,1,S089,Design team
+Server room services requirement,Optional,1,S093,Design team
+Server room specification,Optional,1,S133,Design team
+Services load,Optional,1,S095,Design team
+Settings menu,Optional,1,S088,Design team
+Sharing ratio,Optional,1,S068,Design team
+Signage design,Required,1,S116,Design team
+Signage location plan,Optional,1,S116,Design team
+Site observations,Required,1,S034,Design team
+Site survey photos,Required,1,S033,Design team / client
+Smart workplace scope,Required,1,S134,Design team
+Source imagery per cue,Optional,1,S045,Design team / client
+Space standards schedule,Required,1,S049,Design team
+Staff survey results,Optional,1,S014,Design team
+Standard being applied,Optional,1,S136,Design team
+Studio render,Required,1,S096,Design team / client
+Sun-path diagram,Optional,1,S031,Design team
+Supplier and lead time,Optional,1,S113,Design team
+Supplier references,Optional,1,S111,Design team
+Support space schedule,Required,1,S093,Design team
+Sustainability strategy,Required,1,S138,Design team
+Target certification and level,Required,1,S139,Design team
+Team photos,Required,1,S006,Design team / client
+The concept statement,Required,1,S042,Design team
+Timings,Optional,1,S002,Design team
+Training room render,Required,1,S090,Design team / client
+Two comparable images,Required,1,S046,Design team / client
+Utilisation study,Optional,1,S018,Design team
+VE options with savings,Required,1,S154,Design team
+Vertical circulation strategy,Optional,1,S070,Design team
+Warranty terms,Required,1,S159,Design team
+Washroom render or fixture schedule,Required,1,S092,Design team / client
+Wellness room render,Required,1,S091,Design team / client
+Work-style split (survey or assumed),Required,1,S016,Design team
+Workhall render,Required,1,S083,Design team / client
+Workstation counts by type,Required,1,S068,Design team
+Workstation detail,Optional,1,S083,Design team
+a concept image,Required,1,S043,Design team / client
+a legend,Optional,1,S065,Design team
+accent colour pulled from the logo,Optional,1,S001,Design team / client
+access control zoning,Optional,1,S095,Design team
+accessibility compliance,Optional,1,S100,Design team
+acoustic zoning plan,Optional,1,S115,Design team
+address,Required,1,S031,Design team
+application map,Optional,1,S112,Design team
+approval requirements,Optional,1,S161,Design team
+attrition assumptions,Optional,1,S017,Design team
+audit results,Optional,1,S136,Design team
+base-build capacity,Required,1,S131,Design team
+base-build drawings,Optional,1,S034,Design team
+before/after pair,Optional,1,S008,Design team
+benchmark comparison,Optional,1,S068,Design team
+booking-system data,Optional,1,S018,Client
+booking-tool choice,Optional,1,S048,Design team
+brand imagery,Required,1,S013,Design team / client
+branding detail,Optional,1,S081,Client
+budget allocation,Optional,1,S119,Client
+building orientation,Required,1,S035,Design team
+building photo,Required,1,S031,Design team / client
+capacity figures,Optional,1,S036,Client
+circulation overlay,Required,1,S064,Design team
+client logo,Required,1,S001,Design team / client
+client-side decision dates,Optional,1,S155,Design team
+compliance requirement,Optional,1,S094,Design team
+concept summary,Optional,1,S071,Design team
+concept-to-zone mapping,Required,1,S050,Design team
+constraints,Required,1,S021,Design team
+consultant appointment,Optional,1,S139,Design team
+consultant sign-off,Optional,1,S135,Design team
+content plan,Optional,1,S098,Design team
+contingency assumptions,Optional,1,S151,Design team
+control strategy,Optional,1,S114,Design team
+data and privacy policy,Optional,1,S134,Client
+date,Required,1,S001,Design team
+desk specification,Required,1,S094,Design team
+distribution on plan,Optional,1,S087,Design team
+dwell timings,Optional,1,S098,Design team
+egress calculations,Required,1,S135,Design team
+fitting selection,Required,1,S114,Design team
+footfall estimates,Optional,1,S064,Design team
+furniture legend,Optional,1,S066,Design team
+furniture specification,Optional,1,S088,Design team
+glare study,Optional,1,S035,Design team
+governance calendar,Optional,1,S156,Design team
+headcount,Required,1,S012,Client
+headcount per floor,Required,1,S070,Client
+heritage or archive material,Optional,1,S117,Design team
+inclusions and exclusions list,Optional,1,S152,Design team
+inspection schedule,Optional,1,S157,Design team
+integration requirements,Optional,1,S132,Design team
+lab adjacency,Required,1,S095,Design team
+leadership interview quotes,Optional,1,S014,Design team
+load calculations,Optional,1,S131,Design team
+location,Required,1,S012,Design team
+logos,Required,1,S162,Design team / client
+maintenance contract scope,Optional,1,S118,Design team
+maintenance regime,Optional,1,S111,Design team
+material callouts,Optional,1,S082,Design team
+material detail,Optional,1,S086,Design team
+material provenance data,Optional,1,S138,Client
+material schedule,Required,1,S111,Design team
+named presenter per section,Optional,1,S002,Design team
+names,Required,1,S006,Design team
+neighbourhood amenities,Optional,1,S031,Design team
+number of floors,Optional,1,S012,Design team
+office locations,Optional,1,S003,Design team
+peak-load calculation,Optional,1,S089,Design team
+per-persona day-in-the-life,Optional,1,S015,Design team
+per-zone renders,Required,1,S071,Design team / client
+product imagery,Optional,1,S013,Design team / client
+project facts,Required,1,S008,Design team
+project name,Required,1,S001,Design team
+roles,Required,1,S006,Design team
+servery detail,Optional,1,S089,Design team
+services condition report,Optional,1,S033,Design team
+shift pattern,Optional,1,S099,Design team
+slab-to-slab height,Optional,1,S032,Design team
+species selection,Required,1,S118,Design team
+specification,Required,1,S113,Design team
+statutory requirement reference,Optional,1,S091,Design team
+team size,Optional,1,S003,Design team
+timeline,Required,1,S012,Design team
+training plan,Optional,1,S158,Design team
+transition details,Optional,1,S120,Design team
+typography specification,Optional,1,S116,Design team
+visitor management process,Optional,1,S137,Design team
+visitor route,Required,1,S098,Design team
+wifi heat map,Optional,1,S133,Design team
+zoning overlay,Required,1,S062,Design team

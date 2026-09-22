@@ -32,6 +32,126 @@ or re-explain anything.
 
 ---
 
+## 2026-09-22
+
+**Context:** the typology + concept-driven template population system — ask #1
+of the four logged as "blocked on the user" on 2026-09-18 ("needs the exact
+typology list and which concept-library pillars/slides belong to each"). The
+user asked for the *content* layer only; they build the rules engine and
+interaction logic from it. Deliverable shape was confirmed with them up front:
+a Google Sheet (not a repo xlsx), plus a shared image folder.
+
+**Done — all of it under [docs/template-system/](docs/template-system/) and
+[public/template-library/](public/template-library/); no `src/` changes:**
+- **The structural finding worth knowing before anything else**: `IT`, `GCC`,
+  `Startup` and `Managed Workspace` — the four examples the ask was framed
+  around — are four different *kinds* of thing (an industry sector, an
+  occupancy model, a company stage, a real-estate model). A flat typology list
+  conflates them and cannot express "IT + Startup" or "IT + GCC", both of which
+  are ordinary projects. So the model is **16 primary typologies** (the label a
+  project is tagged with) sitting on **5 independent axes** (occupancy, sector,
+  stage/scale, project nature, grade) that the rules actually read.
+  Second finding: **"Premium" is a grade, not a design concept** — it composes
+  with every character theme (Premium Biophilic and Premium Industrial are both
+  coherent), so it lives on axis E alongside Value/Standard/Luxury rather than
+  as a 13th theme. Keeping it in the concept list would have made that
+  dimension non-orthogonal and produced contradictory rules.
+- **106-slide master library** ([model_slides.py](docs/template-system/model_slides.py))
+  across 9 sections, each row naming a real `SlideLayout` + `SlideStyleKind`
+  from [slide.ts](src/types/slide.ts) so the engine can only emit slides the
+  renderer already understands. Section 05 (space-by-space, 21 slides) is where
+  typology bites hardest — the space list itself changes (dealing floor, lab
+  interface, community space, demo zone, control tower, public counter).
+- **12 design concepts + 4 grades + 16 typologies**
+  ([model_typology.py](docs/template-system/model_typology.py)), and the
+  **selection rules** ([model_rules.py](docs/template-system/model_rules.py)).
+  The sheet's matrices are *derived* from the rules rather than hand-filled —
+  a hand-filled 106x16 grid and an engine drift apart the first time someone
+  edits one and not the other.
+- **13-tab workbook** built by [build_sheet.py](docs/template-system/build_sheet.py),
+  with a CSV mirror of every tab in `docs/template-system/data/` so the engine
+  can read them from git without a Drive round-trip.
+- **Image library** ([gen_images.py](docs/template-system/gen_images.py)):
+  18 original diagrams that go *on* slides (zoning, adjacency, circulation,
+  journey, sun path, stacking, workstation/meeting mix, ABW settings, access
+  hierarchy, work-style and area splits, attendance, acoustics, daylight,
+  delivery model, programme), 12 concept boards, 106 layout thumbnails, the
+  harvested E-Com Express imagery re-indexed by slide type, and the brand
+  marks. Hand-written SVG, rasterised with the preinstalled Chromium at
+  `/opt/pw-browsers/chromium` — no npm install, no Supabase, no dev server.
+
+**Two design decisions in the rules worth not re-litigating:**
+- **Exclusion is sticky.** An `X` from typology or project-nature can never be
+  undone by a later rule, or picking the Tech-Forward concept would pull a BFSI
+  dealing floor into a startup deck. Relevance belongs to the project, not to
+  the design language.
+- **`down` (demote) is a separate operation from listing a slide as `O`.**
+  Escalations resolve by MAX, so listing an already-Recommended slide under
+  "O" does nothing at all. Without a real demote op every deck came out 52-60
+  slides regardless of typology — the one thing this system exists to prevent.
+  Caught by check 8 in `verify.py`, which now asserts the spread.
+
+**Verification** — [verify.py](docs/template-system/verify.py), 25 checks, all
+passing. It **caught a real error**: 20 space-by-space rows had `layout:
+"design"`, but `design` is a `SlideStyleKind`, not a `SlideLayout` —
+`createStyledSlide('design')` in [slideDefaults.ts](src/lib/slideDefaults.ts)
+pairs that style with the `title-content` layout. Every one of those slides
+would have failed to render. The check that caught it parses the real
+`SlideLayout` union out of `slide.ts`, so it cannot go stale. Check 7 re-runs
+the rules and asserts they reproduce the four worked example decks exactly,
+which is what stops tab 09 from becoming an aspirational description of
+behaviour the engine does not have.
+
+**Delivered to Google Drive**, folder "Presenta — Template System"
+(`1j3isjaMBqZaijdyKmBj7gPUMme-ZTClS`, in sathwick@officebanao.com's Drive) as
+13 separate Google Sheets, `00 README` through `12 Layout Coverage`. Uploaded
+as CSV text rather than the single 13-tab `.xlsx`, deliberately: the Drive MCP
+tool only accepts inline content, so the xlsx would have meant hand-relaying
+151 KB of base64 through a tool parameter — the exact failure this repo already
+documents (see 2026-09-17 "Watch out for", where that corrupted a 16 KB file).
+CSV text fails locally and visibly instead of killing the whole archive. The
+single 13-tab workbook still exists at
+`docs/template-system/presenta-slide-template-system.xlsx` and can be imported
+into Sheets in two clicks once the branch is pushed.
+
+**A bug I introduced and then caught, worth knowing about:** an early edit to
+`model_rules.py` was applied with a Python `str.index()` patch whose end-anchor
+matched the *first* `"T16"` in the file — which lives in `SPECIAL_SPACES`, not
+in `TYPOLOGY_RULES`. The result was **two** `TYPOLOGY_RULES` definitions in one
+module, and Python silently used the second (older) one. Every typology `down`
+list was therefore dead code: startup decks came out 42 slides instead of 28,
+and the deck-length spread was 41-59 instead of 28-59. `verify.py`'s check 8
+still passed, because scale and grade demotions alone produced enough spread to
+clear the threshold — a good reminder that a passing assertion only proves what
+it actually asserts. Caught by noticing the Rules tab still carried the old
+"18-26 slides" wording for T03 while the computed default said 42. **Lesson:
+don't patch Python source with index-based slicing; the anchors are rarely as
+unique as they look. Edit the file or regenerate it.**
+
+**Left off / next up:**
+- **Waiting on the user to pick which typologies to detail further** — they
+  asked to see the full analysis first ("tell how many are there..from that
+  ill pick and tell you what needs to be detailed out"). All 16 are mapped at
+  equal depth today; deepening means more `TYPOLOGY_RULES` entries and more
+  per-slide content guidance, not restructuring.
+- **8 slides have no adequate layout** (tab 12 lists them): area-statement
+  table, BOQ line-item table, cost/package table, option-comparison table,
+  project timeline/Gantt, client-logo wall, mood-board image grid, team grid.
+  `merge-diagram` and `title-stats` are standing in and fit none of them well.
+  These are the clearest next build items for the app itself.
+- **No stock photography is included, deliberately and unavoidably.** This
+  environment's egress policy 403s the stock CDNs (`images.unsplash.com`,
+  `images.pexels.com` — confirmed at the proxy, not a transient failure), and
+  more importantly the images these slides need (the reception render, the
+  floor plan) belong to the project. So the 68 photo slots are **spec rows** in
+  `_index.csv` — asset slot, required flag, aspect ratio, minimum pixels, no
+  file. That is the collection checklist, and what the engine should render as
+  an empty frame with a prompt.
+- `pip install openpyxl` is needed to re-run `build_sheet.py`/`verify.py`; it
+  is not a project dependency and deliberately not added to `package.json`.
+
+---
+
 ## 2026-09-21
 
 **Context:** kicked off Phase G ("tighten the editing experience" — the

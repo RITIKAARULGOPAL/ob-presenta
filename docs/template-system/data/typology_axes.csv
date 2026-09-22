@@ -1,0 +1,34 @@
+Axis,Name,Question it answers,Why it matters,Permitted values
+A,Occupancy model,"Who occupies the space, and who is paying for the fit-out?",Decides whose brand the deck speaks in and who the audience is. An operator is selling seats to future tenants; an enterprise is selling a workplace to its own leadership.,"Enterprise HQ
+Captive GCC
+Operator coworking
+Managed / BTS single tenant
+Satellite / branch
+Flex within enterprise"
+B,Industry sector,What does the business actually do?,"Drives compliance load, the special-space list (trading floor, lab, studio), security zoning and the imagery register.","IT & Technology Services
+BFSI
+Consulting & Professional Services
+Legal
+E-commerce & Logistics
+Healthcare / Pharma / Life Sciences
+R&D / Engineering / Hardware
+Manufacturing & Industrial
+Media / Creative / D2C
+Education & EdTech
+Government / PSU / Institutional
+Real Estate & Workspace Operator"
+C,Stage & scale,How big is the organisation and how settled is it?,"The single strongest driver of deck LENGTH and of how much process the client will sit through. Across the rules as written, a seed-stage startup resolves to about 27 slides and a campus-scale GCC to about 59 — the same library, sized to the audience.","Seed (up to 50 seats)
+Scale-up (50-300 seats)
+Mid-market (300-800 seats)
+Enterprise (800-2000 seats)
+Campus (2000+ seats)"
+D,Project nature,What kind of work is this?,"Decides whether existing-condition, phasing and live-site-working slides are mandatory or meaningless.","Greenfield fit-out
+Refurbishment / retrofit
+Expansion floor
+Consolidation
+Relocation
+Showcase only"
+E,Grade,Where does this sit on the cost/finish ladder?,"Composes with any character theme. Governs material specification, how much of the deck is spent on detail and mock-ups, and whether cost is framed as value-per-seat or as craft.","Value / functional
+Standard corporate
+Premium
+Luxury flagship"

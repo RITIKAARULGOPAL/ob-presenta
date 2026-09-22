@@ -1,0 +1,24 @@
+Presenta layout,Exists today,# slides using it,Slides,Gap?
+concept,Yes,21,S008 S016 S020 S032 S043 S044 S048 S111 S112 S113 S114 S115 S116 S117 S118 S119 S120 S121 S132 S134 S138,1 slide(s) forced onto this layout: S044 Mood Board
+freeform,Yes,3,S013 S014 S045,
+linked-views,Yes,11,S033 S050 S061 S062 S064 S065 S066 S067 S070 S071 S137,1 slide(s) forced onto this layout: S061 Space Programme / Area Statement
+material-compare,Yes,1,S046,
+merge-diagram,Yes,7,S007 S019 S041 S047 S063 S155 S156,1 slide(s) forced onto this layout: S155 Project Timeline
+orbit,Yes,1,S015,
+site-locus,Yes,2,S031 S035,
+stat-hero,Yes,1,S152,
+title-content,Yes,35,S002 S003 S005 S006 S011 S036 S049 S081 S082 S083 S084 S085 S086 S087 S088 S089 S090 S091 S092 S093 S094 S095 S096 S097 S098 S099 S100 S131 S133 S135 S136 S153 S157 S158 S159,3 slide(s) forced onto this layout: S005 Client Logo Wall; S006 Our Team; S153 BOQ Highlights
+title-only,Yes,2,S042 S161,
+title-slide,Yes,10,S001 S010 S030 S040 S060 S080 S110 S130 S150 S162,
+title-stats,Yes,8,S004 S012 S017 S018 S068 S069 S139 S151,1 slide(s) forced onto this layout: S151 Budget Summary
+two-content,Yes,4,S021 S034 S154 S160,1 slide(s) forced onto this layout: S154 Value Engineering Options
+,,,,
+MISSING LAYOUTS — these slides have no adequate layout today,,,,
+(currently concept),No,1,S044,Mood Board — no image-grid layout. freeform works but every image is placed by hand.
+(currently linked-views),No,1,S061,"Space Programme / Area Statement — no standalone table layout. Today this rides on LinkedView.seatingZones, which forces it next to a plan."
+(currently merge-diagram),No,1,S155,Project Timeline — no timeline or Gantt layout. merge-diagram shows sequence but neither duration nor overlap.
+(currently title-content),No,1,S005,Client Logo Wall — no logo-wall layout. A grid layout is needed; freeform works but every logo must be placed by hand.
+(currently title-content),No,1,S006,Our Team — no team-grid layout. freeform can do it but is manual.
+(currently title-content),No,1,S153,BOQ Highlights — no line-item table layout. SpaceBoq exists as a placeholder type only — the real table is unbuilt.
+(currently title-stats),No,1,S151,Budget Summary — no cost-table layout. title-stats handles 3-4 headline figures but not a full package breakdown.
+(currently two-content),No,1,S154,Value Engineering Options — no comparison-table layout. Always state what is lost; a saving without a cost reads as padding.

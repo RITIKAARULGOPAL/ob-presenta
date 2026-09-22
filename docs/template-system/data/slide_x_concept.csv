@@ -1,0 +1,120 @@
+Slide ID,Slide,Baseline,Biophilic,Contemporary / Minimal,Collaborative (ABW),Industrial / Raw,Heritage & Local Context,Brand-Immersive / Playful,Wellness-First,Sustainable / Certified Green,Tech-Forward / Smart,Warm Minimal (Japandi),Monochrome / Editorial,Resimercial / Homely,How the content shifts
+S001,Cover / Title,M,M,M,M,M,M,M,M,M,M,M,M,M,
+S002,Agenda / Contents,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S003,About Us,M,M,M,M,M,M,M,M,M,M,M,M,M,
+S004,Credentials by Numbers,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S005,Client Logo Wall,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S006,Our Team,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S007,Why Us / Differentiators,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S008,Selected Work / Case Study,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S010,Section Divider - Understanding,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S011,Brief Recap / Mandate,M,M,M,M,M,M,M,M,M,M,M,M,M,
+S012,Project Snapshot,M,M,M,M,M,M,M,M,M,M,M,M,M,
+S013,Brand Landscape,R,R,R,R,R,R,M,R,R,R,R,R,R,Brand-Immersive / Playful: The brand landscape slide stops being context and becomes the design's source material.
+S014,Workplace Aspirations,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S015,User Profiles / Personas,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S016,Work Styles Mix,O,O,O,M,O,O,O,O,O,O,O,O,O,"Collaborative (ABW): Work-style split is the entire justification for the settings mix. Survey data, not assumption."
+S017,Headcount & Growth,M,M,M,M,M,M,M,M,M,M,M,M,M,
+S018,Attendance & Utilisation,O,O,O,R,O,O,O,O,O,O,O,O,O,
+S019,Employee Journey,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S020,Benchmarks & References,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S021,Design Brief Summary,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S030,Section Divider - Site,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S031,Site Locus / Location,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S032,Building & Floor Plate,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S033,Existing Condition Survey,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S034,Constraints & Opportunities,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S035,Daylight & Orientation,O,M,O,O,O,O,O,R,O,O,O,O,O,"Biophilic: Daylight study drives the planting strategy, not just the desk layout."
+S036,Base Build & Services Review,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S040,Section Divider - Approach,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S041,Design Approach / Process,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S042,Design Concept - The Big Idea,M,M,M,M,M,M,M,M,M,M,M,M,M,
+S043,Concept Narrative,M,M,M,M,M,M,M,M,M,M,M,M,M,
+S044,Mood Board,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S045,Design Cues / Keywords,O,O,O,O,O,O,R,O,O,O,O,O,O,
+S046,Concept Applied - Option Compare,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S047,Design Principles,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S048,Workplace Strategy Model,O,O,O,M,O,O,O,O,O,O,O,O,O,Collaborative (ABW): Name the model explicitly and commit to a change-management programme on the same slide.
+S049,Space Standards / Kit of Parts,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S050,Concept-to-Space Map,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S060,Section Divider - Planning,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S061,Space Programme / Area Statement,M,M,M,M,M,M,M,M,M,M,M,M,M,
+S062,Zoning Strategy,M,M,M,M,M,M,M,M,M,M,M,M,M,
+S063,Adjacency Diagram,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S064,Circulation Strategy,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S065,Key Plan / Floor Plate,M,M,M,M,M,M,M,M,M,M,M,M,M,
+S066,Furniture Layout Plan,M,M,M,M,M,M,M,M,M,M,M,M,M,
+S067,Seating Capacity / Occupancy,M,M,M,M,M,M,M,M,M,M,M,M,M,
+S068,Workstation Mix & Ratios,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S069,Meeting Room Mix,O,O,O,R,O,O,O,O,O,R,O,O,O,"Tech-Forward / Smart: Room mix is derived from booking data, which the smart layer will keep measuring."
+S070,Stacking Plan,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S071,Zone Walkthrough,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S080,Section Divider - Design,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S081,Reception & Arrival,M,M,M,M,M,M,M,M,M,M,M,M,M,Biophilic: Reception carries the biggest planted gesture; it sets the expectation for the rest.
+S082,Client Waiting / Lounge,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S083,Open Workspace / Workhall,M,M,M,M,M,M,M,M,M,M,M,M,M,
+S084,Cabins & Leadership,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S085,Meeting Rooms,M,M,M,M,M,M,M,M,M,M,M,M,M,
+S086,Boardroom,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S087,Huddle & Phone Booths,O,O,O,M,O,O,O,O,O,O,O,O,O,"Collaborative (ABW): Booth ratio per 100 seats becomes a headline number, not a footnote."
+S088,Collaboration & Breakout,R,R,R,M,R,R,R,R,R,R,R,R,M,"Collaborative (ABW): The main evidence for the concept — show the full settings menu, not one lounge render.
+Resimercial / Homely: Domestic-scale settings are the evidence — lounge, rug, lamp, not another meeting table."
+S089,Cafeteria & Pantry,M,M,M,M,M,M,M,M,M,M,M,M,M,
+S090,Training / Town Hall,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S091,Wellness & Mother's Room,O,O,O,O,O,O,O,M,O,O,O,O,O,"Wellness-First: The wellness amenity set is the concept's evidence — quiet, prayer, mother's and recharge rooms."
+S092,Washrooms,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S093,"Support, Utility & Server",O,O,O,O,O,O,O,O,O,O,O,O,O,
+S094,Trading / Dealing Floor,O,X,X,X,X,X,X,X,X,X,X,X,X,
+S095,Lab / Workshop Interface,O,X,X,X,X,X,X,X,X,X,X,X,X,
+S096,Studio / Content Space,O,X,X,X,X,X,X,X,X,X,X,X,X,
+S097,Community & Event Space,O,X,X,X,X,X,X,X,X,X,X,X,X,
+S098,Experience / Demo Zone,O,X,X,X,X,X,X,X,X,X,X,X,X,
+S099,Operations Control Tower,O,X,X,X,X,X,X,X,X,X,X,X,X,
+S100,Public Interface Counter,O,X,X,X,X,X,X,X,X,X,X,X,X,
+S110,Section Divider - Materials,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S111,Material Palette,M,M,M,M,M,M,M,M,M,M,M,M,M,"Biophilic: Lead with natural, tactile materials — timber, cork, stone, natural textile.
+Contemporary / Minimal: Fewer materials, used more precisely. Show finish and edge, not variety.
+Brand-Immersive / Playful: Keep the boldest colour on replaceable surfaces — brand refreshes outpace fit-outs.
+Sustainable / Certified Green: Material provenance and recycled content per line, not just appearance.
+Warm Minimal (Japandi): Texture and grain carry the concept — show close-ups, not flat swatches.
+Monochrome / Editorial: Check luminance ratios at desks — high contrast is hard on screen work and on accessibility."
+S112,Colour Palette,O,O,O,O,O,R,M,O,O,O,O,R,R,Brand-Immersive / Playful: Colour is applied at architectural scale; show where and at what extent.
+S113,Furniture Selection,O,O,O,O,O,O,O,R,O,O,R,O,M,"Wellness-First: Ergonomic standard and adjustability become a specified requirement.
+Warm Minimal (Japandi): Furniture curation matters more than quantity; fewer, better pieces.
+Resimercial / Homely: Specify contract-grade equivalents; domestic fabrics fail commercial abrasion and fire ratings."
+S114,Lighting Design,R,R,R,R,R,R,R,R,R,R,R,M,R,"Contemporary / Minimal: Concealed and linear fittings; the lighting design is mostly what you cannot see.
+Monochrome / Editorial: Gallery-grade accent lighting is the concept; lux and contrast ratios matter.
+Resimercial / Homely: Layered lamps and pendants at domestic scale, warm colour temperature."
+S115,Acoustic Strategy,O,O,O,O,M,O,O,M,O,O,O,O,O,"Industrial / Raw: Exposed soffits remove the usual absorption — the acoustic compensation must be shown in the same breath.
+Wellness-First: Acoustic comfort is a health claim here, so give it ratings rather than adjectives."
+S116,Signage & Wayfinding,O,O,O,O,O,O,M,O,O,O,O,M,O,Monochrome / Editorial: Typography and signage are the main decorative system.
+S117,Graphics & Storytelling,O,O,O,O,O,M,M,O,O,O,O,O,O,"Heritage & Local Context: Storytelling is the concept's payload — name the region, the craft and the maker.
+Brand-Immersive / Playful: Graphics are architecture here, not applied decoration."
+S118,Planting & Greenscaping,O,M,O,O,O,O,O,O,O,O,O,O,O,"Biophilic: Becomes a full planting plan: species by light condition, planter design, irrigation and who maintains it."
+S119,Art Programme,O,O,O,O,O,M,O,O,O,O,O,R,O,"Heritage & Local Context: Commissioned craft pieces, with artisan partners named."
+S120,Ceiling & Flooring,O,R,R,O,M,O,O,O,R,O,R,O,O,Industrial / Raw: Ceiling strategy is the concept. Show the services coordination as a designed element.
+S121,Detail Junctions,O,O,M,O,O,O,O,O,O,O,R,R,O,"Contemporary / Minimal: Minimal shows every tolerance, so junction details become a proof of buildability.
+Warm Minimal (Japandi): Pale timber and linen mark fast — show the maintenance regime alongside the detail."
+S130,Section Divider - Technical,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S131,MEP & Services Coordination,O,O,O,O,R,O,O,O,O,R,O,O,O,"Industrial / Raw: Exposed services must be coordinated to be seen, which is a higher bar than concealed."
+S132,AV & Technology Standard,O,O,O,O,O,O,O,O,O,M,O,O,O,Tech-Forward / Smart: AV standard per room type becomes a headline deliverable.
+S133,"IT, Power & Data",O,O,O,O,O,O,O,O,O,M,O,O,O,
+S134,Smart Workplace,O,O,O,R,O,O,O,R,O,M,O,O,O,Tech-Forward / Smart: Occupancy sensing is a privacy conversation — state the data position and name HR/Legal involvement.
+S135,Fire & Life Safety,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S136,Accessibility,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S137,Security & Access Control,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S138,Sustainability Approach,O,R,O,O,O,O,O,R,M,O,O,O,O,
+S139,Green Certification Pathway,O,O,O,O,O,O,O,O,M,O,O,O,O,"Sustainable / Certified Green: Commit to a rating level and show the credit scorecard, or do not claim certification at all."
+S150,Section Divider - Commercials,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S151,Budget Summary,M,M,M,M,M,M,M,M,M,M,M,M,M,Sustainable / Certified Green: Certification changes both programme and budget — show the delta honestly.
+S152,Cost per Seat,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S153,BOQ Highlights,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S154,Value Engineering Options,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S155,Project Timeline,M,M,M,M,M,M,M,M,M,M,M,M,M,"Heritage & Local Context: Craft procurement lead times go on the programme, not in a footnote."
+S156,Delivery Model & Team,R,R,R,R,R,R,R,R,R,R,R,R,R,
+S157,Site Safety & Quality,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S158,Operations & Handover,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S159,Warranty & Post-Handover,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S160,Risks & Assumptions,O,O,O,O,O,O,O,O,O,O,O,O,O,
+S161,Next Steps,M,M,M,M,M,M,M,M,M,M,M,M,M,
+S162,Thank You / Contact,M,M,M,M,M,M,M,M,M,M,M,M,M,

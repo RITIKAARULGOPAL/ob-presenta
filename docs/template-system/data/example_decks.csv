@@ -1,0 +1,214 @@
+Example,Combination,Profile,#,Slide ID,Slide,Section,Level,Presenta layout,Why it is in this deck
+EX1,IT + Biophilic,T01 + C01 + G2 + SC3 + N1,57,,,,,,"A mid-size IT services company taking a new floor. The deck argues desk-sharing from real attendance data, then spends its design budget on daylight and planting. Planting plan and daylight study become mandatory; the acoustic slide stays standard because the ceiling is not exposed."
+,,,1,S001,Cover / Title,Cover & Credentials,M,title-slide,baseline M
+,,,2,S002,Agenda / Contents,Cover & Credentials,R,title-content,baseline R
+,,,3,S003,About Us,Cover & Credentials,M,title-content,baseline M
+,,,4,S008,Selected Work / Case Study,Cover & Credentials,R,concept,baseline R
+,,,5,S010,Section Divider - Understanding,Understanding the Brief,R,title-slide,baseline R
+,,,6,S011,Brief Recap / Mandate,Understanding the Brief,M,title-content,baseline M
+,,,7,S012,Project Snapshot,Understanding the Brief,M,title-stats,baseline M
+,,,8,S013,Brand Landscape,Understanding the Brief,R,freeform,baseline R
+,,,9,S014,Workplace Aspirations,Understanding the Brief,R,freeform,baseline R
+,,,10,S015,User Profiles / Personas,Understanding the Brief,R,orbit,baseline R
+,,,11,S017,Headcount & Growth,Understanding the Brief,M,title-stats,baseline M
+,,,12,S018,Attendance & Utilisation,Understanding the Brief,M,title-stats,T01 raises to M
+,,,13,S031,Site Locus / Location,Site & Context,R,site-locus,C01 raises to R
+,,,14,S032,Building & Floor Plate,Site & Context,R,concept,baseline R
+,,,15,S034,Constraints & Opportunities,Site & Context,R,two-content,baseline R
+,,,16,S035,Daylight & Orientation,Site & Context,M,site-locus,C01 raises to M
+,,,17,S040,Section Divider - Approach,Strategy & Concept,R,title-slide,baseline R
+,,,18,S041,Design Approach / Process,Strategy & Concept,R,merge-diagram,baseline R
+,,,19,S042,Design Concept - The Big Idea,Strategy & Concept,M,title-only,baseline M
+,,,20,S043,Concept Narrative,Strategy & Concept,M,concept,baseline M
+,,,21,S044,Mood Board,Strategy & Concept,R,concept,baseline R
+,,,22,S048,Workplace Strategy Model,Strategy & Concept,R,concept,T01 raises to R
+,,,23,S060,Section Divider - Planning,Planning,R,title-slide,baseline R
+,,,24,S061,Space Programme / Area Statement,Planning,M,linked-views,baseline M
+,,,25,S062,Zoning Strategy,Planning,M,linked-views,baseline M
+,,,26,S063,Adjacency Diagram,Planning,R,merge-diagram,baseline R
+,,,27,S064,Circulation Strategy,Planning,R,linked-views,baseline R
+,,,28,S065,Key Plan / Floor Plate,Planning,M,linked-views,baseline M
+,,,29,S066,Furniture Layout Plan,Planning,M,linked-views,baseline M
+,,,30,S067,Seating Capacity / Occupancy,Planning,M,linked-views,baseline M
+,,,31,S068,Workstation Mix & Ratios,Planning,R,title-stats,T01 raises to R
+,,,32,S069,Meeting Room Mix,Planning,R,title-stats,T01 raises to R
+,,,33,S071,Zone Walkthrough,Planning,R,linked-views,baseline R
+,,,34,S080,Section Divider - Design,Design - Space by Space,R,title-slide,baseline R
+,,,35,S081,Reception & Arrival,Design - Space by Space,M,title-content,baseline M
+,,,36,S083,Open Workspace / Workhall,Design - Space by Space,M,title-content,baseline M
+,,,37,S084,Cabins & Leadership,Design - Space by Space,R,title-content,baseline R
+,,,38,S085,Meeting Rooms,Design - Space by Space,M,title-content,baseline M
+,,,39,S087,Huddle & Phone Booths,Design - Space by Space,M,title-content,T01 raises to M
+,,,40,S088,Collaboration & Breakout,Design - Space by Space,R,title-content,baseline R
+,,,41,S089,Cafeteria & Pantry,Design - Space by Space,M,title-content,baseline M
+,,,42,S111,Material Palette,Materials & Detail,M,concept,baseline M
+,,,43,S114,Lighting Design,Materials & Detail,R,concept,baseline R
+,,,44,S118,Planting & Greenscaping,Materials & Detail,M,concept,C01 raises to M
+,,,45,S120,Ceiling & Flooring,Materials & Detail,R,concept,C01 raises to R
+,,,46,S132,AV & Technology Standard,Technical & Compliance,M,concept,T01 raises to M
+,,,47,S133,"IT, Power & Data",Technical & Compliance,R,title-content,T01 raises to R
+,,,48,S135,Fire & Life Safety,Technical & Compliance,R,title-content,baseline R
+,,,49,S136,Accessibility,Technical & Compliance,R,title-content,baseline R
+,,,50,S138,Sustainability Approach,Technical & Compliance,R,concept,C01 raises to R
+,,,51,S150,Section Divider - Commercials,Commercials & Delivery,R,title-slide,baseline R
+,,,52,S151,Budget Summary,Commercials & Delivery,M,title-stats,baseline M
+,,,53,S152,Cost per Seat,Commercials & Delivery,R,stat-hero,baseline R
+,,,54,S155,Project Timeline,Commercials & Delivery,M,merge-diagram,baseline M
+,,,55,S156,Delivery Model & Team,Commercials & Delivery,R,merge-diagram,baseline R
+,,,56,S161,Next Steps,Commercials & Delivery,M,title-only,baseline M
+,,,57,S162,Thank You / Contact,Commercials & Delivery,M,title-slide,baseline M
+,,,,,,,,,
+EX2,Managed Workspace + Premium,T04 + C02 + G3 + SC3 + N1,55,,,,,,"An operator building a premium centre. Everything is framed as yield — area statement, workstation mix and sellable cabins are mandatory, and community space is a revenue line rather than an amenity. Premium grade pulls in detail junctions and the boardroom. The brand slides drop to optional because a future tenant cannot inherit the client's story."
+,,,1,S001,Cover / Title,Cover & Credentials,M,title-slide,baseline M
+,,,2,S002,Agenda / Contents,Cover & Credentials,R,title-content,baseline R
+,,,3,S003,About Us,Cover & Credentials,M,title-content,baseline M
+,,,4,S008,Selected Work / Case Study,Cover & Credentials,R,concept,baseline R
+,,,5,S010,Section Divider - Understanding,Understanding the Brief,R,title-slide,baseline R
+,,,6,S011,Brief Recap / Mandate,Understanding the Brief,M,title-content,baseline M
+,,,7,S012,Project Snapshot,Understanding the Brief,M,title-stats,baseline M
+,,,8,S017,Headcount & Growth,Understanding the Brief,M,title-stats,baseline M
+,,,9,S031,Site Locus / Location,Site & Context,R,site-locus,baseline R
+,,,10,S032,Building & Floor Plate,Site & Context,R,concept,baseline R
+,,,11,S034,Constraints & Opportunities,Site & Context,R,two-content,baseline R
+,,,12,S040,Section Divider - Approach,Strategy & Concept,R,title-slide,baseline R
+,,,13,S041,Design Approach / Process,Strategy & Concept,R,merge-diagram,baseline R
+,,,14,S042,Design Concept - The Big Idea,Strategy & Concept,M,title-only,baseline M
+,,,15,S043,Concept Narrative,Strategy & Concept,M,concept,baseline M
+,,,16,S044,Mood Board,Strategy & Concept,R,concept,baseline R
+,,,17,S049,Space Standards / Kit of Parts,Strategy & Concept,R,title-content,T04 raises to R
+,,,18,S060,Section Divider - Planning,Planning,R,title-slide,baseline R
+,,,19,S061,Space Programme / Area Statement,Planning,M,linked-views,T04 raises to M
+,,,20,S062,Zoning Strategy,Planning,M,linked-views,baseline M
+,,,21,S063,Adjacency Diagram,Planning,R,merge-diagram,baseline R
+,,,22,S064,Circulation Strategy,Planning,R,linked-views,baseline R
+,,,23,S065,Key Plan / Floor Plate,Planning,M,linked-views,baseline M
+,,,24,S066,Furniture Layout Plan,Planning,M,linked-views,baseline M
+,,,25,S067,Seating Capacity / Occupancy,Planning,M,linked-views,baseline M
+,,,26,S068,Workstation Mix & Ratios,Planning,M,title-stats,T04 raises to M
+,,,27,S069,Meeting Room Mix,Planning,R,title-stats,T04 raises to R
+,,,28,S071,Zone Walkthrough,Planning,R,linked-views,baseline R
+,,,29,S080,Section Divider - Design,Design - Space by Space,R,title-slide,baseline R
+,,,30,S081,Reception & Arrival,Design - Space by Space,M,title-content,baseline M
+,,,31,S083,Open Workspace / Workhall,Design - Space by Space,M,title-content,baseline M
+,,,32,S084,Cabins & Leadership,Design - Space by Space,M,title-content,T04 raises to M
+,,,33,S085,Meeting Rooms,Design - Space by Space,M,title-content,baseline M
+,,,34,S086,Boardroom,Design - Space by Space,M,title-content,G3 raises to M
+,,,35,S087,Huddle & Phone Booths,Design - Space by Space,M,title-content,T04 raises to M
+,,,36,S088,Collaboration & Breakout,Design - Space by Space,R,title-content,baseline R
+,,,37,S089,Cafeteria & Pantry,Design - Space by Space,M,title-content,baseline M
+,,,38,S097,Community & Event Space,Design - Space by Space,M,title-content,space owned by T04
+,,,39,S111,Material Palette,Materials & Detail,M,concept,G3 raises to M
+,,,40,S113,Furniture Selection,Materials & Detail,R,concept,G3 raises to R
+,,,41,S114,Lighting Design,Materials & Detail,R,concept,C02 raises to R; G3 raises to R
+,,,42,S119,Art Programme,Materials & Detail,R,concept,G3 raises to R
+,,,43,S120,Ceiling & Flooring,Materials & Detail,R,concept,C02 raises to R; G3 raises to R
+,,,44,S121,Detail Junctions,Materials & Detail,M,concept,C02 raises to M; G3 raises to M
+,,,45,S135,Fire & Life Safety,Technical & Compliance,R,title-content,baseline R
+,,,46,S136,Accessibility,Technical & Compliance,R,title-content,baseline R
+,,,47,S150,Section Divider - Commercials,Commercials & Delivery,R,title-slide,baseline R
+,,,48,S151,Budget Summary,Commercials & Delivery,M,title-stats,baseline M
+,,,49,S152,Cost per Seat,Commercials & Delivery,R,stat-hero,baseline R
+,,,50,S155,Project Timeline,Commercials & Delivery,M,merge-diagram,baseline M
+,,,51,S156,Delivery Model & Team,Commercials & Delivery,R,merge-diagram,baseline R
+,,,52,S158,Operations & Handover,Commercials & Delivery,M,title-content,T04 raises to M
+,,,53,S159,Warranty & Post-Handover,Commercials & Delivery,R,title-content,T04 raises to R
+,,,54,S161,Next Steps,Commercials & Delivery,M,title-only,baseline M
+,,,55,S162,Thank You / Contact,Commercials & Delivery,M,title-slide,baseline M
+,,,,,,,,,
+EX3,GCC + Contemporary,T02 + C02 + G2 + SC4 + N1,60,,,,,,"A captive centre conforming to a parent's global workplace standard. Kit of parts, AV standard, IT infrastructure and security zoning are all mandatory, and the agenda slide is too because the deck will be read asynchronously overseas without a presenter."
+,,,1,S001,Cover / Title,Cover & Credentials,M,title-slide,baseline M
+,,,2,S002,Agenda / Contents,Cover & Credentials,M,title-content,T02 raises to M
+,,,3,S003,About Us,Cover & Credentials,M,title-content,baseline M
+,,,4,S008,Selected Work / Case Study,Cover & Credentials,R,concept,baseline R
+,,,5,S010,Section Divider - Understanding,Understanding the Brief,R,title-slide,baseline R
+,,,6,S011,Brief Recap / Mandate,Understanding the Brief,M,title-content,baseline M
+,,,7,S012,Project Snapshot,Understanding the Brief,M,title-stats,baseline M
+,,,8,S013,Brand Landscape,Understanding the Brief,R,freeform,baseline R
+,,,9,S014,Workplace Aspirations,Understanding the Brief,R,freeform,baseline R
+,,,10,S015,User Profiles / Personas,Understanding the Brief,R,orbit,baseline R
+,,,11,S017,Headcount & Growth,Understanding the Brief,M,title-stats,baseline M
+,,,12,S018,Attendance & Utilisation,Understanding the Brief,M,title-stats,T02 raises to M
+,,,13,S020,Benchmarks & References,Understanding the Brief,R,concept,T02 raises to R
+,,,14,S031,Site Locus / Location,Site & Context,R,site-locus,baseline R
+,,,15,S032,Building & Floor Plate,Site & Context,R,concept,baseline R
+,,,16,S034,Constraints & Opportunities,Site & Context,R,two-content,baseline R
+,,,17,S040,Section Divider - Approach,Strategy & Concept,R,title-slide,baseline R
+,,,18,S041,Design Approach / Process,Strategy & Concept,R,merge-diagram,baseline R
+,,,19,S042,Design Concept - The Big Idea,Strategy & Concept,M,title-only,baseline M
+,,,20,S043,Concept Narrative,Strategy & Concept,M,concept,baseline M
+,,,21,S044,Mood Board,Strategy & Concept,R,concept,baseline R
+,,,22,S049,Space Standards / Kit of Parts,Strategy & Concept,M,title-content,T02 raises to M
+,,,23,S060,Section Divider - Planning,Planning,R,title-slide,baseline R
+,,,24,S061,Space Programme / Area Statement,Planning,M,linked-views,baseline M
+,,,25,S062,Zoning Strategy,Planning,M,linked-views,baseline M
+,,,26,S063,Adjacency Diagram,Planning,R,merge-diagram,baseline R
+,,,27,S064,Circulation Strategy,Planning,R,linked-views,baseline R
+,,,28,S065,Key Plan / Floor Plate,Planning,M,linked-views,baseline M
+,,,29,S066,Furniture Layout Plan,Planning,M,linked-views,baseline M
+,,,30,S067,Seating Capacity / Occupancy,Planning,M,linked-views,baseline M
+,,,31,S068,Workstation Mix & Ratios,Planning,R,title-stats,baseline R
+,,,32,S070,Stacking Plan,Planning,R,linked-views,baseline O
+,,,33,S071,Zone Walkthrough,Planning,R,linked-views,baseline R
+,,,34,S080,Section Divider - Design,Design - Space by Space,R,title-slide,baseline R
+,,,35,S081,Reception & Arrival,Design - Space by Space,M,title-content,baseline M
+,,,36,S083,Open Workspace / Workhall,Design - Space by Space,M,title-content,baseline M
+,,,37,S084,Cabins & Leadership,Design - Space by Space,R,title-content,baseline R
+,,,38,S085,Meeting Rooms,Design - Space by Space,M,title-content,baseline M
+,,,39,S088,Collaboration & Breakout,Design - Space by Space,R,title-content,baseline R
+,,,40,S089,Cafeteria & Pantry,Design - Space by Space,M,title-content,baseline M
+,,,41,S090,Training / Town Hall,Design - Space by Space,M,title-content,T02 raises to M
+,,,42,S111,Material Palette,Materials & Detail,M,concept,baseline M
+,,,43,S114,Lighting Design,Materials & Detail,R,concept,C02 raises to R
+,,,44,S120,Ceiling & Flooring,Materials & Detail,R,concept,C02 raises to R
+,,,45,S121,Detail Junctions,Materials & Detail,M,concept,C02 raises to M; T02 raises to R
+,,,46,S132,AV & Technology Standard,Technical & Compliance,M,concept,T02 raises to M
+,,,47,S133,"IT, Power & Data",Technical & Compliance,M,title-content,T02 raises to M
+,,,48,S135,Fire & Life Safety,Technical & Compliance,R,title-content,baseline R
+,,,49,S136,Accessibility,Technical & Compliance,R,title-content,baseline R
+,,,50,S137,Security & Access Control,Technical & Compliance,M,linked-views,T02 raises to M
+,,,51,S139,Green Certification Pathway,Technical & Compliance,R,title-stats,T02 raises to R
+,,,52,S150,Section Divider - Commercials,Commercials & Delivery,R,title-slide,baseline R
+,,,53,S151,Budget Summary,Commercials & Delivery,M,title-stats,baseline M
+,,,54,S152,Cost per Seat,Commercials & Delivery,R,stat-hero,baseline R
+,,,55,S155,Project Timeline,Commercials & Delivery,M,merge-diagram,baseline M
+,,,56,S156,Delivery Model & Team,Commercials & Delivery,R,merge-diagram,baseline R
+,,,57,S158,Operations & Handover,Commercials & Delivery,R,title-content,T02 raises to R
+,,,58,S160,Risks & Assumptions,Commercials & Delivery,R,two-content,T02 raises to R
+,,,59,S161,Next Steps,Commercials & Delivery,M,title-only,baseline M
+,,,60,S162,Thank You / Contact,Commercials & Delivery,M,title-slide,baseline M
+,,,,,,,,,
+EX4,Startup + Collaborative,T03 + C03 + G1 + SC2 + N1,33,,,,,,"A Series-B company that wants activity-based working. The startup typology strips the deck to its shortest form, but the Collaborative concept pushes back on four slides it would otherwise have cut — settings, workplace model, work styles and booths. That collision is the clearest demonstration of why levels resolve by MAX rather than by last-rule-wins."
+,,,1,S001,Cover / Title,Cover & Credentials,M,title-slide,baseline M
+,,,2,S003,About Us,Cover & Credentials,M,title-content,baseline M
+,,,3,S008,Selected Work / Case Study,Cover & Credentials,R,concept,baseline R
+,,,4,S011,Brief Recap / Mandate,Understanding the Brief,M,title-content,baseline M
+,,,5,S012,Project Snapshot,Understanding the Brief,M,title-stats,baseline M
+,,,6,S014,Workplace Aspirations,Understanding the Brief,R,freeform,baseline R
+,,,7,S015,User Profiles / Personas,Understanding the Brief,R,orbit,baseline R
+,,,8,S016,Work Styles Mix,Understanding the Brief,M,concept,C03 raises to M
+,,,9,S017,Headcount & Growth,Understanding the Brief,M,title-stats,T03 raises to M
+,,,10,S018,Attendance & Utilisation,Understanding the Brief,R,title-stats,C03 raises to R
+,,,11,S042,Design Concept - The Big Idea,Strategy & Concept,M,title-only,baseline M
+,,,12,S043,Concept Narrative,Strategy & Concept,M,concept,baseline M
+,,,13,S048,Workplace Strategy Model,Strategy & Concept,M,concept,C03 raises to M
+,,,14,S060,Section Divider - Planning,Planning,R,title-slide,baseline R
+,,,15,S061,Space Programme / Area Statement,Planning,M,linked-views,baseline M
+,,,16,S062,Zoning Strategy,Planning,M,linked-views,baseline M
+,,,17,S065,Key Plan / Floor Plate,Planning,M,linked-views,baseline M
+,,,18,S066,Furniture Layout Plan,Planning,M,linked-views,baseline M
+,,,19,S067,Seating Capacity / Occupancy,Planning,M,linked-views,baseline M
+,,,20,S069,Meeting Room Mix,Planning,R,title-stats,C03 raises to R
+,,,21,S071,Zone Walkthrough,Planning,R,linked-views,baseline R
+,,,22,S081,Reception & Arrival,Design - Space by Space,M,title-content,baseline M
+,,,23,S083,Open Workspace / Workhall,Design - Space by Space,M,title-content,baseline M
+,,,24,S085,Meeting Rooms,Design - Space by Space,M,title-content,baseline M
+,,,25,S087,Huddle & Phone Booths,Design - Space by Space,M,title-content,C03 raises to M
+,,,26,S088,Collaboration & Breakout,Design - Space by Space,M,title-content,C03 raises to M; T03 raises to R
+,,,27,S089,Cafeteria & Pantry,Design - Space by Space,M,title-content,baseline M
+,,,28,S111,Material Palette,Materials & Detail,M,concept,baseline M
+,,,29,S151,Budget Summary,Commercials & Delivery,M,title-stats,baseline M
+,,,30,S152,Cost per Seat,Commercials & Delivery,M,stat-hero,T03 raises to M
+,,,31,S155,Project Timeline,Commercials & Delivery,M,merge-diagram,baseline M
+,,,32,S161,Next Steps,Commercials & Delivery,M,title-only,baseline M
+,,,33,S162,Thank You / Contact,Commercials & Delivery,M,title-slide,baseline M
+,,,,,,,,,

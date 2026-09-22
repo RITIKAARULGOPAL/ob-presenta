@@ -1,0 +1,26 @@
+--- auto-logged 2026-09-22 10:36 ---
+Changed files:
+ M docs/template-system/data/example_decks.csv
+ M docs/template-system/data/rules.csv
+ M docs/template-system/data/slide_x_typology.csv
+ M docs/template-system/data/typologies.csv
+ M docs/template-system/model_rules.py
+ M docs/template-system/presenta-slide-template-system.xlsx
+?? PROGRESS.md.pending
+
+Diff stat:
+ docs/template-system/data/example_decks.csv        | 177 ++++++++++-----------
+ docs/template-system/data/rules.csv                |  44 ++---
+ docs/template-system/data/slide_x_typology.csv     |  50 +++---
+ docs/template-system/data/typologies.csv           |  14 +-
+ docs/template-system/model_rules.py                | 108 -------------
+ .../presenta-slide-template-system.xlsx            | Bin 113718 -> 113009 bytes
+ 6 files changed, 134 insertions(+), 259 deletions(-)
+
+Recent commits:
+34d1f99 Add the typology + concept-driven template population system
+069f72d Add save-status indicator, real slide duplication and undo/redo
+33db2b9 Rebuild "as is" E-Com Express slides as per-element editable freeform slides
+8844f72 Make imported "as is" slide images fully editable
+b88c2e9 Move the E-Com Express reference slides into the quick Add-slide menu
+

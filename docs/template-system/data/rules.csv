@@ -1,0 +1,102 @@
+Rule ID,Priority,When (condition),Operation,Slides,Why
+R000,0,always,baseline,"see 04 Slide Library, column 'Baseline'",Start from each slide's own default level.
+R0094,1,slide = S094,X unless owned,T06=M,Trading / Dealing Floor exists only in these typologies; excluded everywhere else.
+R0095,1,slide = S095,X unless owned,T11=M; T10=R,Lab / Workshop Interface exists only in these typologies; excluded everywhere else.
+R0096,1,slide = S096,X unless owned,T13=M; T14=R,Studio / Content Space exists only in these typologies; excluded everywhere else.
+R0097,1,slide = S097,X unless owned,T04=M; T05=O,Community & Event Space exists only in these typologies; excluded everywhere else.
+R0098,1,slide = S098,X unless owned,T16=M; T01=O; T02=O,Experience / Demo Zone exists only in these typologies; excluded everywhere else.
+R0099,1,slide = S099,X unless owned,T09=M,Operations Control Tower exists only in these typologies; excluded everywhere else.
+R0100,1,slide = S100,X unless owned,T15=M; T06=O,Public Interface Counter exists only in these typologies; excluded everywhere else.
+R1-T01-M,2,typology = T01,M,S018 S087 S132,"Desk-sharing has to be argued from attendance data, and every room needs hybrid AV."
+R1-T01-R,2,typology = T01,R,S048 S068 S069 S133,"Desk-sharing has to be argued from attendance data, and every room needs hybrid AV."
+R1-T02-M,2,typology = T02,M,S002 S018 S049 S090 S132 S133 S137,"The parent's global workplace standard is the spine, and the deck is read asynchronously overseas without a presenter."
+R1-T02-R,2,typology = T02,R,S020 S121 S139 S158 S160,"The parent's global workplace standard is the spine, and the deck is read asynchronously overseas without a presenter."
+R1-T03-X,2,typology = T03,X,S005 S006 S033 S035 S036 S047 S049 S050 S070 S110 S117 S119 S120 S121 S130 S134 S137 S139,"Decided fast, often by one person. Everything that is not the plan, the money or the growth story is trimmed to optional."
+R1-T03-down,2,typology = T03,down,S002 S010 S013 S031 S032 S034 S040 S041 S063 S064 S068 S080 S084 S114 S135 S136 S150 S156,"Decided fast, often by one person. Everything that is not the plan, the money or the growth story is trimmed to optional."
+R1-T03-M,2,typology = T03,M,S017 S152,"Decided fast, often by one person. Everything that is not the plan, the money or the growth story is trimmed to optional."
+R1-T03-R,2,typology = T03,R,S088,"Decided fast, often by one person. Everything that is not the plan, the money or the growth story is trimmed to optional."
+R1-T04-down,2,typology = T04,down,S013 S014 S015,Sellable seats per sq ft is the argument. The brand stays neutral because a future tenant cannot inherit this client's story.
+R1-T04-M,2,typology = T04,M,S061 S068 S084 S087 S158,Sellable seats per sq ft is the argument. The brand stays neutral because a future tenant cannot inherit this client's story.
+R1-T04-R,2,typology = T04,R,S049 S069 S159,Sellable seats per sq ft is the argument. The brand stays neutral because a future tenant cannot inherit this client's story.
+R1-T05-M,2,typology = T05,M,S093 S156 S158 S159,Two audiences at once - the operator who runs it and the tenant who occupies it. Operations earn real slide time.
+R1-T05-R,2,typology = T05,R,S013 S049 S157,Two audiences at once - the operator who runs it and the tenant who occupies it. Operations earn real slide time.
+R1-T06-M,2,typology = T06,M,S082 S086 S135 S137,"Security zoning and regulatory segregation are design drivers, and compliance can veto the plan late."
+R1-T06-R,2,typology = T06,R,S111 S121 S133 S160,"Security zoning and regulatory segregation are design drivers, and compliance can veto the plan late."
+R1-T07-M,2,typology = T07,M,S018 S048 S082 S084 S086,"High headcount, low real attendance. The sharing ratio is the commercial argument; the client suite is the brand one."
+R1-T07-R,2,typology = T07,R,S068 S111 S121,"High headcount, low real attendance. The sharing ratio is the commercial argument; the client suite is the brand one."
+R1-T08-X,2,typology = T08,X,S018,"Cellular by nature and bound by confidentiality. Acoustic privacy is a legal requirement, not a preference."
+R1-T08-down,2,typology = T08,down,S044 S063 S068 S088,"Cellular by nature and bound by confidentiality. Acoustic privacy is a legal requirement, not a preference."
+R1-T08-M,2,typology = T08,M,S082 S084 S115,"Cellular by nature and bound by confidentiality. Acoustic privacy is a legal requirement, not a preference."
+R1-T08-R,2,typology = T08,R,S093 S121,"Cellular by nature and bound by confidentiality. Acoustic privacy is a legal requirement, not a preference."
+R1-T09-M,2,typology = T09,M,S089 S090,"Genuine 24x7 operation. Shift overlap, not headcount, sizes circulation and amenities."
+R1-T09-R,2,typology = T09,R,S018 S091 S133 S157,"Genuine 24x7 operation. Shift overlap, not headcount, sizes circulation and amenities."
+R1-T10-M,2,typology = T10,M,S091 S111 S136,Regulated adjacency and material hygiene. Finishes are chosen for cleanability and certification first.
+R1-T10-R,2,typology = T10,R,S137 S138 S157,Regulated adjacency and material hygiene. Finishes are chosen for cleanability and certification first.
+R1-T11-M,2,typology = T11,M,S036 S131 S137,"The lab boundary governs services load, access control and the goods route before anything aesthetic."
+R1-T11-R,2,typology = T11,R,S133 S157 S160,"The lab boundary governs services load, access control and the goods route before anything aesthetic."
+R1-T12-X,2,typology = T12,X,S119,Office and plant staff share entrances and canteens. Durability beats delicacy in every material call.
+R1-T12-down,2,typology = T12,down,S013 S044,Office and plant staff share entrances and canteens. Durability beats delicacy in every material call.
+R1-T12-M,2,typology = T12,M,S089 S136 S157,Office and plant staff share entrances and canteens. Durability beats delicacy in every material call.
+R1-T12-R,2,typology = T12,R,S033 S092 S120,Office and plant staff share entrances and canteens. Durability beats delicacy in every material call.
+R1-T13-down,2,typology = T13,down,S002 S063 S068 S135 S136 S156,The office is a brand artefact and often a shoot location. This audience out-designs generic corporate renders.
+R1-T13-M,2,typology = T13,M,S013 S044 S114,The office is a brand artefact and often a shoot location. This audience out-designs generic corporate renders.
+R1-T13-R,2,typology = T13,R,S045 S117 S119,The office is a brand artefact and often a shoot location. This audience out-designs generic corporate renders.
+R1-T14-down,2,typology = T14,down,S013 S044 S063 S068,"Timetable peaks, not headcount, size circulation and washrooms. Heavy footfall demands durability."
+R1-T14-M,2,typology = T14,M,S090 S092,"Timetable peaks, not headcount, size circulation and washrooms. Heavy footfall demands durability."
+R1-T14-R,2,typology = T14,R,S115 S136 S157,"Timetable peaks, not headcount, size circulation and washrooms. Heavy footfall demands durability."
+R1-T15-X,2,typology = T15,X,S119,Entitlement norms and tender compliance define the plan before design begins.
+R1-T15-down,2,typology = T15,down,S013 S044,Entitlement norms and tender compliance define the plan before design begins.
+R1-T15-M,2,typology = T15,M,S049 S135 S136,Entitlement norms and tender compliance define the plan before design begins.
+R1-T15-R,2,typology = T15,R,S092 S153 S160,Entitlement norms and tender compliance define the plan before design begins.
+R1-T16-X,2,typology = T16,X,S018 S068 S070 S084,The visitor's route IS the design. Desking slides are noise; sequence and reveal order carry the deck.
+R1-T16-down,2,typology = T16,down,S002 S010 S017 S063 S064 S067 S083,The visitor's route IS the design. Desking slides are noise; sequence and reveal order carry the deck.
+R1-T16-M,2,typology = T16,M,S111 S114 S117 S119 S132,The visitor's route IS the design. Desking slides are noise; sequence and reveal order carry the deck.
+R1-T16-R,2,typology = T16,R,S116 S121 S134,The visitor's route IS the design. Desking slides are noise; sequence and reveal order carry the deck.
+R2-N1-X,3,nature = N1,X,S033,There are no existing conditions to survey.
+R2-N2-M,3,nature = N2,M,S033,"The existing condition is the baseline, and before/after is the most persuasive slide available."
+R2-N2-R,3,nature = N2,R,S046 S157 S036,"The existing condition is the baseline, and before/after is the most persuasive slide available."
+R2-N3-X,3,nature = N3,X,S033,Matching the existing standard matters more than establishing a new concept.
+R2-N3-M,3,nature = N3,M,S049,Matching the existing standard matters more than establishing a new concept.
+R2-N3-O,3,nature = N3,O,S013 S014 S042 S044,Matching the existing standard matters more than establishing a new concept.
+R2-N4-M,3,nature = N4,M,S017 S063,Merging sites is an adjacency and change problem before it is a design one.
+R2-N4-R,3,nature = N4,R,S070 S160,Merging sites is an adjacency and change problem before it is a design one.
+R2-N5-R,3,nature = N5,R,S031 S019 S160,Commute and change impact are live concerns — location and journey earn more time.
+R2-N6-X,3,nature = N6,X,S017 S018 S067 S068 S083,"Nobody is assigned a desk here, so capacity slides are misleading."
+R2-N6-O,3,nature = N6,O,S061 S066,"Nobody is assigned a desk here, so capacity slides are misleading."
+R3-C01-M,4,concept includes C01,M,S118 S035,Biophilic needs these slides to carry its evidence.
+R3-C01-R,4,concept includes C01,R,S031 S138 S120,Biophilic needs these slides to carry its evidence.
+R3-C02-M,4,concept includes C02,M,S121,Contemporary / Minimal needs these slides to carry its evidence.
+R3-C02-R,4,concept includes C02,R,S120 S114,Contemporary / Minimal needs these slides to carry its evidence.
+R3-C03-M,4,concept includes C03,M,S088 S048 S016 S087,Collaborative (ABW) needs these slides to carry its evidence.
+R3-C03-R,4,concept includes C03,R,S018 S134 S069,Collaborative (ABW) needs these slides to carry its evidence.
+R3-C04-M,4,concept includes C04,M,S115 S120,Industrial / Raw needs these slides to carry its evidence.
+R3-C04-R,4,concept includes C04,R,S131,Industrial / Raw needs these slides to carry its evidence.
+R3-C05-M,4,concept includes C05,M,S117 S119,Heritage & Local Context needs these slides to carry its evidence.
+R3-C05-R,4,concept includes C05,R,S111 S155 S112,Heritage & Local Context needs these slides to carry its evidence.
+R3-C06-M,4,concept includes C06,M,S013 S112 S116 S117,Brand-Immersive / Playful needs these slides to carry its evidence.
+R3-C06-R,4,concept includes C06,R,S045 S081,Brand-Immersive / Playful needs these slides to carry its evidence.
+R3-C07-M,4,concept includes C07,M,S091 S115,Wellness-First needs these slides to carry its evidence.
+R3-C07-R,4,concept includes C07,R,S113 S138 S134 S035,Wellness-First needs these slides to carry its evidence.
+R3-C08-M,4,concept includes C08,M,S138 S139 S111,Sustainable / Certified Green needs these slides to carry its evidence.
+R3-C08-R,4,concept includes C08,R,S155 S151 S120,Sustainable / Certified Green needs these slides to carry its evidence.
+R3-C09-M,4,concept includes C09,M,S134 S132 S133,Tech-Forward / Smart needs these slides to carry its evidence.
+R3-C09-R,4,concept includes C09,R,S069 S131,Tech-Forward / Smart needs these slides to carry its evidence.
+R3-C10-M,4,concept includes C10,M,S111,Warm Minimal (Japandi) needs these slides to carry its evidence.
+R3-C10-R,4,concept includes C10,R,S113 S121 S120 S114,Warm Minimal (Japandi) needs these slides to carry its evidence.
+R3-C11-M,4,concept includes C11,M,S114 S116,Monochrome / Editorial needs these slides to carry its evidence.
+R3-C11-R,4,concept includes C11,R,S119 S121 S112,Monochrome / Editorial needs these slides to carry its evidence.
+R3-C12-M,4,concept includes C12,M,S088 S113,Resimercial / Homely needs these slides to carry its evidence.
+R3-C12-R,4,concept includes C12,R,S089 S112 S114,Resimercial / Homely needs these slides to carry its evidence.
+R4-G1-X,5,grade = G1,X,S119 S121,"Shortest deck. Detail, art and mock-up slides are cut; space-by-space slides get grouped."
+R4-G1-down,5,grade = G1,down,S044 S084 S114,"Shortest deck. Detail, art and mock-up slides are cut; space-by-space slides get grouped."
+R4-G3-M,5,grade = G3,M,S111 S121 S086,"Junction quality is most of what is being paid for, so detail and material slides escalate."
+R4-G3-R,5,grade = G3,R,S113 S114 S119 S120,"Junction quality is most of what is being paid for, so detail and material slides escalate."
+R4-G4-M,5,grade = G4,M,S111 S113 S114 S119 S121,"Longest deck. Art programme, provenance and bespoke joinery all earn their own slides."
+R4-G4-R,5,grade = G4,R,S112 S116 S120 S082,"Longest deck. Art programme, provenance and bespoke joinery all earn their own slides."
+R5-SC1-X,6,scale = SC1,X,S005 S006 S036 S049 S070 S110 S130 S139 S153 S157 S158,"Under 50 seats, process slides cost more attention than they buy."
+R5-SC1-down,6,scale = SC1,down,S002 S008 S010 S032 S040 S041 S063 S064 S068 S080 S114 S150 S156,"Under 50 seats, process slides cost more attention than they buy."
+R5-SC2-down,6,scale = SC2,down,S002 S063,Trim the institutional slides; keep the full planning section.
+R5-SC4-R,6,scale = SC4,R,S049 S070 S137 S156 S160,Governance and standards slides start to matter at this size.
+R5-SC5-M,6,scale = SC5,M,S049 S070 S156,Stacking and space standards become mandatory; multi-floor coordination is the hard part.
+R5-SC5-R,6,scale = SC5,R,S063 S137 S139 S158 S160,Stacking and space standards become mandatory; multi-floor coordination is the hard part.
+R900,99,after all rules,resolve,MAX(level) wins; X from typology or nature is final,Exclusion is sticky so a design concept can never pull an irrelevant space into a deck. Escalation beats demotion so a concept can re-earn a slide the typology trimmed.

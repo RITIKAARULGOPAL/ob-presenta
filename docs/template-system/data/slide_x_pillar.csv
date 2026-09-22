@@ -1,0 +1,107 @@
+Slide ID,Slide,Pillar ID (conceptLibrary.ts),Concept IDs within pillar,How to use it
+S001,Cover / Title,,,No framework mapping — project content only.
+S002,Agenda / Contents,,,No framework mapping — project content only.
+S003,About Us,,,No framework mapping — project content only.
+S004,Credentials by Numbers,economics-operations,operational-efficiency,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S005,Client Logo Wall,,,No framework mapping — project content only.
+S006,Our Team,,,No framework mapping — project content only.
+S007,Why Us / Differentiators,economics-operations,operational-efficiency,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S008,Selected Work / Case Study,,,No framework mapping — project content only.
+S010,Section Divider - Understanding,people,,Section divider — use pillarSectionSlide() for this pillar.
+S011,Brief Recap / Mandate,people,user-profiles,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S012,Project Snapshot,space-planning,capacity-density,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S013,Brand Landscape,experience-brand,brand-expression storytelling,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S014,Workplace Aspirations,people,employee-experience work-styles,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S015,User Profiles / Personas,people,user-profiles work-styles privacy-inclusion,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S016,Work Styles Mix,people,work-styles,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S017,Headcount & Growth,space-planning,capacity-density flexibility,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S018,Attendance & Utilisation,space-planning,capacity-density,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S019,Employee Journey,people,employee-experience visitor-experience,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S020,Benchmarks & References,economics-operations,cost-per-seat,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S021,Design Brief Summary,people,employee-experience,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S030,Section Divider - Site,space-planning,,Section divider — use pillarSectionSlide() for this pillar.
+S031,Site Locus / Location,environmental,daylight-views,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S032,Building & Floor Plate,space-planning,zoning circulation,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S033,Existing Condition Survey,space-planning,,Sits under this pillar but maps to no single concept — use the pillar for grouping only.
+S034,Constraints & Opportunities,space-planning,zoning flexibility,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S035,Daylight & Orientation,environmental,daylight-views thermal-comfort,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S036,Base Build & Services Review,technology,power-data,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S040,Section Divider - Approach,,,Section divider — use pillarSectionSlide() for this pillar.
+S041,Design Approach / Process,,,No framework mapping — project content only.
+S042,Design Concept - The Big Idea,experience-brand,brand-expression placemaking,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S043,Concept Narrative,experience-brand,brand-expression storytelling placemaking,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S044,Mood Board,experience-brand,materiality placemaking,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S045,Design Cues / Keywords,experience-brand,brand-expression materiality,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S046,Concept Applied - Option Compare,experience-brand,materiality,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S047,Design Principles,experience-brand,placemaking,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S048,Workplace Strategy Model,work-settings,focused-work collaboration informal-collaboration,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S049,Space Standards / Kit of Parts,flexibility-adaptability,modular-planning multi-purpose-spaces,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S050,Concept-to-Space Map,experience-brand,placemaking storytelling,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S060,Section Divider - Planning,space-planning,,Section divider — use pillarSectionSlide() for this pillar.
+S061,Space Programme / Area Statement,space-planning,capacity-density,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S062,Zoning Strategy,space-planning,zoning access-hierarchy adjacency,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S063,Adjacency Diagram,function-workflow,department-interaction movement-workflow,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S064,Circulation Strategy,space-planning,circulation,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S065,Key Plan / Floor Plate,space-planning,zoning,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S066,Furniture Layout Plan,space-planning,capacity-density,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S067,Seating Capacity / Occupancy,space-planning,capacity-density,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S068,Workstation Mix & Ratios,space-planning,capacity-density flexibility,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S069,Meeting Room Mix,work-settings,formal-meetings meeting-patterns phone-video-calls,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S070,Stacking Plan,space-planning,adjacency zoning,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S071,Zone Walkthrough,space-planning,zoning adjacency,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S080,Section Divider - Design,experience-brand,,Section divider — use pillarSectionSlide() for this pillar.
+S081,Reception & Arrival,experience-brand,arrival brand-expression,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S082,Client Waiting / Lounge,people,visitor-experience,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S083,Open Workspace / Workhall,work-settings,focused-work collaboration,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S084,Cabins & Leadership,people,privacy-inclusion,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S085,Meeting Rooms,work-settings,formal-meetings phone-video-calls,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S086,Boardroom,work-settings,formal-meetings,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S087,Huddle & Phone Booths,work-settings,phone-video-calls informal-collaboration,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S088,Collaboration & Breakout,work-settings,informal-collaboration social-breakout collaboration,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S089,Cafeteria & Pantry,work-settings,social-breakout,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S090,Training / Town Hall,work-settings,training-multipurpose,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S091,Wellness & Mother's Room,wellbeing,mental-recharge social-wellbeing user-control,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S092,Washrooms,safety-compliance,accessibility,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S093,"Support, Utility & Server",function-workflow,support-spaces storage,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S094,Trading / Dealing Floor,technology,power-data av-hybrid-work,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S095,Lab / Workshop Interface,safety-compliance,security life-safety,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S096,Studio / Content Space,technology,av-hybrid-work,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S097,Community & Event Space,work-settings,social-breakout training-multipurpose,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S098,Experience / Demo Zone,experience-brand,storytelling placemaking,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S099,Operations Control Tower,technology,av-hybrid-work smart-workplace,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S100,Public Interface Counter,people,visitor-experience,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S110,Section Divider - Materials,experience-brand,,Section divider — use pillarSectionSlide() for this pillar.
+S111,Material Palette,experience-brand,materiality,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S112,Colour Palette,experience-brand,brand-expression,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S113,Furniture Selection,wellbeing,ergonomics,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S114,Lighting Design,environmental,lighting daylight-views,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S115,Acoustic Strategy,environmental,acoustics,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S116,Signage & Wayfinding,experience-brand,placemaking brand-expression,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S117,Graphics & Storytelling,experience-brand,storytelling brand-expression,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S118,Planting & Greenscaping,environmental,biophilia,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S119,Art Programme,experience-brand,storytelling placemaking,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S120,Ceiling & Flooring,environmental,acoustics,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S121,Detail Junctions,experience-brand,materiality,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S130,Section Divider - Technical,technology,,Section divider — use pillarSectionSlide() for this pillar.
+S131,MEP & Services Coordination,technology,power-data,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S132,AV & Technology Standard,technology,av-hybrid-work connectivity,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S133,"IT, Power & Data",technology,power-data connectivity,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S134,Smart Workplace,technology,smart-workplace future-technology,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S135,Fire & Life Safety,safety-compliance,life-safety emergency-planning,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S136,Accessibility,safety-compliance,accessibility,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S137,Security & Access Control,safety-compliance,security,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S138,Sustainability Approach,sustainability,material-selection energy reuse-refurbishment indoor-health,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S139,Green Certification Pathway,sustainability,energy water waste-circularity indoor-health,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S150,Section Divider - Commercials,economics-operations,,Section divider — use pillarSectionSlide() for this pillar.
+S151,Budget Summary,economics-operations,budget,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S152,Cost per Seat,economics-operations,cost-per-seat,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S153,BOQ Highlights,economics-operations,budget lifecycle-cost,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S154,Value Engineering Options,economics-operations,budget durability,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S155,Project Timeline,economics-operations,operational-efficiency,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S156,Delivery Model & Team,economics-operations,operational-efficiency,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S157,Site Safety & Quality,safety-compliance,life-safety,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S158,Operations & Handover,economics-operations,operational-efficiency lifecycle-cost,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S159,Warranty & Post-Handover,economics-operations,durability lifecycle-cost,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S160,Risks & Assumptions,economics-operations,budget,Prefill this slide's lead and points from CONCEPT_DETAIL for these concept ids.
+S161,Next Steps,,,No framework mapping — project content only.
+S162,Thank You / Contact,,,No framework mapping — project content only.

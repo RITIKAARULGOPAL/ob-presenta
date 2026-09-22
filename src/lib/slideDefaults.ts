@@ -204,6 +204,10 @@ export function cloneSlide(slide: Slide): Slide {
         id: hotspotIdMap.get(h.id)!,
         targetViewId: h.targetViewId ? (viewIdMap.get(h.targetViewId) ?? h.targetViewId) : undefined,
         stageIds: h.stageIds?.map((id) => stageIdMap.get(id) ?? id),
+        // Same-slide cross-reference, needs the same rewrite as targetViewId/
+        // stageIds — missed originally, which left a clone's adjacency lines
+        // pointing at the *original* slide's hotspot ids.
+        adjacentHotspotIds: h.adjacentHotspotIds?.map((id) => hotspotIdMap.get(id) ?? id),
         listEntry: h.listEntry ? { ...h.listEntry, id: makeId('list') } : undefined,
         gallery: h.gallery?.map((g) => ({ ...g, id: makeId('gal') })),
       })),

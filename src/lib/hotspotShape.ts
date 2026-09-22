@@ -134,6 +134,27 @@ export function centroidOf(points: Point[]): Point | null {
   };
 }
 
+/** A shape's own area in normalised frame units — 1 would be the whole frame.
+ *  Caller converts to real-world area (see PlanCalibration), since that needs
+ *  the frame's pixel aspect ratio, which only the renderer knows.
+ *
+ *  An ellipse stores two opposite corners rather than an outline, so it gets
+ *  the real ellipse area instead of the zero a two-point shoelace would give. */
+export function shapeArea(points: Point[], shape?: ShapeKind): number {
+  if (shape === 'ellipse') {
+    if (points.length < 2) return 0;
+    return (Math.PI * Math.abs(points[1].x - points[0].x) * Math.abs(points[1].y - points[0].y)) / 4;
+  }
+  if (points.length < 3) return 0;
+  let sum = 0;
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    sum += a.x * b.y - b.x * a.y;
+  }
+  return Math.abs(sum) / 2;
+}
+
 /** Snaps a segment's direction to a multiple of `stepDeg`, holding Shift.
  *
  * The maths runs in display space, not normalised space. Points are stored 0–1

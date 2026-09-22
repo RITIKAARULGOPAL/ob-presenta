@@ -19,6 +19,7 @@ export function SeatingTable({
   hoveredHotspotId,
   onHoverHotspots,
   onChangeView,
+  onSelectHotspot,
 }: {
   view: LinkedView;
   hotspots: ViewHotspot[];
@@ -28,11 +29,25 @@ export function SeatingTable({
   hoveredHotspotId: string | null;
   onHoverHotspots: (ids: string[]) => void;
   onChangeView: (patch: Partial<LinkedView>) => void;
+  /** Click-to-jump for a row linked to exactly one hotspot — mirrors
+   *  HotspotSidePanel's own click-through, giving the seating table parity
+   *  with it (a row could otherwise only hover-highlight, never actually
+   *  open the space it's about). A row linked to several hotspots (e.g. a
+   *  group header) has no single obvious target, so it stays hover-only. */
+  onSelectHotspot?: (hotspotId: string) => void;
 }) {
   const zones = view.seatingZones ?? [];
+  // A viewer convenience, not authored content — like the key-plan card's
+  // own visible/expanded state, it stays local rather than persisted, so
+  // collapsing it while presenting never edits the deck.
+  const [collapsed, setCollapsed] = useState(false);
   const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
   const [importBusy, setImportBusy] = useState(false);
-  const [importSummary, setImportSummary] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  // Parsed but not yet committed — a bad spreadsheet can be reviewed and
+  // discarded before it touches `zones`, rather than relying on the app's
+  // global undo as the only way back.
+  const [importPending, setImportPending] = useState<{ zones: SeatingZone[]; summary: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function setZones(next: SeatingZone[]) {
@@ -82,7 +97,8 @@ export function SeatingTable({
   async function handleFile(file: File | undefined) {
     if (!file) return;
     setImportBusy(true);
-    setImportSummary(null);
+    setImportError(null);
+    setImportPending(null);
     try {
       const rows = await parseSeatingWorkbook(file);
       const hotspotIdByLabel = new Map(hotspots.filter((h) => h.label).map((h) => [h.label!.trim().toLowerCase(), h.id]));
@@ -122,26 +138,44 @@ export function SeatingTable({
           added += 1;
         }
       }
-      setZones(nextZones);
-      setImportSummary(`${added} row${added === 1 ? '' : 's'} added, ${updated} updated, ${matched} linked to a hotspot.`);
+      setImportPending({
+        zones: nextZones,
+        summary: `${added} row${added === 1 ? '' : 's'} added, ${updated} updated, ${matched} linked to a hotspot.`,
+      });
     } catch (err) {
       console.error('Could not read that spreadsheet:', err);
-      setImportSummary('Could not read that spreadsheet.');
+      setImportError('Could not read that spreadsheet.');
     } finally {
       setImportBusy(false);
     }
   }
 
+  // Collapsed drops the fixed width rather than just hiding content below it
+  // — the plan sits in a `flex-1 aspect-video` box right next to this one, so
+  // freeing the width here lets it actually grow into it (and, via
+  // aspect-video, grow taller too), not just leave dead space.
   return (
-    <div className="flex w-72 shrink-0 flex-col gap-3 overflow-y-auto">
-      <div className="flex items-center justify-between gap-2">
+    <div className={`flex shrink-0 flex-col gap-3 ${collapsed ? 'w-auto' : 'w-72 overflow-y-auto'}`}>
+      <div className="flex items-center gap-1.5">
+        {/* A sibling button, not a wrapper around the editable title — the
+            title is contentEditable, and contentEditable inside a <button>
+            is unreliable (a click to place the cursor can fire the button's
+            own click instead of focusing the text). */}
+        <button
+          type="button"
+          onClick={() => setCollapsed((v) => !v)}
+          title={collapsed ? 'Show seating capacity' : 'Hide seating capacity'}
+          className="shrink-0 text-[9px] text-[var(--ink-3)] hover:text-[var(--ink)]"
+        >
+          <span className={`inline-block transition-transform ${collapsed ? '-rotate-90' : ''}`}>▾</span>
+        </button>
         <EditableText
           editable={editable}
           value={view.seatingTitle ?? ''}
           onChange={(v) => onChangeView({ seatingTitle: v })}
           as="div"
           placeholder="Seating Capacity"
-          className="text-xs font-bold uppercase tracking-wide text-[var(--ink)] outline-none"
+          className="min-w-0 flex-1 text-xs font-bold uppercase tracking-wide text-[var(--ink)] outline-none"
         />
         {editable && (
           <>
@@ -169,9 +203,33 @@ export function SeatingTable({
         )}
       </div>
 
-      {importSummary && <p className="text-[10px] text-[var(--ink-3)]">{importSummary}</p>}
+      {importError && <p className="text-[10px] text-red-500">{importError}</p>}
+      {importPending && (
+        <div className="rounded-md border border-[var(--line)] bg-[var(--accent-soft)] px-2.5 py-2 text-[10px] text-[var(--ink-2)]">
+          <p className="mb-1.5">{importPending.summary}</p>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                setZones(importPending.zones);
+                setImportPending(null);
+              }}
+              className="rounded-md bg-[var(--accent)] px-2 py-1 text-[10px] font-semibold text-white"
+            >
+              Apply
+            </button>
+            <button
+              type="button"
+              onClick={() => setImportPending(null)}
+              className="rounded-md border border-[var(--line)] px-2 py-1 text-[10px] font-medium text-[var(--ink-3)] hover:border-[var(--ink-3)]"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
-      {!editable && zones.length === 0 ? null : (
+      {!collapsed && (!editable && zones.length === 0 ? null : (
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-[1fr_44px_44px] gap-2 border-b border-[var(--line)] pb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-3)]">
             <span>Area</span>
@@ -200,9 +258,10 @@ export function SeatingTable({
                 )}
               </div>
               {zone.rows.map((row) => {
-                const linked = row.hotspotIds?.length;
                 const highlighted =
                   hoveredRowId === row.id || (!!hoveredHotspotId && !!row.hotspotIds?.includes(hoveredHotspotId));
+                const soleHotspotId = row.hotspotIds?.length === 1 ? row.hotspotIds[0] : undefined;
+                const clickable = !editable && !!soleHotspotId && !!onSelectHotspot;
                 return (
                   <div key={row.id} className="flex flex-col">
                     <div
@@ -214,11 +273,24 @@ export function SeatingTable({
                         setHoveredRowId(null);
                         onHoverHotspots([]);
                       }}
+                      onClick={clickable ? () => onSelectHotspot!(soleHotspotId!) : undefined}
+                      onKeyDown={
+                        clickable
+                          ? (e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                onSelectHotspot!(soleHotspotId!);
+                              }
+                            }
+                          : undefined
+                      }
+                      role={clickable ? 'button' : undefined}
+                      tabIndex={clickable ? 0 : undefined}
                       className={`grid grid-cols-[1fr_44px_44px] items-baseline gap-2 rounded px-1.5 py-1 text-[11px] transition-colors ${
                         highlighted ? 'bg-[var(--accent-soft)]' : ''
                       } ${row.kind === 'group' ? 'mt-1 border-t border-[var(--line)] pt-1.5 font-semibold text-[var(--ink)]' : ''} ${
                         row.kind === 'sub' ? 'pl-3 text-[var(--ink-3)]' : 'text-[var(--ink-2)]'
-                      } ${linked && !editable ? 'cursor-pointer' : ''}`}
+                      } ${clickable ? 'cursor-pointer' : ''}`}
                     >
                       {editable ? (
                         <EditableText
@@ -311,9 +383,9 @@ export function SeatingTable({
             </button>
           )}
         </div>
-      )}
+      ))}
 
-      {activeNote && (
+      {!collapsed && activeNote && (
         <div className="rounded-md border border-[var(--accent-soft-line)] bg-[var(--accent-soft)] px-2.5 py-2 text-[11px] leading-snug text-[var(--ink-2)]">
           {activeNote}
         </div>

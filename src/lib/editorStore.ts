@@ -63,6 +63,7 @@ interface EditorState {
   changeLayout: (layout: SlideLayout) => void;
   changeStyle: (style: SlideStyleKind) => void;
   setBrandOverride: (brand: Brand | undefined) => void;
+  setDesignOption: (label: string | undefined) => void;
   setClientLogo: (dataUrl: string | undefined) => void;
   setClientLogoTransform: (transform: ImageTransform | undefined) => void;
   setAccentColor: (hex: string | undefined) => void;
@@ -465,6 +466,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { project, currentSlideId } = get();
     if (!project || !currentSlideId) return;
     const slides = project.slides.map((s) => (s.id === currentSlideId ? { ...s, brandOverride: brand } : s));
+    commitProject({ ...project, slides });
+  },
+
+  setDesignOption: (label) => {
+    const { project, currentSlideId } = get();
+    if (!project || !currentSlideId) return;
+    const slides = project.slides.map((s) => (s.id === currentSlideId ? { ...s, designOption: label } : s));
     commitProject({ ...project, slides });
   },
 

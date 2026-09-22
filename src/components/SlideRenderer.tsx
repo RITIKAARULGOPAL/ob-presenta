@@ -1,11 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EditableText } from './EditableText';
 import { useEditorStore } from '@/lib/editorStore';
 import { shadeWithBlack, tintWithWhite } from '@/lib/color';
 import { resolveTypography, headlineStyle } from '@/lib/fonts';
 import { dataUrlBytes, fileToDataUrl, fileToSlideImage } from '@/lib/imageFile';
+import { loadPdfDocument, preparePdfPlan, renderPlanPage } from '@/lib/pdfPlan';
+import { buildSnapIndex, snapTo, type SnapResult } from '@/lib/planSnap';
 import {
   centroidOf,
   clamp01,
@@ -14,11 +16,13 @@ import {
   previewPath,
   rectPoints,
   hasEnoughPoints,
+  shapeArea,
   shapePath,
   snapAngle,
   squareFrom,
   type ShapeKind,
 } from '@/lib/hotspotShape';
+import { calibrationFrom, formatArea, formatMeasure, realArea, realDistance, zoneColor } from '@/lib/planOverlay';
 import { ConceptDiagram } from './ConceptDiagram';
 import { HotspotSidePanel } from './HotspotSidePanel';
 import { SeatingTable } from './SeatingTable';
@@ -31,8 +35,10 @@ import { ImageAdjustOverlay } from './ImageAdjustOverlay';
 import { LogoAdjustOverlay } from './LogoAdjustOverlay';
 import { clamp, imageStyle, maxPan, MAX_ZOOM, MIN_ZOOM } from '@/lib/imageTransform';
 import { makeId } from '@/lib/id';
-import type { Brand, FreeformElement, HotspotGalleryImage, ImageTransform, LinkedView, Slide, ViewHotspot } from '@/types/slide';
+import type { Brand, FreeformElement, HotspotGalleryImage, ImageTransform, LinkedView, PlanCalibration, PlanGeometry, Slide, ViewHotspot } from '@/types/slide';
 import type { Point } from '@/lib/hotspotShape';
+
+type PdfDocument = import('pdfjs-dist').PDFDocumentProxy;
 
 interface SlideRendererProps {
   slide: Slide;
@@ -71,6 +77,8 @@ function MediaBox({
   mediaRef,
   elevated = false,
   square = false,
+  fit = 'cover',
+  onPdfPlan,
 }: {
   url: string;
   kind: 'image' | 'video';
@@ -82,6 +90,15 @@ function MediaBox({
   className?: string;
   style?: React.CSSProperties;
   mediaRef?: React.Ref<HTMLVideoElement>;
+  /** `contain` shows the whole picture, letterboxed. Plans need it — a floor
+   *  plan is rarely 16:9, and `cover` would crop away the parts of the drawing
+   *  you then cannot click. Photos keep `cover`. */
+  fit?: 'cover' | 'contain';
+  /** Opt-in: when set, an uploaded PDF also yields its vector geometry for
+   *  snapping. The image and geometry arrive together so the caller can commit
+   *  them in **one** patch — two writes into the same array field in one tick
+   *  clobber each other (see `setView`). */
+  onPdfPlan?: (plan: { imageUrl: string; geometry: PlanGeometry }) => void;
   /** A larger radius + a real soft shadow instead of the plain frame — for a
    *  slide's one hero image (the `design` style), not every MediaBox use. */
   elevated?: boolean;
@@ -94,6 +111,7 @@ function MediaBox({
   const [dragging, setDragging] = useState(false);
   const [note, setNote] = useState('');
   const [adjusting, setAdjusting] = useState(false);
+  const [pdfPick, setPdfPick] = useState<{ doc: PdfDocument; numPages: number; page: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const canUpload = editable && kind === 'image';
@@ -114,15 +132,59 @@ function MediaBox({
     fileRef.current.click();
   }
 
+  /** Renders one PDF page in and, when the caller asked for it, reads the
+   *  drawing's vector geometry so measurements can snap to real walls. */
+  async function applyPdfPage(doc: PdfDocument, pageNumber: number) {
+    setBusy(true);
+    setNote('Reading the plan…');
+    try {
+      if (onPdfPlan) {
+        const { imageUrl, geometry } = await preparePdfPlan(doc, pageNumber, FRAME_ASPECT);
+        onPdfPlan({ imageUrl, geometry });
+        const kb = Math.round(dataUrlBytes(imageUrl) / 1024);
+        const points = geometry.vertices.length / 2;
+        setNote(
+          points === 0
+            ? `Added — ${kb}KB. No vector lines in this PDF (it looks scanned), so picks won't snap.`
+            : `Added — ${kb}KB · ${points} snap points${geometry.truncated ? ' (plan is dense, trimmed to the busiest lines)' : ''}.`,
+        );
+      } else {
+        const imageUrl = await renderPlanPage(doc, pageNumber);
+        onChangeUrl(imageUrl);
+        onChangeTransform?.(undefined);
+        setNote(`Added — ${Math.round(dataUrlBytes(imageUrl) / 1024)}KB.`);
+      }
+      setPdfPick(null);
+    } catch (err) {
+      console.error('Could not read that PDF page:', err);
+      setNote('Could not read that PDF page.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function accept(file: File | undefined) {
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setNote('That file is not an image.');
+    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+    if (!isPdf && !file.type.startsWith('image/')) {
+      setNote('That file is not an image or a PDF.');
       return;
     }
     setBusy(true);
     setNote('');
     try {
+      if (isPdf) {
+        const doc = await loadPdfDocument(file);
+        if (doc.numPages === 1) {
+          await applyPdfPage(doc, 1);
+        } else {
+          // Don't guess which page is the plan. No thumbnail strip either:
+          // these decks run to hundreds of pages.
+          setPdfPick({ doc, numPages: doc.numPages, page: 1 });
+          setNote(`${doc.numPages} pages — pick the one with the plan.`);
+        }
+        return;
+      }
       const dataUrl = await fileToSlideImage(file);
       onChangeUrl(dataUrl);
       onChangeTransform?.(undefined);
@@ -130,8 +192,8 @@ function MediaBox({
       // Worth saying out loud: this lands in the project row, not a bucket.
       setNote(kb > 700 ? `Added — ${kb}KB, which is heavy for one slide.` : `Added — ${kb}KB.`);
     } catch (err) {
-      console.error('Could not read that image:', err);
-      setNote('Could not read that image.');
+      console.error('Could not read that file:', err);
+      setNote(isPdf ? 'Could not read that PDF.' : 'Could not read that image.');
     } finally {
       setBusy(false);
     }
@@ -141,7 +203,12 @@ function MediaBox({
     <div className={`relative ${className ?? ''}`} style={style}>
       <div
         ref={frameRef}
-        className={`relative h-full w-full overflow-hidden bg-black/30 ${square ? '' : elevated ? 'rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)]' : 'rounded-lg'} ${dragging ? 'ring-2 ring-[var(--accent)]' : ''} ${
+        className={`relative h-full w-full overflow-hidden ${
+          // A letterboxed plan reads as a sheet of paper, not a photo in a
+          // dark mount, so the bars around it are white rather than the
+          // usual scrim.
+          fit === 'contain' && url ? 'bg-white' : 'bg-black/30'
+        } ${square ? '' : elevated ? 'rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)]' : 'rounded-lg'} ${dragging ? 'ring-2 ring-[var(--accent)]' : ''} ${
           canAdjust && url && !adjusting ? 'cursor-pointer' : ''
         }`}
         onClick={canAdjust && url && !adjusting ? () => setAdjusting(true) : undefined}
@@ -163,7 +230,12 @@ function MediaBox({
             <video ref={mediaRef} src={url} controls className="h-full w-full object-cover" />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={url} alt="" style={imageStyle(transform)} className="h-full w-full object-cover" />
+            <img
+              src={url}
+              alt=""
+              style={imageStyle(transform)}
+              className={`h-full w-full ${fit === 'contain' ? 'object-contain' : 'object-cover'}`}
+            />
           )
         ) : (
           <div
@@ -175,7 +247,7 @@ function MediaBox({
           >
             {canUpload ? (
               <>
-                <span>{dragging ? 'Drop to add' : busy ? 'Reading image…' : 'Drag an image here'}</span>
+                <span>{dragging ? 'Drop to add' : busy ? 'Reading…' : onPdfPlan ? 'Drag an image or PDF plan here' : 'Drag an image here'}</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); openPicker(); }}
                   className="rounded-md border border-dashed border-white/30 px-2.5 py-1 text-xs font-semibold text-white/70 hover:border-white/60 hover:text-white"
@@ -193,7 +265,7 @@ function MediaBox({
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
+            accept="image/*,application/pdf"
             className="absolute h-px w-px overflow-hidden opacity-0"
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -203,21 +275,66 @@ function MediaBox({
           />
         )}
 
+        {pdfPick && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-black/80 p-3 text-white"
+          >
+            <span className="text-xs text-white/80">Which page is the plan?</span>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min={1}
+                max={pdfPick.numPages}
+                value={pdfPick.page}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  if (Number.isFinite(n)) {
+                    setPdfPick((cur) => (cur ? { ...cur, page: Math.min(cur.numPages, Math.max(1, Math.round(n))) } : cur));
+                  }
+                }}
+                className="w-16 rounded-md border border-white/25 bg-black/60 px-2 py-1 text-center text-xs outline-none"
+              />
+              <span className="text-[11px] text-white/60">of {pdfPick.numPages}</span>
+              <button
+                disabled={busy}
+                onClick={() => void applyPdfPage(pdfPick.doc, pdfPick.page)}
+                className="rounded-md bg-white px-2.5 py-1 text-[11px] font-semibold text-black hover:bg-white/90 disabled:opacity-50"
+              >
+                {busy ? 'Reading…' : 'Use this page'}
+              </button>
+              <button
+                onClick={() => { setPdfPick(null); setNote(''); }}
+                className="rounded-md border border-white/25 px-2 py-1 text-[11px] text-white/70 hover:text-white"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         {editable && !adjusting && (
           <div className="absolute inset-x-2 bottom-2 flex flex-col gap-1">
             {note && <span className="rounded bg-black/70 px-2 py-0.5 text-[10px] text-white/80">{note}</span>}
             <div className="flex gap-1">
-              <input
-                value={url.startsWith('data:') ? '' : url}
-                onChange={(e) => onChangeUrl(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                placeholder={url.startsWith('data:') ? 'Uploaded image' : `Paste ${kind} URL…`}
-                className="min-w-0 flex-1 rounded-md border border-white/20 bg-black/60 px-2 py-1 text-xs text-white outline-none placeholder:text-white/40"
-              />
+              {/* Image has real upload paths now (drag-drop, Choose a file,
+                  PDF plans) — a paste-URL fallback next to all of that is just
+                  clutter, so it's video-only: video has no adjust overlay and
+                  no upload path at all (a base64 video would be tens of
+                  megabytes in the project row, see imageFile.ts), so a pasted
+                  URL is its *only* way to get a source. */}
+              {kind === 'video' && (
+                <input
+                  value={url}
+                  onChange={(e) => onChangeUrl(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  placeholder="Paste video URL…"
+                  className="min-w-0 flex-1 rounded-md border border-white/20 bg-black/60 px-2 py-1 text-xs text-white outline-none placeholder:text-white/40"
+                />
+              )}
               {/* Replace lives in the on-image toolbar once selected (click the
                   image) — a photo doesn't also need a standalone Upload button
-                  here. Video has no adjust overlay, so it keeps Upload as its
-                  only way to swap the file. */}
+                  here. */}
               {canUpload && !canAdjust && (
                 <button
                   onClick={(e) => { e.stopPropagation(); fileRef.current?.click(); }}
@@ -254,6 +371,18 @@ function MediaBox({
     </div>
   );
 }
+
+/** The linked-views stage box is `aspect-video`, so the frame every hotspot
+ *  coordinate, calibration and PDF snap point is normalised against is always
+ *  16:9 — no measuring needed, and the number holds at any render size, export
+ *  scale or viewer zoom. Module-level because `MediaBox` needs it too, to place
+ *  a PDF plan's geometry into that same space at upload. */
+const FRAME_ASPECT = 16 / 9;
+
+/** How close, in on-screen pixels, a pointer has to be before a pick snaps to
+ *  the plan's geometry. Generous enough to catch a corner without hunting,
+ *  tight enough that two walls a few pixels apart stay separately selectable. */
+const SNAP_SCREEN_PX = 12;
 
 export const DEFAULT_ACCENT = '#000000';
 
@@ -860,6 +989,11 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   const [pendingGallery, setPendingGallery] = useState<HotspotGalleryImage[]>([]);
   const [galleryBusy, setGalleryBusy] = useState(false);
   const galleryFileRef = useRef<HTMLInputElement>(null);
+  /** Only meaningful once a hotspot has both a gallery and a target —
+   *  otherwise there's nothing for jumpTo to choose between. */
+  const [pendingClickAction, setPendingClickAction] = useState<'navigate' | 'gallery' | ''>('');
+  const [pendingKeyPlanUrl, setPendingKeyPlanUrl] = useState('');
+  const [pendingKeyPlanArrowDeg, setPendingKeyPlanArrowDeg] = useState('');
   /** Space Detail — everything about this space surfaced on click instead of
    *  navigating away. Collapsed by default; expands automatically once
    *  editing a hotspot that already has any of this filled in. */
@@ -888,9 +1022,28 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   /** Which named stage is active — undefined means "no stages defined" or
    *  "first one," both of which fall back to the view's own url/transform. */
   const [activeStageId, setActiveStageId] = useState<string | undefined>(undefined);
+  /** Which reading of the plan is on screen. Transient like the active stage:
+   *  it's how the plan is being *looked at* right now, mid-pitch, not
+   *  something authored into the deck. 'plan' is the plan as drawn, no
+   *  overlay. */
+  const [overlayMode, setOverlayMode] = useState<'plan' | 'zoning' | 'adjacency' | 'dimensions'>('plan');
+  /** A two-point pick in progress on the plan: either establishing the scale
+   *  ('calibrate') or just measuring between two points ('measure'). Both
+   *  collect points the same way, so they share one bit of state. */
+  const [pickMode, setPickMode] = useState<null | 'calibrate' | 'measure'>(null);
+  const [pickPoints, setPickPoints] = useState<Point[]>([]);
+  /** Where the next click would actually land, once snapped to the plan's own
+   *  geometry — shown live so the user can see what they are about to pick. */
+  const [snapHit, setSnapHit] = useState<SnapResult | null>(null);
+  const [pendingCalDistance, setPendingCalDistance] = useState('');
+  const [pendingCalUnit, setPendingCalUnit] = useState('m');
   /** Which stages the hotspot being drawn/edited is active on. Empty = every
    *  stage (matches `stageIds` being unset on save). */
   const [pendingStageIds, setPendingStageIds] = useState<string[]>([]);
+  /** Zoning/adjacency for the hotspot being drawn or edited — see the
+   *  matching fields on ViewHotspot. */
+  const [pendingZoneCategory, setPendingZoneCategory] = useState('');
+  const [pendingAdjacentIds, setPendingAdjacentIds] = useState<string[]>([]);
   /** Rows in the seating table (if any) whose hotspot(s) should highlight
    *  right now — fed by hovering a SeatingTable row; consumed by the hotspot
    *  <path> rendering below alongside the simple side-list's own
@@ -906,6 +1059,15 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   const panRef = useRef<{ startX: number; startY: number; startPanX: number; startPanY: number; moved: boolean } | null>(null);
   const stageBoxRef = useRef<HTMLDivElement>(null);
   const zoomPanActiveRef = useRef(false);
+  /** Live, uncommitted angle while the north-point handle is being dragged —
+   *  `null` when not dragging. Read by both the toolbar icon and the
+   *  on-stage badge so they rotate together in real time; committed once, on
+   *  release, via `setStage` (see the drag handlers near it, below the early
+   *  return). Declared up here, with the rest of this component's hooks,
+   *  same reasoning as `panRef`/`viewportZoom` above — so the hook order
+   *  can't change across the early return just below. */
+  const [dragNorthDeg, setDragNorthDeg] = useState<number | null>(null);
+  const northDragRef = useRef<{ cx: number; cy: number; startAngle: number; startDeg: number } | null>(null);
   /** Background-music playback for the active view (Render/Axo, typically) —
    *  mute is a viewer preference kept across view switches; whether the
    *  browser actually blocked autoplay is per-attempt, so it resets. */
@@ -922,11 +1084,51 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
    *  fires (and clears panRef) before the browser's click event does. */
   const justPannedRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  /** A `targetTime` seek that arrived before its walkthrough view's <video>
+   *  had actually mounted — applied by the effect below once it has,
+   *  instead of hoping a single requestAnimationFrame was enough. */
+  const pendingSeekRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const time = pendingSeekRef.current;
+    if (time == null) return;
+    const video = videoRef.current;
+    // Nothing mounted for this view (it isn't a walkthrough, or the target
+    // view has no video yet) — there's nothing to seek, drop the request
+    // rather than leaving it to fire against some later, unrelated video.
+    if (!video) {
+      pendingSeekRef.current = null;
+      return;
+    }
+    const apply = () => {
+      video.currentTime = time;
+      pendingSeekRef.current = null;
+    };
+    if (video.readyState >= 1) {
+      apply();
+      return;
+    }
+    video.addEventListener('loadedmetadata', apply, { once: true });
+    return () => video.removeEventListener('loadedmetadata', apply);
+  }, [activeId]);
   const active = views.find((v) => v.id === activeId) ?? views[0];
   const activeStage = active?.stages?.find((s) => s.id === activeStageId) ?? active?.stages?.[0];
+  // Derived up here, before the early return below, so the hook order can't
+  // change. Rebuilding the grid is only worth doing when the plan changes.
+  const planGeometry = activeStage?.url ? activeStage.geometry : active?.geometry;
+  const snapIndex = useMemo(() => buildSnapIndex(planGeometry, FRAME_ASPECT), [planGeometry]);
 
   function setView(id: string, patch: Partial<LinkedView>) {
-    updateField('views', views.map((v) => (v.id === id ? { ...v, ...patch } : v)));
+    // Read the freshest views from the store rather than this render's
+    // closure. MediaBox commits a url and then a transform back-to-back in
+    // one tick (see accept()), and for a linked view *both* land inside this
+    // same `views` array — so computing the second patch from a stale
+    // snapshot silently threw the first one away, which is why dropping an
+    // image here reported "Added — 113KB" and then showed an empty slot.
+    // Ordinary slides never hit this: their url and transform are separate
+    // fields, so two writes can't clobber each other.
+    const live = useEditorStore.getState().project?.slides.find((s) => s.id === slide.id)?.fields.views ?? views;
+    updateField('views', live.map((v) => (v.id === id ? { ...v, ...patch } : v)));
   }
 
   // Declared before the early return below so the hook order never changes.
@@ -974,14 +1176,31 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     setViewportZoom(1);
     setViewportPanX(0);
     setViewportPanY(0);
-  }, [activeId, activeStageId]);
-
-  // Fresh key-plan state per view — never carries an expanded card over from
-  // whichever view was showing before, matching the reference deck.
-  useEffect(() => {
+    // A different plan is a different reading: an overlay (or a half-finished
+    // measurement) from the last one would be describing the wrong image.
+    setOverlayMode('plan');
+    setPickMode(null);
+    setPickPoints([]);
+    setSnapHit(null);
+    // Fresh key-plan state per view/stage — never carries an expanded card
+    // over from whichever plan was showing before, matching the reference
+    // deck. Scoped to activeStageId too (not just activeId): a stage swaps
+    // the actual image on screen just as much as a view does.
     setKeyPlanVisible(true);
     setKeyPlanExpanded(false);
-  }, [activeId]);
+    // A hover highlight describing a space on the *last* plan is just wrong
+    // once the image underneath it has changed — nothing else here is
+    // spared this reset, hover shouldn't be either.
+    setHoveredHotspotId(null);
+    setHoveredRowHotspotIds([]);
+    // Closing these by hand (rather than letting the next render's
+    // `hotspots.find(...)` quietly return undefined) keeps their own
+    // onClose cleanup — clearing spaceDetailGalleryIndex alongside
+    // lightboxHotspotId — from being skipped.
+    setLightboxHotspotId(null);
+    setSpaceDetailHotspotId(null);
+    setSpaceDetailGalleryIndex(null);
+  }, [activeId, activeStageId]);
 
   // Background music for the active view: fades in on arrival, stops on
   // leaving (or when this view has none). A play() promise can reject if
@@ -1025,6 +1244,113 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   const hotspots = activeStage ? allHotspots.filter((h) => !h.stageIds || h.stageIds.includes(activeStage.id)) : allHotspots;
   const stageUrl = activeStage?.url ?? active.url;
   const stageTransform = activeStage?.url ? activeStage.transform : active.transform;
+  // Scale belongs to whichever image is actually on screen — a stage that
+  // brought its own plan carries its own scale; otherwise it's the view's.
+  const calibration = activeStage?.url ? activeStage.calibration : active.calibration;
+  const isPdfPlan = activeStage?.url ? activeStage.isPdfPlan : active.isPdfPlan;
+  const northDeg = activeStage?.url ? activeStage.northDeg : active.northDeg;
+  const displayNorthDeg = dragNorthDeg ?? northDeg ?? 0;
+
+  /** Where a pointer at these client coordinates should actually place a point.
+   *
+   *  The snap radius is a **screen** distance converted into frame units, so it
+   *  shrinks as the viewer zooms in — snapping must get finer with magnification,
+   *  not coarser, since zooming in is exactly when precision is being asked for. */
+  function resolvePick(rect: DOMRect, clientX: number, clientY: number): { point: Point; snap: SnapResult | null } {
+    const raw = clamp01({ x: (clientX - rect.left) / rect.width, y: (clientY - rect.top) / rect.height });
+    const radius = (SNAP_SCREEN_PX / rect.width) / Math.max(1, viewportZoom);
+    const snap = snapTo(snapIndex, raw, radius);
+    return { point: snap ? snap.point : raw, snap };
+  }
+
+  /** Writes any of the image-scoped fields to whichever of the stage or the
+   *  view actually owns the picture on screen.
+   *
+   *  A stage only owns the image once it has its own `url`; until then it is
+   *  showing the view's. Setting a url is therefore what makes a stage
+   *  image-owning, which is why that case targets the stage even though the
+   *  check above would still say the view. */
+  function setStage(patch: Partial<Pick<LinkedView, 'url' | 'transform' | 'calibration' | 'geometry' | 'isPdfPlan' | 'northDeg'>>) {
+    const targetsStage = !!activeStage && (!!activeStage.url || patch.url !== undefined);
+    if (targetsStage) {
+      setView(active.id, { stages: active.stages!.map((s) => (s.id === activeStage!.id ? { ...s, ...patch } : s)) });
+    } else {
+      setView(active.id, patch);
+    }
+  }
+
+  /** North-point rotate handle. Mirrors the drag-tools' own pointer-capture
+   *  pattern just below this (plain functions, `setPointerCapture`) rather
+   *  than ImageAdjustOverlay's window-listener approach — capture already
+   *  keeps delivering moves once the pointer leaves the icon's small hit
+   *  area, so there's no stale-closure/listener-teardown risk to guard
+   *  against here.
+   *
+   *  Commits once, on release, not on every move: `setStage` isn't memoized
+   *  and `commitProject` pushes an undo-stack entry on every call with no
+   *  de-duping for array fields, so a live per-move commit would flood undo
+   *  history (and, past MAX_HISTORY, evict unrelated earlier edits) for
+   *  what should read as one undo-able action. `dragNorthDeg` carries the
+   *  live angle during the drag so the toolbar icon and on-stage badge can
+   *  still rotate smoothly in real time without committing anything yet. */
+  function normalizeDeg(deg: number) {
+    return ((deg % 360) + 360) % 360;
+  }
+
+  function startNorthDrag(e: React.PointerEvent<HTMLButtonElement>) {
+    e.stopPropagation();
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // No active pointer to capture; pointermove on the button still works.
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    northDragRef.current = { cx, cy, startAngle: Math.atan2(e.clientY - cy, e.clientX - cx), startDeg: displayNorthDeg };
+    setDragNorthDeg(displayNorthDeg);
+  }
+
+  function moveNorthDrag(e: React.PointerEvent<HTMLButtonElement>) {
+    const drag = northDragRef.current;
+    if (!drag) return;
+    const nowAngle = Math.atan2(e.clientY - drag.cy, e.clientX - drag.cx);
+    const deltaDeg = ((nowAngle - drag.startAngle) * 180) / Math.PI;
+    setDragNorthDeg(normalizeDeg(drag.startDeg + deltaDeg));
+  }
+
+  function endNorthDrag(e: React.PointerEvent<HTMLButtonElement>) {
+    if (!northDragRef.current) return;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // Capture may already be gone; nothing to release.
+    }
+    northDragRef.current = null;
+    setStage({ northDeg: dragNorthDeg ?? displayNorthDeg });
+    setDragNorthDeg(null);
+  }
+
+  function setCalibration(cal: PlanCalibration | undefined) {
+    setStage({ calibration: cal });
+  }
+
+  const zoneCategories = [...new Set(hotspots.map((h) => h.zoneCategory?.trim()).filter((z): z is string => !!z))].sort();
+  // Only one end of a pair has to name the other, and a space whose partner
+  // isn't on this stage simply has no line to draw here.
+  const adjacencyPairs: { a: ViewHotspot; b: ViewHotspot }[] = [];
+  const seenPairs = new Set<string>();
+  for (const h of hotspots) {
+    for (const otherId of h.adjacentHotspotIds ?? []) {
+      const other = hotspots.find((o) => o.id === otherId);
+      if (!other || other.id === h.id) continue;
+      const key = [h.id, other.id].sort().join('|');
+      if (seenPairs.has(key)) continue;
+      seenPairs.add(key);
+      adjacencyPairs.push({ a: h, b: other });
+    }
+  }
+  const overlaysAvailable = !!stageUrl && active.kind !== 'walkthrough' && (editable || zoneCategories.length > 0 || adjacencyPairs.length > 0 || !!calibration);
   // Unset means "show it exactly when something would appear in it" — computed
   // here, once, rather than re-derived wherever it's read.
   const showHotspotList = active.showHotspotList ?? hotspots.some((h) => h.listEntry);
@@ -1241,6 +1567,9 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     setPendingListValue(h?.listEntry?.value ?? '');
     setPendingListDescription(h?.listEntry?.description ?? '');
     setPendingGallery(h?.gallery ?? []);
+    setPendingClickAction(h?.clickAction ?? '');
+    setPendingKeyPlanUrl(h?.keyPlanImage?.url ?? '');
+    setPendingKeyPlanArrowDeg(h?.keyPlanImage?.arrowDeg != null ? String(h.keyPlanImage.arrowDeg) : '');
     setPendingStageIds(h?.stageIds ?? []);
     setPendingConceptTitle(h?.spaceDetail?.concept?.title ?? '');
     setPendingConceptBody(h?.spaceDetail?.concept?.body ?? '');
@@ -1249,6 +1578,8 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     setPendingBoqNote(h?.spaceDetail?.boq?.note ?? '');
     setPendingSpaceNote(h?.spaceDetail?.note ?? '');
     setSpaceDetailOpen(!!h?.spaceDetail);
+    setPendingZoneCategory(h?.zoneCategory ?? '');
+    setPendingAdjacentIds(h?.adjacentHotspotIds ?? []);
   }
 
   function buildSpaceDetail(): ViewHotspot['spaceDetail'] {
@@ -1276,6 +1607,14 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   function startEditingHotspot(h: ViewHotspot) {
     loadPendingFrom(h);
     setEditingHotspotId(h.id);
+  }
+
+  function buildKeyPlanImage(): ViewHotspot['keyPlanImage'] {
+    if (!pendingKeyPlanUrl.trim()) return undefined;
+    return {
+      url: pendingKeyPlanUrl.trim(),
+      arrowDeg: pendingKeyPlanArrowDeg.trim() ? Number(pendingKeyPlanArrowDeg) : undefined,
+    };
   }
 
   function buildListEntry(existingId?: string): ViewHotspot['listEntry'] {
@@ -1306,8 +1645,12 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
       label: pendingLabel.trim() || undefined,
       listEntry: buildListEntry(),
       gallery: pendingGallery.length ? pendingGallery : undefined,
+      keyPlanImage: buildKeyPlanImage(),
+      clickAction: pendingClickAction || undefined,
       stageIds: pendingStageIds.length ? pendingStageIds : undefined,
       spaceDetail: buildSpaceDetail(),
+      zoneCategory: pendingZoneCategory.trim() || undefined,
+      adjacentHotspotIds: pendingAdjacentIds.length ? pendingAdjacentIds : undefined,
     };
     setView(active.id, { hotspots: [...allHotspots, hotspot] });
     // Stay on the tool rather than dropping out after every single region.
@@ -1332,8 +1675,12 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               label: pendingLabel.trim() || undefined,
               listEntry: buildListEntry(h.listEntry?.id),
               gallery: pendingGallery.length ? pendingGallery : undefined,
+              keyPlanImage: buildKeyPlanImage(),
+              clickAction: pendingClickAction || undefined,
               stageIds: pendingStageIds.length ? pendingStageIds : undefined,
               spaceDetail: buildSpaceDetail(),
+              zoneCategory: pendingZoneCategory.trim() || undefined,
+              adjacentHotspotIds: pendingAdjacentIds.length ? pendingAdjacentIds : undefined,
             }
           : h,
       ),
@@ -1342,7 +1689,25 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   }
 
   function removeHotspot(id: string) {
-    setView(active.id, { hotspots: allHotspots.filter((h) => h.id !== id) });
+    setView(active.id, {
+      // Also drop the deleted space from anyone's adjacency list, so a
+      // rebuilt plan doesn't accumulate links pointing at nothing.
+      hotspots: allHotspots
+        .filter((h) => h.id !== id)
+        .map((h) => {
+          if (!h.adjacentHotspotIds?.includes(id)) return h;
+          const rest = h.adjacentHotspotIds.filter((x) => x !== id);
+          return { ...h, adjacentHotspotIds: rest.length ? rest : undefined };
+        }),
+      // Same reasoning as the adjacency cleanup above, for the seating
+      // table's own hotspot links — otherwise a deleted space leaves a
+      // dangling id in a row's hotspotIds that will just never highlight
+      // anything again, silently.
+      seatingZones: active.seatingZones?.map((z) => ({
+        ...z,
+        rows: z.rows.map((r) => (r.hotspotIds?.includes(id) ? { ...r, hotspotIds: r.hotspotIds.filter((x) => x !== id) } : r)),
+      })),
+    });
     setEditingHotspotId((cur) => (cur === id ? null : cur));
   }
 
@@ -1359,50 +1724,76 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   function jumpTo(hotspot: ViewHotspot) {
     const detail = hotspot.spaceDetail;
     const hasRichDetail = !!(detail?.concept || detail?.walkthroughUrl || detail?.boq || detail?.note);
+    // Always wins, regardless of clickAction — per ViewHotspot.clickAction's
+    // own doc comment, staying on the plan takes priority over any override.
     if (hasRichDetail || occupancyFor(hotspot.id)) {
       setSpaceDetailHotspotId(hotspot.id);
       return;
     }
+
+    const openGallery = () => setLightboxHotspotId(hotspot.id);
+    const navigate = () => {
+      if (hotspot.targetSlideId) {
+        selectSlide(hotspot.targetSlideId);
+        return;
+      }
+      if (!hotspot.targetViewId) return;
+      const changingView = hotspot.targetViewId !== activeId;
+      setActiveId(hotspot.targetViewId);
+      if (hotspot.targetTime == null) return;
+      if (!changingView && videoRef.current) {
+        // Already on this view — its video is already mounted, no render to
+        // wait for.
+        videoRef.current.currentTime = hotspot.targetTime;
+      } else {
+        // Video for the view being switched to isn't mounted yet; the effect
+        // above applies this once it is.
+        pendingSeekRef.current = hotspot.targetTime;
+      }
+    };
+
+    // clickAction only means something when there's a real choice to make —
+    // 'gallery' with no gallery, or 'navigate' with no target, falls through
+    // to the same default priority as if it were unset.
+    if (hotspot.clickAction === 'gallery' && hotspot.gallery?.length) {
+      openGallery();
+      return;
+    }
+    if (hotspot.clickAction === 'navigate' && (hotspot.targetSlideId || hotspot.targetViewId)) {
+      navigate();
+      return;
+    }
     if (hotspot.gallery?.length) {
-      setLightboxHotspotId(hotspot.id);
+      openGallery();
       return;
     }
-    if (hotspot.targetSlideId) {
-      selectSlide(hotspot.targetSlideId);
-      return;
-    }
-    if (!hotspot.targetViewId) return;
-    setActiveId(hotspot.targetViewId);
-    if (hotspot.targetTime != null) {
-      requestAnimationFrame(() => {
-        if (videoRef.current) videoRef.current.currentTime = hotspot.targetTime!;
-      });
-    }
+    navigate();
   }
 
   const centroid: Point | null = drawingPoints ? centroidOf(drawingPoints) : null;
   const editingCentroid: Point | null = editingHotspot ? centroidOf(editingHotspot.points) : null;
   const showPopup = pickingTarget || !!editingHotspotId;
   const popupCentroid = editingHotspotId ? editingCentroid : centroid;
+  const dark = slide.style === 'section-starter' || slide.style === 'design';
 
   return (
-    <div className="mt-6 flex flex-col">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        {views.map((v) => (
-          <button
-            key={v.id}
-            onClick={() => selectView(v.id)}
-            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-              v.id === active.id
-                ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
-                : 'border-[var(--line)] text-[var(--ink-2)] hover:border-[var(--ink-3)]'
-            }`}
-          >
-            {v.label}
-          </button>
-        ))}
+    // `h-full min-h-0`: this fills exactly the 720px the slide has to give
+    // (the `base` wrapper in the root component is `h-full overflow-hidden`
+    // for this layout specifically, so there's a genuine, fixed budget to
+    // fill instead of growing past it) — `min-h-0` is what lets a flex item
+    // actually shrink below its content's natural size, overriding the
+    // flexbox default that would otherwise ignore that budget. Everything
+    // below shares it: the chrome rows opt out with `shrink-0`, so the
+    // plan/seating row is the one thing that actually gives, sizing the
+    // plan by whatever height is left rather than the reverse.
+    <div className="flex h-full min-h-0 flex-col">
+      {/* The title rarely fills this width, so the per-view toolbar
+          (zoom/pan, north point, drawing tools) shares its row instead of
+          owning a row of its own further down. */}
+      <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-4">
+        <Title slide={slide} editable={editable} dark={dark} />
         {editable && active.url && active.kind !== 'walkthrough' && (
-          <div className="ml-auto flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
             <label className="flex items-center gap-1 text-[11px] font-medium text-[var(--ink-3)]" title="Lets viewers wheel-zoom and drag-pan this image (Presenter/view mode only)">
               <input
                 type="checkbox"
@@ -1412,6 +1803,20 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               />
               Zoom/pan
             </label>
+            <button
+              onPointerDown={startNorthDrag}
+              onPointerMove={moveNorthDrag}
+              onPointerUp={endNorthDrag}
+              title={`North: ${Math.round(displayNorthDeg)}° — drag to rotate`}
+              style={{ transform: `rotate(${displayNorthDeg}deg)` }}
+              className="flex h-7 w-7 shrink-0 cursor-grab items-center justify-center rounded-full border border-[var(--line)] text-[var(--ink-3)] outline-none [touch-action:none] hover:border-[var(--accent)] hover:text-[var(--accent)] active:cursor-grabbing"
+            >
+              <svg viewBox="0 0 40 40" className="h-full w-full">
+                <circle cx="20" cy="21" r="17" fill="none" stroke="currentColor" strokeOpacity="0.6" strokeWidth="1.5" />
+                <line x1="20" y1="31" x2="20" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path d="M20 12 L24 19 L20 16.5 L16 19 Z" fill="currentColor" />
+              </svg>
+            </button>
             {TOOLS.map((t) => (
               <button
                 key={t.key}
@@ -1433,12 +1838,34 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           </div>
         )}
       </div>
+      <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2">
+        {views.map((v) => (
+          <button
+            key={v.id}
+            onClick={() => selectView(v.id)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+              v.id === active.id
+                ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                : 'border-[var(--line)] text-[var(--ink-2)] hover:border-[var(--ink-3)]'
+            }`}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
       {(active.stages?.length || editable) && active.kind !== 'walkthrough' && (
-        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        <div className="mb-3 flex shrink-0 flex-wrap items-center gap-1.5">
           {active.stages?.map((s) => (
             <button
               key={s.id}
-              onClick={() => setActiveStageId(s.id)}
+              onClick={() => {
+                // Same reasoning as selectView: a hotspot mid-edit, or a
+                // half-drawn shape, belongs to the stage it was started on —
+                // switching away should cancel it, not leave it dangling
+                // against a filtered hotspot list that may no longer include it.
+                cancelDrawing();
+                setActiveStageId(s.id);
+              }}
               className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
                 s.id === activeStage?.id
                   ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
@@ -1453,6 +1880,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               onClick={() => {
                 const stage = { id: makeId('stage'), label: `Stage ${(active.stages?.length ?? 0) + 1}` };
                 setView(active.id, { stages: [...(active.stages ?? []), stage] });
+                cancelDrawing();
                 setActiveStageId(stage.id);
               }}
               className="rounded-full border border-dashed border-[var(--line)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
@@ -1462,8 +1890,155 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           )}
         </div>
       )}
-      {editable && active.kind !== 'walkthrough' && (
-        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+      {overlaysAvailable && (
+        <div className="mb-3 flex shrink-0 flex-wrap items-center gap-1.5">
+          {([
+            ['plan', 'Plan'],
+            ['zoning', 'Zoning'],
+            ['adjacency', 'Adjacency'],
+            ['dimensions', 'Dimensions'],
+          ] as const).map(([mode, label]) => {
+            const ready =
+              mode === 'plan'
+                ? true
+                : mode === 'zoning'
+                  ? zoneCategories.length > 0
+                  : mode === 'adjacency'
+                    ? adjacencyPairs.length > 0
+                    : !!calibration;
+            // An overlay with nothing behind it yet is only offered while
+            // editing — in Presenter it would be a dead end mid-pitch.
+            if (!ready && !editable) return null;
+            return (
+              <button
+                key={mode}
+                onClick={() => {
+                  setOverlayMode(mode);
+                  setPickMode(null);
+                  setPickPoints([]);
+                }}
+                title={ready ? undefined : 'Nothing set up for this overlay yet'}
+                className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+                  overlayMode === mode
+                    ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                    : ready
+                      ? 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--ink-3)]'
+                      : 'border-dashed border-[var(--line)] text-[var(--ink-3)] opacity-60 hover:opacity-100'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+
+          {overlayMode === 'zoning' &&
+            zoneCategories.map((z) => (
+              <span key={z} className="flex items-center gap-1 text-[11px] text-[var(--ink-2)]">
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: zoneColor(z) }} />
+                {z}
+              </span>
+            ))}
+
+          {overlayMode === 'dimensions' && (
+            <>
+              {calibration ? (
+                <>
+                  <button
+                    onClick={() => {
+                      setPickMode((cur) => (cur === 'measure' ? null : 'measure'));
+                      setPickPoints([]);
+                    }}
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+                      pickMode === 'measure'
+                        ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                        : 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--ink-3)]'
+                    }`}
+                  >
+                    {pickMode === 'measure' ? 'Measuring — click two points' : 'Measure'}
+                  </button>
+                  {editable && (
+                    <button
+                      onClick={() => {
+                        setPickMode('calibrate');
+                        setPickPoints([]);
+                        setPendingCalDistance('');
+                      }}
+                      className="rounded-full border border-[var(--line)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-3)] hover:border-[var(--ink-3)]"
+                    >
+                      Recalibrate
+                    </button>
+                  )}
+                </>
+              ) : editable ? (
+                <button
+                  onClick={() => {
+                    setPickMode('calibrate');
+                    setPickPoints([]);
+                    setPendingCalDistance('');
+                  }}
+                  className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+                    pickMode === 'calibrate'
+                      ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                      : 'border-[var(--accent-soft-line)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                  }`}
+                >
+                  {pickMode === 'calibrate' ? 'Click two points a known distance apart' : 'Calibrate to enable dimensions'}
+                </button>
+              ) : null}
+
+              {pickMode === 'calibrate' && pickPoints.length === 2 && (
+                <span className="flex items-center gap-1 text-[var(--ink)]">
+                  <input
+                    autoFocus
+                    type="number"
+                    value={pendingCalDistance}
+                    onChange={(e) => setPendingCalDistance(e.target.value)}
+                    placeholder="Distance"
+                    title="How far apart those two points are in the real world"
+                    className="w-20 rounded-md border border-[var(--line)] px-2 py-1 text-[11px] outline-none"
+                  />
+                  <input
+                    value={pendingCalUnit}
+                    onChange={(e) => setPendingCalUnit(e.target.value)}
+                    placeholder="m"
+                    title="Unit — shown after every measurement"
+                    className="w-12 rounded-md border border-[var(--line)] px-2 py-1 text-[11px] outline-none"
+                  />
+                  <button
+                    onClick={() => {
+                      const cal = calibrationFrom(
+                        pickPoints[0],
+                        pickPoints[1],
+                        FRAME_ASPECT,
+                        Number(pendingCalDistance),
+                        pendingCalUnit.trim() || 'm',
+                      );
+                      if (!cal) return;
+                      setCalibration(cal);
+                      setPickMode(null);
+                      setPickPoints([]);
+                    }}
+                    className="rounded-full bg-[var(--accent)] px-2.5 py-1 text-[11px] font-semibold text-white"
+                  >
+                    Set scale
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPickMode(null);
+                      setPickPoints([]);
+                    }}
+                    className="rounded-full border border-[var(--line)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-3)]"
+                  >
+                    Cancel
+                  </button>
+                </span>
+              )}
+            </>
+          )}
+        </div>
+      )}
+      {editable && active.kind !== 'walkthrough' && active.kind !== 'layout' && (
+        <div className="mb-3 flex shrink-0 flex-wrap items-center gap-1.5 text-[var(--ink)]">
           <input
             value={active.musicUrl ?? ''}
             onChange={(e) => setView(active.id, { musicUrl: e.target.value || undefined })}
@@ -1496,10 +2071,21 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           )}
         </div>
       )}
-      <div className="flex gap-4">
+      {/* `min-h-0 flex-1` on the row: with the chrome rows above all opting
+          out via `shrink-0`, this row is the one thing that actually claims
+          "whatever's left" of the 720px budget. `h-full` (not `flex-1`) on
+          the plan box itself is deliberate: `flex-1` would also force its
+          *width* via flex-grow, which — paired with an aspect-ratio box —
+          leaves nothing "auto" left for the aspect ratio to derive, so it'd
+          just ignore the ratio outright. Left with only height definite
+          (`h-full`, matching the row's own default stretch), width derives
+          from *that* via `aspect-video` — exactly inverted from before,
+          where width (from flex-1) drove an unbounded height. `justify-center`
+          on the row absorbs the horizontal space that leaves unclaimed. */}
+      <div className="flex min-h-0 flex-1 justify-center gap-4">
       <div
         ref={stageBoxRef}
-        className={`relative aspect-video min-w-0 flex-1 select-none overflow-hidden ${
+        className={`relative aspect-video h-full min-w-0 select-none overflow-hidden ${
           drawing ? 'cursor-crosshair' : zoomPanActive && viewportZoom > 1 ? 'cursor-grab active:cursor-grabbing' : ''
         }`}
         onPointerDown={handlePointerDown}
@@ -1516,33 +2102,100 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           kind={active.kind === 'walkthrough' ? 'video' : 'image'}
           editable={editable}
           onChangeUrl={(url) =>
-            activeStage
-              ? setView(active.id, { stages: active.stages!.map((s) => (s.id === activeStage.id ? { ...s, url } : s)) })
-              : setView(active.id, { url })
+            // A new plan is a new scale: keeping the old calibration would
+            // silently report confident, wrong measurements. Same for the snap
+            // geometry, which describes the plan being replaced.
+            setStage({ url, calibration: undefined, geometry: undefined, isPdfPlan: undefined })
           }
+          onPdfPlan={
+            active.kind === 'walkthrough'
+              ? undefined
+              : ({ imageUrl, geometry }) =>
+                  // One patch, not three: these all live in the same `views`
+                  // array, and separate writes in one tick clobber each other.
+                  setStage({ url: imageUrl, geometry, isPdfPlan: true, calibration: undefined, transform: undefined })
+          }
+          fit={isPdfPlan ? 'contain' : 'cover'}
           transform={stageTransform}
-          onChangeTransform={(t) =>
-            activeStage
-              ? setView(active.id, { stages: active.stages!.map((s) => (s.id === activeStage.id ? { ...s, transform: t } : s)) })
-              : setView(active.id, { transform: t })
-          }
-          allowAdjust={tool === null}
+          onChangeTransform={(t) => setStage({ transform: t })}
+          // A PDF plan's geometry and calibration are both fixed to the plan as
+          // rendered, so re-cropping it would silently desync both.
+          allowAdjust={tool === null && !isPdfPlan}
           className="h-full w-full"
           mediaRef={active.kind === 'walkthrough' ? videoRef : undefined}
         />
 
         <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+          {overlayMode === 'adjacency' &&
+            adjacencyPairs.map(({ a, b }) => {
+              const ca = centroidOf(a.points);
+              const cb = centroidOf(b.points);
+              if (!ca || !cb) return null;
+              return (
+                <g key={`${a.id}|${b.id}`}>
+                  <line
+                    x1={ca.x * 100}
+                    y1={ca.y * 100}
+                    x2={cb.x * 100}
+                    y2={cb.y * 100}
+                    vectorEffect="non-scaling-stroke"
+                    className="stroke-[var(--accent)]"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    opacity={0.85}
+                  />
+                  {[ca, cb].map((p, i) => (
+                    <circle key={i} cx={p.x * 100} cy={p.y * 100} r={0.9} vectorEffect="non-scaling-stroke" className="fill-[var(--accent)]" />
+                  ))}
+                </g>
+              );
+            })}
+          {pickPoints.length > 0 && (
+            <g>
+              {pickPoints.length === 2 && (
+                <line
+                  x1={pickPoints[0].x * 100}
+                  y1={pickPoints[0].y * 100}
+                  x2={pickPoints[1].x * 100}
+                  y2={pickPoints[1].y * 100}
+                  vectorEffect="non-scaling-stroke"
+                  className="stroke-[var(--accent)]"
+                  strokeWidth={1.75}
+                  strokeDasharray="4,3"
+                />
+              )}
+              {pickPoints.map((p, i) => (
+                <circle
+                  key={i}
+                  cx={p.x * 100}
+                  cy={p.y * 100}
+                  r={1.1}
+                  vectorEffect="non-scaling-stroke"
+                  className="fill-white stroke-[var(--accent)]"
+                  strokeWidth={1.5}
+                />
+              ))}
+            </g>
+          )}
           {hotspots.filter((h) => hasEnoughPoints(h.points, h.shape)).map((h) => {
             const isHot = hoveredHotspotId === h.id || hoveredRowHotspotIds.includes(h.id);
+            // Zoning repaints every space by its zone rather than its authored
+            // colour — an unzoned space stays visible but reads as unassigned
+            // rather than quietly joining whichever zone it looks nearest.
+            const zone = overlayMode === 'zoning' ? h.zoneCategory?.trim() : undefined;
+            const zoning = overlayMode === 'zoning';
+            const paint = zoning ? (zone ? zoneColor(zone) : '#94a3b8') : undefined;
+            const baseFillOpacity = zoning ? (zone ? 0.38 : 0.1) : (h.fillOpacity ?? DEFAULT_FILL_OPACITY);
+            const baseStrokeWidth = zoning ? 1.25 : (h.strokeWidth ?? DEFAULT_STROKE_WIDTH);
             return (
             <path
               key={h.id}
               d={shapePath(h.points, h.shape)}
               vectorEffect="non-scaling-stroke"
-              fill={h.fillColor ?? DEFAULT_FILL}
-              fillOpacity={isHot ? Math.min(1, (h.fillOpacity ?? DEFAULT_FILL_OPACITY) * 1.8) : (h.fillOpacity ?? DEFAULT_FILL_OPACITY)}
-              stroke={h.strokeColor ?? DEFAULT_STROKE}
-              strokeWidth={isHot ? (h.strokeWidth ?? DEFAULT_STROKE_WIDTH) * 1.6 : (h.strokeWidth ?? DEFAULT_STROKE_WIDTH)}
+              fill={paint ?? h.fillColor ?? DEFAULT_FILL}
+              fillOpacity={isHot ? Math.min(1, baseFillOpacity * 1.8) : baseFillOpacity}
+              stroke={paint ?? h.strokeColor ?? DEFAULT_STROKE}
+              strokeWidth={isHot ? baseStrokeWidth * 1.6 : baseStrokeWidth}
               className={drawing ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer transition-[fill-opacity,stroke-width]'}
               onMouseEnter={() => !drawing && setHoveredHotspotId(h.id)}
               onMouseLeave={() => setHoveredHotspotId((cur) => (cur === h.id ? null : cur))}
@@ -1645,21 +2298,157 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
             </>
           )}
         </svg>
+
+        {/* Every overlay label is HTML rather than SVG <text>: the hotspot
+            SVG above is stretched with preserveAspectRatio="none", which
+            would squash anything drawn as type inside it. Sitting inside the
+            same transformed wrapper keeps labels pinned to the plan when a
+            viewer zooms. */}
+        {overlayMode === 'dimensions' &&
+          calibration &&
+          hotspots.map((h) => {
+            const c = centroidOf(h.points);
+            const areaNorm = shapeArea(h.points, h.shape);
+            if (!c || areaNorm <= 0) return null;
+            return (
+              <span
+                key={h.id}
+                className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded bg-black/70 px-1.5 py-0.5 text-[9px] font-semibold text-white"
+                style={{ left: `${c.x * 100}%`, top: `${c.y * 100}%` }}
+              >
+                {h.label ? `${h.label} · ` : ''}
+                {formatArea(realArea(areaNorm, FRAME_ASPECT, calibration), calibration.unit)}
+              </span>
+            );
+          })}
+
+        {pickPoints.length === 2 && (
+          <span
+            className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded bg-[var(--accent)] px-1.5 py-0.5 text-[9px] font-semibold text-white"
+            style={{
+              left: `${((pickPoints[0].x + pickPoints[1].x) / 2) * 100}%`,
+              top: `${((pickPoints[0].y + pickPoints[1].y) / 2) * 100}%`,
+            }}
+          >
+            {calibration && pickMode === 'measure'
+              ? formatMeasure(realDistance(pickPoints[0], pickPoints[1], FRAME_ASPECT, calibration), calibration.unit)
+              : 'Enter the real distance →'}
+          </span>
+        )}
+
+        {/* Drawn as HTML rather than into the overlay <svg>: that one is
+            viewBox 0 0 100 100 with preserveAspectRatio="none", so a square
+            marker would come out visibly oblong. */}
+        {pickMode && snapHit && (
+          <span
+            className={`pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2 border-2 border-[var(--accent)] bg-white/80 ${
+              // A corner reads as a box, a point along a wall as a dot, so it
+              // is obvious which of the two you are about to commit.
+              snapHit.kind === 'vertex' ? 'h-2.5 w-2.5' : 'h-2 w-2 rounded-full'
+            }`}
+            style={{ left: `${snapHit.point.x * 100}%`, top: `${snapHit.point.y * 100}%` }}
+          />
+        )}
+
+        {/* Its own click-capture layer rather than threading another mode
+            through the drawing/pan pointer handlers below — those already
+            juggle three gestures, and a measurement is a self-contained one. */}
+        {pickMode && (
+          <div
+            className="absolute inset-0 z-20 cursor-crosshair"
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerMove={(e) => {
+              const next = resolvePick(e.currentTarget.getBoundingClientRect(), e.clientX, e.clientY);
+              setSnapHit(next.snap);
+            }}
+            onPointerLeave={() => setSnapHit(null)}
+            onClick={(e) => {
+              const { point } = resolvePick(e.currentTarget.getBoundingClientRect(), e.clientX, e.clientY);
+              // A third click starts a fresh measurement rather than doing
+              // nothing — the common case is measuring several things in a row.
+              setPickPoints((cur) => (cur.length >= 2 ? [point] : [...cur, point]));
+            }}
+          />
+        )}
       </div>
 
-        {zoomPanActive && viewportZoom > 1 && (
-          <button
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={() => {
-              setViewportZoom(1);
-              setViewportPanX(0);
-              setViewportPanY(0);
-            }}
-            className="absolute right-2 top-2 z-20 rounded-md bg-black/75 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-black/85"
-          >
-            Reset zoom
-          </button>
-        )}
+        {/* One shared row, not each control independently `absolute`-offset
+            against the next — that pattern only worked as long as exactly
+            two things (mute, "Tap for sound") ever shared this corner, and
+            "Tap for sound"'s own `right-12` already only holds because it
+            assumes the mute button's exact width. A flex row lays out
+            whichever of these are actually present with no offset to keep
+            in sync, and gives north an honest "aligned with the others"
+            rather than an eyeballed match. */}
+        <div className="absolute right-2 top-2 z-20 flex items-center gap-2">
+          {stageUrl && active.kind !== 'walkthrough' && (
+            <div
+              className="pointer-events-none flex h-8 w-8 items-center justify-center rounded-full bg-black/60 p-1 shadow-lg"
+              style={{ transform: `rotate(${displayNorthDeg}deg)` }}
+              title={`North is ${Math.round(displayNorthDeg)}° clockwise from up`}
+            >
+              <svg viewBox="0 0 40 40" className="h-full w-full">
+                <circle cx="20" cy="21" r="17" fill="none" stroke="white" strokeOpacity="0.85" strokeWidth="1.5" />
+                {/* Arrow points up toward the N label, shaft below — the arrow
+                    itself rotates with the angle; the label rotates with it,
+                    which is correct: it's naming whichever direction the arrow
+                    is now pointing, not staying pinned to true up. */}
+                <line x1="20" y1="31" x2="20" y2="17" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                <path d="M20 12 L24 19 L20 16.5 L16 19 Z" fill="white" />
+                <text x="20" y="10" textAnchor="middle" fontSize="8" fontWeight="700" fill="white">
+                  N
+                </text>
+              </svg>
+            </div>
+          )}
+
+          {zoomPanActive && viewportZoom > 1 && (
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => {
+                setViewportZoom(1);
+                setViewportPanX(0);
+                setViewportPanY(0);
+              }}
+              className="rounded-md bg-black/75 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-black/85"
+            >
+              Reset zoom
+            </button>
+          )}
+
+          {active.musicUrl && (
+            <>
+              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+              <audio ref={musicAudioRef} src={active.musicUrl} className="hidden" />
+              <button
+                onClick={() => {
+                  const audio = musicAudioRef.current;
+                  const next = !musicMuted;
+                  setMusicMuted(next);
+                  if (audio) {
+                    audio.muted = next;
+                    if (!next && musicBlocked) {
+                      setMusicBlocked(false);
+                      void audio.play().catch(() => setMusicBlocked(true));
+                    }
+                  }
+                }}
+                title={musicMuted ? 'Unmute background music' : 'Mute background music'}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-sm text-white hover:bg-black/75"
+              >
+                {musicMuted ? '🔇' : '🔊'}
+              </button>
+              {musicBlocked && !musicMuted && (
+                <button
+                  onClick={() => void musicAudioRef.current?.play().catch(() => setMusicBlocked(true))}
+                  className="rounded-full bg-black/60 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-black/75"
+                >
+                  Tap for sound
+                </button>
+              )}
+            </>
+          )}
+        </div>
 
         {drawing && !pickingTarget && (
           <div onPointerDown={(e) => e.stopPropagation()} className="absolute left-2 top-2 z-20 flex items-center gap-2 rounded-md bg-black/75 px-2.5 py-1.5 text-[11px] font-medium text-white">
@@ -1695,39 +2484,6 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               Cancel
             </button>
           </div>
-        )}
-
-        {active.musicUrl && (
-          <>
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <audio ref={musicAudioRef} src={active.musicUrl} className="hidden" />
-            <button
-              onClick={() => {
-                const audio = musicAudioRef.current;
-                const next = !musicMuted;
-                setMusicMuted(next);
-                if (audio) {
-                  audio.muted = next;
-                  if (!next && musicBlocked) {
-                    setMusicBlocked(false);
-                    void audio.play().catch(() => setMusicBlocked(true));
-                  }
-                }
-              }}
-              title={musicMuted ? 'Unmute background music' : 'Mute background music'}
-              className="absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-sm text-white hover:bg-black/75"
-            >
-              {musicMuted ? '🔇' : '🔊'}
-            </button>
-            {musicBlocked && !musicMuted && (
-              <button
-                onClick={() => void musicAudioRef.current?.play().catch(() => setMusicBlocked(true))}
-                className="absolute right-12 top-2 z-20 rounded-full bg-black/60 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-black/75"
-              >
-                Tap for sound
-              </button>
-            )}
-          </>
         )}
 
         {active.keyPlanImage && (
@@ -1767,7 +2523,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{ left: `${popupCentroid.x * 100}%`, top: `${popupCentroid.y * 100}%` }}
-            className="absolute z-20 w-60 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--line)] bg-white p-3 shadow-xl"
+            className="absolute z-20 w-60 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--line)] bg-white p-3 text-[var(--ink)] shadow-xl"
           >
             <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--ink-3)]">
               {editingHotspotId ? 'Edit hotspot' : 'New hotspot'}
@@ -1910,6 +2666,53 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
             )}
 
             <div className="mb-2">
+              <span className="mb-1 block text-[10px] font-semibold text-[var(--ink-3)]">Zone</span>
+              <input
+                value={pendingZoneCategory}
+                onChange={(e) => setPendingZoneCategory(e.target.value)}
+                placeholder="e.g. Workstations, Meeting, Support"
+                title="Groups this space in the Zoning overlay — spaces sharing a zone name share a colour"
+                list={`zones-${active.id}`}
+                className="w-full rounded-md border border-[var(--line)] bg-white px-2 py-1 text-xs outline-none"
+              />
+              {/* Existing zones offered as suggestions, so a second "Meeting"
+                  is one keystroke rather than a near-miss like "meeting ". */}
+              <datalist id={`zones-${active.id}`}>
+                {[...new Set(allHotspots.map((h) => h.zoneCategory?.trim()).filter(Boolean))].map((z) => (
+                  <option key={z} value={z} />
+                ))}
+              </datalist>
+            </div>
+
+            {allHotspots.some((h) => h.id !== editingHotspotId) && (
+              <div className="mb-2">
+                <span className="mb-1 block text-[10px] font-semibold text-[var(--ink-3)]">Adjacent to</span>
+                <div className="flex flex-wrap gap-1">
+                  {allHotspots
+                    .filter((h) => h.id !== editingHotspotId)
+                    .map((h) => {
+                      const on = pendingAdjacentIds.includes(h.id);
+                      return (
+                        <button
+                          key={h.id}
+                          onClick={() =>
+                            setPendingAdjacentIds((prev) => (on ? prev.filter((id) => id !== h.id) : [...prev, h.id]))
+                          }
+                          className={`rounded-full border px-2 py-0.5 text-[11px] transition ${
+                            on
+                              ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                              : 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--ink-3)]'
+                          }`}
+                        >
+                          {h.label || 'Untitled'}
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            <div className="mb-2">
               <span className="mb-1 block text-[10px] font-semibold text-[var(--ink-3)]">Gallery images</span>
               {pendingGallery.length > 0 && (
                 <div className="mb-1.5 flex flex-wrap gap-1.5">
@@ -1954,6 +2757,49 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
                 }}
               />
             </div>
+
+            {pendingGallery.length > 0 && (
+              <div className="mb-2 flex gap-1.5">
+                <input
+                  value={pendingKeyPlanUrl}
+                  onChange={(e) => setPendingKeyPlanUrl(e.target.value)}
+                  placeholder="Key plan image URL (optional)"
+                  title="A small orientation crop shown in this hotspot's own gallery"
+                  className="min-w-0 flex-1 rounded-md border border-[var(--line)] px-2 py-1.5 text-xs outline-none"
+                />
+                {pendingKeyPlanUrl && (
+                  <input
+                    type="number"
+                    value={pendingKeyPlanArrowDeg}
+                    onChange={(e) => setPendingKeyPlanArrowDeg(e.target.value)}
+                    placeholder="Arrow °"
+                    className="w-16 rounded-md border border-[var(--line)] px-2 py-1.5 text-xs outline-none"
+                  />
+                )}
+              </div>
+            )}
+
+            {pendingGallery.length > 0 && pendingTarget && (
+              <div className="mb-2">
+                <span className="mb-1 block text-[10px] font-semibold text-[var(--ink-3)]">On click</span>
+                <div className="flex gap-1.5">
+                  {(['gallery', 'navigate'] as const).map((action) => (
+                    <button
+                      key={action}
+                      type="button"
+                      onClick={() => setPendingClickAction((cur) => (cur === action ? '' : action))}
+                      className={`flex-1 rounded-md border px-2 py-1 text-[11px] font-medium transition ${
+                        pendingClickAction === action
+                          ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                          : 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--ink-3)]'
+                      }`}
+                    >
+                      {action === 'gallery' ? 'Open gallery' : 'Jump to target'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="mb-2 border-t border-[var(--line)] pt-2">
               <button
@@ -2073,6 +2919,10 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           hoveredHotspotId={hoveredHotspotId}
           onHoverHotspots={setHoveredRowHotspotIds}
           onChangeView={(patch) => setView(active.id, patch)}
+          onSelectHotspot={(id) => {
+            const h = hotspots.find((x) => x.id === id);
+            if (h) jumpTo(h);
+          }}
         />
       ) : (
         showHotspotList && (
@@ -2466,7 +3316,9 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
 
   const base = (
     <div
-      className={`relative flex min-h-full w-full flex-col justify-center px-16 pb-14 pt-10 ${animClass} ${
+      className={`relative flex ${
+        slide.layout === 'linked-views' ? 'h-full overflow-hidden' : 'min-h-full'
+      } w-full flex-col justify-center px-16 pb-14 pt-10 ${animClass} ${
         hasCustomBg ? '' : dark ? 'bg-[var(--ink)] [background-image:radial-gradient(120%_90%_at_15%_-10%,var(--dark-veil-1),var(--dark-veil-2)_60%)]' : 'bg-white'
       }`}
       style={
@@ -2604,7 +3456,9 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
       ) : (
         <>
           <Kicker slide={slide} editable={editable} />
-          <Title slide={slide} editable={editable} dark={dark} />
+          {/* Linked Views renders its own Title, sharing its row with the
+              per-view toolbar (zoom/pan, north point, drawing tools). */}
+          {slide.layout !== 'linked-views' && <Title slide={slide} editable={editable} dark={dark} />}
           {slide.layout === 'title-content' && <Body slide={slide} editable={editable} />}
           {(slide.layout === 'title-stats' || slide.style === 'company') && (
             <>

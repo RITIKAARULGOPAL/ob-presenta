@@ -21,8 +21,12 @@ export default function HomePage() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
-  const [client, setClient] = useState('');
-  const [preparedBy, setPreparedBy] = useState('Officebanao');
+  // No longer collected on this form — `Project.client`/`preparedBy` are
+  // still real, required fields elsewhere (the home list's "{client} ·
+  // {date}" line, the editor header's "by {preparedBy}"), so they're kept
+  // as fixed defaults here rather than removed from the data model.
+  const client = '';
+  const preparedBy = 'Officebanao';
   const [brand, setBrand] = useState<Brand>('ob');
   const [clientLogo, setClientLogo] = useState<string | undefined>();
   const [accentColor, setAccentColor] = useState<string | undefined>();
@@ -103,7 +107,7 @@ export default function HomePage() {
               </span>
               <span>
                 <span className="block font-display text-lg font-bold">New presentation</span>
-                <span className="block text-sm text-hero-ink-3">Start from a blank project — set the name, client and date</span>
+                <span className="block text-sm text-hero-ink-3">Start from a blank project — set the name and date</span>
               </span>
             </button>
 
@@ -122,7 +126,8 @@ export default function HomePage() {
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-display text-sm font-semibold text-hero-ink">{p.name}</span>
                       <span className="block text-xs text-hero-ink-2">
-                        {p.client} · {p.date}
+                        {p.client ? `${p.client} · ` : ''}
+                        {p.date}
                       </span>
                     </span>
                   </button>
@@ -177,25 +182,6 @@ export default function HomePage() {
                 />
                 {error && <span className="mt-1 block text-xs text-ui-danger">{error}</span>}
               </label>
-              <div className="flex gap-4">
-                <label className="block flex-1">
-                  <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-ui-ink-2">Client</span>
-                  <input
-                    value={client}
-                    onChange={(e) => setClient(e.target.value)}
-                    placeholder="Client name"
-                    className="w-full rounded-lg border border-ui-line bg-ui-raised px-3.5 py-2.5 text-sm outline-none focus:border-ui-accent focus:bg-ui-surface"
-                  />
-                </label>
-                <label className="block flex-1">
-                  <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-ui-ink-2">Prepared by</span>
-                  <input
-                    value={preparedBy}
-                    onChange={(e) => setPreparedBy(e.target.value)}
-                    className="w-full rounded-lg border border-ui-line bg-ui-raised px-3.5 py-2.5 text-sm outline-none focus:border-ui-accent focus:bg-ui-surface"
-                  />
-                </label>
-              </div>
               <label className="block">
                 <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-ui-ink-2">Presentation date</span>
                 <input readOnly value={date} className="w-full rounded-lg border border-ui-line bg-ui-raised px-3.5 py-2.5 text-sm text-ui-ink-2" />

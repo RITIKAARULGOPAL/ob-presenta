@@ -97,13 +97,17 @@ export default function PresenterPage({ params }: { params: Promise<{ id: string
   const shownIndex = shown.findIndex((s) => s.id === currentSlide?.id);
 
   // One group per section — a run of slides starting at a section-starter
-  // divider (or the very first slide, which starts the implicit first group
-  // even when it isn't one). Purely a visual clustering of the nav dots; it
-  // doesn't change navigation order or which slides are "in" a section
-  // beyond "everything up to the next divider."
+  // divider, or wherever a design-option tag changes (e.g. into or out of
+  // "Option 1"), or the very first slide, which starts the implicit first
+  // group even when it isn't one of the above. Purely a visual clustering of
+  // the nav dots; it doesn't change navigation order or which slides are "in"
+  // a group beyond "everything up to the next divider." A deck that never
+  // sets designOption behaves exactly as before — every comparison below is
+  // undefined !== undefined, which is false, so nothing new ever splits it.
   const groups: { slide: (typeof shown)[number]; index: number }[][] = [];
   shown.forEach((s, i) => {
-    if (groups.length === 0 || s.style === 'section-starter') groups.push([]);
+    const optionChanged = (s.designOption?.trim() || undefined) !== (shown[i - 1]?.designOption?.trim() || undefined);
+    if (groups.length === 0 || s.style === 'section-starter' || optionChanged) groups.push([]);
     groups[groups.length - 1].push({ slide: s, index: i });
   });
 

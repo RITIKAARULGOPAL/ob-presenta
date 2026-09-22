@@ -5,7 +5,7 @@ import { useEditorStore } from '@/lib/editorStore';
 import { AccentPicker } from './AccentPicker';
 import { FONT_PAIRINGS, TYPE_SCALES, HEADLINE_WEIGHTS, BODY_FONTS, TRACKINGS } from '@/lib/fonts';
 import { fileToSlideImage } from '@/lib/imageFile';
-import { IconImage, IconLink, IconDroplet, IconType } from './icons';
+import { IconImage, IconLink, IconDroplet, IconType, IconLayers } from './icons';
 import type { Brand } from '@/types/slide';
 
 const BRAND_OPTIONS: { key: Brand | 'default'; label: string }[] = [
@@ -62,6 +62,7 @@ export function PropertiesPanel() {
   const slide = useEditorStore((s) => s.currentSlide());
   const project = useEditorStore((s) => s.project);
   const setBrandOverride = useEditorStore((s) => s.setBrandOverride);
+  const setDesignOption = useEditorStore((s) => s.setDesignOption);
   const setAccentColor = useEditorStore((s) => s.setAccentColor);
   const setSlideTypographyOverride = useEditorStore((s) => s.setSlideTypographyOverride);
   const setLinkedSlideIds = useEditorStore((s) => s.setLinkedSlideIds);
@@ -82,6 +83,36 @@ export function PropertiesPanel() {
     <aside className="flex w-72 flex-shrink-0 flex-col overflow-y-auto border-l border-ui-line bg-ui-surface px-5 py-6">
       <div className="mb-1 text-xs font-bold uppercase tracking-wider text-ui-accent">Slide</div>
       <div className="mb-6 font-display text-base font-bold text-ui-ink">Properties</div>
+
+      {/* One project can carry several design options (e.g. "Option 1",
+          "Scheme West") as ordinary Concept/Layout/Render slides tagged with
+          the same free-text label — not a new slide type, just a shared tag,
+          the same convention ViewHotspot.zoneCategory already uses. Placed
+          above Background/Layout/Style: it groups slides across the whole
+          deck, so it reads as the most structural thing on this panel. */}
+      <div className="mb-2 border-b border-ui-line-soft pb-6">
+        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ui-ink-3">
+          <IconLayers className="h-3.5 w-3.5" /> Design Option
+        </h4>
+        <input
+          value={slide.designOption ?? ''}
+          onChange={(e) => setDesignOption(e.target.value.trim() || undefined)}
+          placeholder="e.g. Option 1, Scheme West"
+          title="Groups this slide with others tagged the same — a Concept, Layout and Renders for one design option"
+          list="design-options"
+          className="w-full rounded-md border border-ui-line px-2.5 py-1.5 text-xs outline-none focus:border-ui-accent"
+        />
+        {/* Existing options offered as suggestions, so a second "Option 1" is
+            one keystroke rather than a near-miss like "option 1 ". */}
+        <datalist id="design-options">
+          {[...new Set((project?.slides ?? []).map((s) => s.designOption?.trim()).filter(Boolean))].map((o) => (
+            <option key={o} value={o} />
+          ))}
+        </datalist>
+        <p className="mt-2 text-[11px] leading-relaxed text-ui-ink-3">
+          Leave blank for a slide that doesn&apos;t belong to any option.
+        </p>
+      </div>
 
       {/* Slide Style and Slide Layout used to live here as 18 always-visible
           pills. They are menu triggers in the editor toolbar now — one line

@@ -156,6 +156,56 @@ export interface ViewHotspot {
    *  occupancy reuses a linked SeatingRow (via its `hotspotIds`) rather than
    *  storing a second copy of the same number. */
   spaceDetail?: SpaceDetail;
+  /** Which functional zone this space belongs to, e.g. "Workstations" or
+   *  "Meeting" — drives the Zoning overlay's colour fill and its legend.
+   *  Free text on purpose: the set of zones is whatever a given project
+   *  actually uses, and colours are derived from the name rather than
+   *  configured, so two spaces typed the same always match. */
+  zoneCategory?: string;
+  /** Other hotspots on this same view this space reads as adjacent to —
+   *  drawn as connector lines between centroids in the Adjacency overlay.
+   *  Only one end of a pair needs to name the other; the overlay dedupes. */
+  adjacentHotspotIds?: string[];
+}
+
+/** Real-world scale for one plan image, set by clicking two points on it and
+ *  entering the distance between them.
+ *
+ *  Stored as "how many units span the frame's full width" rather than any
+ *  kind of pixels-per-unit, because the plan is rendered at whatever size
+ *  the slide canvas gives it while hotspot coordinates are already
+ *  normalised 0–1 against that same frame — so this one number stays correct
+ *  at any display size, export scale or viewer zoom level, with no
+ *  recalibration.
+ *
+ *  Lives per stage (and on the view itself, for a view with no stages)
+ *  because each stage can carry a different plan at a different scale. It is
+ *  cleared whenever that image is replaced: a new plan is a new scale. */
+export interface PlanCalibration {
+  unitsPerWidth: number;
+  /** Shown verbatim after every measurement, e.g. "m" or "ft". */
+  unit: string;
+}
+
+/** The real line geometry of a plan uploaded as a PDF, so measurement picks can
+ *  snap to the drawing's own walls rather than to wherever the cursor landed.
+ *
+ *  Both arrays are flat — `[x,y, x,y, …]` for vertices and
+ *  `[x1,y1,x2,y2, …]` for segments — rather than arrays of `{x, y}`. This
+ *  rides along in the project row next to a ~1MB plan image, and the object
+ *  form roughly triples the JSON for identical data.
+ *
+ *  Coordinates are normalised 0–1 against the **16:9 stage frame**, the same
+ *  space hotspots and calibration already use, with the `contain` letterbox
+ *  already applied. That is what keeps snapping correct at any render size,
+ *  viewer zoom or export scale without re-deriving anything. */
+export interface PlanGeometry {
+  vertices: number[];
+  segments: number[];
+  /** Set when the plan was dense enough to hit the size budget, so the UI can
+   *  say so instead of silently offering fewer snap points than the drawing
+   *  actually has. */
+  truncated?: boolean;
 }
 
 /** A short standalone card for the space-detail overlay — deliberately not
@@ -196,6 +246,23 @@ export interface LinkedViewStage {
   /** Swaps the view's own image for this stage. Absent = reuse the view's url/transform. */
   url?: string;
   transform?: ImageTransform;
+  /** Real-world scale for this stage's own image — see PlanCalibration.
+   *  Only meaningful once `url` is set; cleared when that image changes. */
+  calibration?: PlanCalibration;
+  /** Snap geometry, when this stage's image came from a PDF. Cleared with the
+   *  calibration whenever the image changes — it describes that plan only. */
+  geometry?: PlanGeometry;
+  /** Set when the image was rendered from a PDF plan: it is fitted with
+   *  `contain` so no part of the drawing is cropped away, and the authored
+   *  crop is disabled because re-cropping would desync both the geometry and
+   *  the calibration. */
+  isPdfPlan?: boolean;
+  /** Rotation, in degrees clockwise, of true north from straight up on this
+   *  stage's own image — a plan is rarely drawn with north up. The compass
+   *  is always shown once there's an image to show it over (any kind but
+   *  walkthrough) — `undefined` just means "never dragged from its 0°/up
+   *  default," not "off"; there's no way to hide it once an image exists. */
+  northDeg?: number;
 }
 
 export interface LinkedView {
@@ -211,6 +278,17 @@ export interface LinkedView {
   /** Lets the viewer wheel-zoom/drag-pan the image itself, independent of the
    *  authored `transform` crop. A viewer aid, never persisted back onto it. */
   zoomPanEnabled?: boolean;
+  /** Real-world scale for this view's own base image — see PlanCalibration.
+   *  A view whose stages each carry their own image calibrates per stage
+   *  instead; this covers the (common) case of a view with no stages. */
+  calibration?: PlanCalibration;
+  /** Snap geometry, when this view's base image came from a PDF. Scoped and
+   *  cleared exactly like `calibration` above. */
+  geometry?: PlanGeometry;
+  /** See LinkedViewStage.isPdfPlan. */
+  isPdfPlan?: boolean;
+  /** See LinkedViewStage.northDeg — covers the (common) no-stages case. */
+  northDeg?: number;
   /** Looping ambient background track played while this view is active —
    *  matches the reference deck's render/axo viewer having its own mutable
    *  background music, faded in on arrival and out on leaving. URL only,
@@ -461,6 +539,15 @@ export interface Slide {
   skipped?: boolean;
   /** Per-slide background color/image override — see SlideBackground. */
   background?: SlideBackground;
+  /** Which design option this slide belongs to (e.g. "Option 1", "Scheme
+   *  West") — one project can carry several options, each as its own run of
+   *  ordinary slides (a Concept, a Layout, some Renders) tagged with the same
+   *  string, rather than a new slide type. Free text, matched case-sensitively
+   *  by exact string — same convention as `ViewHotspot.zoneCategory`, so two
+   *  slides typed "Option 1" always belong together with nothing to keep in
+   *  sync, and the rail's own datalist offers every option already in use so
+   *  a second "Option 1" is one keystroke, not a near-miss like "option 1". */
+  designOption?: string;
 }
 
 export interface Project {

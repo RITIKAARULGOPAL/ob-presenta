@@ -32,6 +32,864 @@ or re-explain anything.
 
 ---
 
+## 2026-09-22 (cont'd 6) — Presenter: Linked Views plan no longer overflows the slide
+
+**Context:** in Presenter, a Linked Views "Layout" slide with a Stage
+present needed to scroll vertically to see the whole plan — the user's ask
+was blunt and correct: "the layout should fit the screen and no scrolling
+up and down should be there."
+
+**Root cause.** The plan's own box is `aspect-video` (16:9) sized by
+*width* (`flex-1` in a row) with height *derived* from that width — nothing
+ever checked whether the slide's fixed 1280×720 canvas actually had that
+much vertical room left after the rows above it (view tabs, stage tabs,
+overlay pills). Ran the numbers: even with *just* the view-tabs row and
+nothing else, a full-width plan box derives to 648px tall against only
+~582px actually available after padding — this slide type was overflowing
+its own canvas by design, not as an edge case. The **shared** slide wrapper
+(`base`, used by every layout) makes this worse: it's `min-h-full`, a floor
+not a ceiling, so nothing ever stopped it from silently growing past 720px
+to accommodate oversized content — the "no scrolling" contract the fixed
+1280×720 canvas is supposed to guarantee (matching what `exportDeck.ts`
+rasterizes) was never actually enforced for this layout.
+
+**Fix — flip which dimension derives from which**, real flexbox-based
+shrink-to-fit rather than any hardcoded pixel budget (Kicker/Title height is
+content-dependent, so a hardcoded number would've been fragile):
+- `base`'s className now conditionally uses `h-full overflow-hidden`
+  instead of `min-h-full`, **only when `slide.layout === 'linked-views'`**
+  — confirmed live that every other layout's className is byte-identical to
+  before (a Title + Content slide still renders/centers exactly as it did).
+  This turns `base` into a genuine 720px *ceiling* for this one layout,
+  which the rest of the fix needs to have anything to shrink within.
+- `LinkedViewsExplorer`'s own root is now `flex h-full min-h-0 flex-col` —
+  claims that fixed budget and (`min-h-0`) is actually allowed to shrink
+  below its content's natural size, overriding flexbox's normal default.
+- Every "chrome" row above the plan (title/toolbar, view tabs, stage tabs,
+  overlay pills, the music/key-plan row) gets `shrink-0` — they're short,
+  fixed-content pill rows and should never be the thing that gives.
+- The plan+seating row is now the one flexible element (`min-h-0 flex-1
+  justify-center`), and the plan box itself drops `flex-1` for `h-full`.
+  This is the actual inversion: `flex-1` would make *width* the definite
+  dimension (via flex-grow), leaving nothing "auto" for `aspect-ratio` to
+  derive — pairing `h-full` with `aspect-video` instead makes *height* the
+  definite dimension (the row's own default `align-items: stretch`), so
+  width is what gets derived and shrunk. `justify-center` on the row
+  absorbs whatever horizontal space that leaves unclaimed. Neither sibling
+  panel (`SeatingTable`, `HotspotSidePanel`) needed changes — both already
+  had `shrink-0` + `overflow-y-auto`, ready for a definite-height parent.
+- Verified live, real pixel measurements in actual Presenter (not the
+  editor's own pannable/zoomable canvas, which is intentionally scrollable
+  and untouched by this): with a Stage present and a plan image, the
+  slide's rendered height matches its scaled 1280×720 box **exactly**
+  (`overflowsBy: 0`), and `document.documentElement.scrollHeight` equals
+  `window.innerHeight` — no page scroll at all, confirmed both via
+  `getBoundingClientRect()` and a screenshot. Structured (`--format json`)
+  eslint diff against the committed baseline: zero new errors/warnings.
+  `tsc --noEmit` clean. Scratch project deleted after.
+
+**Left off / next up:**
+- Not yet checked against a *very* long chain of optional rows all present
+  at once (stages **and** a populated overlay-pills row **and** an
+  editable-mode toolbar) — plausible the plan could shrink quite narrow in
+  that combination, which is the correct trade-off but hasn't been eyeballed
+  for legibility at the extreme.
+- Nothing from today committed yet — stacks on everything else.
+
+---
+
+## 2026-09-22 (cont'd 5) — North point: always on, drag-to-rotate; a real invisible-text bug
+
+**Context:** follow-up to the toolbar-relocation entry below. Feedback on the
+north-point control: it should always be there (no add/remove toggle), show
+the actual compass symbol instead of a numeric degree field, and be directly
+draggable to rotate. Planned properly first — an Explore pass over the
+current code plus the existing image/logo rotate-handle pattern, then a
+Plan-agent critique of the synthesized design — since the literal "reuse the
+existing rotate pattern" instinct turned out to be wrong in two real
+respects (see Design below). Full plan:
+`C:\Users\Ritika\.claude\plans\ok-lets-no-do-giggly-snowglobe.md`.
+
+**Done:**
+- **Removed the on/off toggle.** The toolbar's `"+ North"` button and the
+  `N [___]° ✕` input are gone. The on-stage compass badge's gate changed
+  from `northDeg != null` to `stageUrl && active.kind !== 'walkthrough'` —
+  deliberately narrower than just dropping the null-check, since the badge
+  itself never had its own `kind !== 'walkthrough'` guard (the old toolbar's
+  gating was the only thing keeping it from ever appearing on a walkthrough
+  view, and that protection would have silently vanished once the badge
+  started rendering unconditionally). `northDeg` stays `number | undefined`
+  in the type — `undefined` now means "never dragged, defaults to 0°" rather
+  than "off" (updated the doc comment in [slide.ts](src/types/slide.ts)).
+  **Real, visible behaviour change, called out deliberately**: every
+  existing Linked View/stage with an image now shows a compass at 0° by
+  default — in the editor, Presenter, *and* rendered PDF/image exports
+  (`exportDeck.ts` renders the same component tree) — wherever it
+  previously showed nothing.
+- **Toolbar shows a symbol, not a number.** One always-rendered circular
+  icon button (the same compass SVG as the on-stage badge, restyled with
+  `currentColor` for toolbar chrome instead of white-on-photo), `cursor-
+  grab`, with a `title` tooltip giving the live rounded degree as a
+  hover aid. This icon is the *only* drag target — the on-stage badge stays
+  `pointer-events-none`, exactly as before.
+- **Drag mechanics, and two deliberate departures from the literal
+  "reuse `ImageAdjustOverlay`'s pattern" instruction**, both surfaced by the
+  Plan-agent critique before writing any code:
+  1. Reused the `atan2`-delta-from-drag-start angle math verbatim (it's
+     what makes the rotation feel smooth instead of snapping on grab), but
+     wired the drag through plain synthetic pointer props +
+     `e.currentTarget.setPointerCapture` — the same pattern this
+     component's own hotspot-drawing handlers already use — instead of
+     `ImageAdjustOverlay`'s `window.addEventListener` + ref-mirroring.
+     Capture already keeps delivering moves once the pointer leaves the
+     icon's small hit area, so the whole ref-mirroring workaround (built
+     for a stale-closure bug in a *different* drag implementation
+     elsewhere in this file) never applies here in the first place.
+  2. Commits **once**, on release, not on every `pointermove` the way
+     `ImageAdjustOverlay` does. Confirmed directly in
+     [editorStore.ts](src/lib/editorStore.ts): `commitProject` pushes an
+     undo-stack entry on *every* call with no de-duping for array fields,
+     and `MAX_HISTORY` is 50 — a live per-move commit wouldn't just take
+     "many Undo clicks" to revert one drag, a slow drag could evict
+     *unrelated* earlier edits off the stack entirely. A small
+     `dragNorthDeg` component-state value carries the live angle during
+     the drag (read by **both** the toolbar icon and the on-stage badge, so
+     they rotate together in real time — costs nothing extra, since both
+     already close over the same `northDeg` in one component), committed
+     once via the existing `setStage({ northDeg })` on `pointerup`.
+     (`ImageAdjustOverlay`/`LogoAdjustOverlay` likely have this same
+     per-move undo-flooding gap already — they predate undo/redo. Not
+     touched here, flagged only.)
+- **A real bug caught during my own planning, not a hooks-lint nitpick**:
+  my first pass declared the new `useState`/`useRef` for the drag
+  *after* `LinkedViewsExplorer`'s existing `if (!active) return null;` —
+  every other piece of state in this component is deliberately declared
+  *before* that line for exactly this reason (two comments in the file
+  already say so), and mine broke the same rule. `eslint` caught it
+  immediately (`react-hooks/rules-of-hooks`, "called conditionally") —
+  fixed by moving both up alongside the component's other transient drag
+  state (`panRef`, `viewportZoom`, …). Confirmed via a structured
+  (`--format json`, not the fragile text output) diff against the
+  committed baseline that this was the *only* thing my changes affected:
+  zero new errors/warnings project-wide, one pre-existing one incidentally
+  fixed. The two "conditionally called useEffect" warnings still present
+  near the drag code are pre-existing (confirmed present in the committed
+  file too, from before today) — not mine, not touched.
+- **A "double commit" I chased as a real undo-flooding bug turned out to be
+  a test-scripting artifact**, the same class of false alarm flagged
+  several times earlier this session: an early verification pass showed
+  one drag apparently needing two Undo clicks to fully revert. Diagnostic
+  logging proved the drag's own commit handler fired exactly once; a
+  clean, isolated retest (fresh page load, one drag, one Undo) confirmed a
+  single click fully reverts every time — the earlier reading came from two
+  separate drags run back-to-back in the same test script, not one.
+- **Verified live**, real dispatched pointer drags (down/move/up), not just
+  reasoning about the code: the compass renders immediately at 0° with no
+  opt-in step; a drag rotates the toolbar icon *and* the on-stage badge
+  together in real time (confirmed via `getComputedStyle().transform`
+  matrices at intermediate angles, not just the final value); the
+  committed angle matches the drag's actual geometry exactly (0°→90°,
+  200°→290°); **exactly one** Undo click reverts a whole drag; a
+  Walkthrough view shows no compass; two stages (one with its own image,
+  one without) hold independent angles correctly, mirroring the
+  already-verified stage-independence from the original feature; Presenter
+  shows the committed angle with no drag affordance. `tsc --noEmit` clean.
+
+- **Separately, a real bug the user caught live**: the calibration
+  "Distance apart"/unit text inputs rendered with effectively invisible
+  text. Root cause, confirmed from `globals.css` before touching anything:
+  `body { color: var(--app-ink); }` sets the **app chrome's** default text
+  colour — dark navy in light mode, near-white (`#e8edf5`) in dark mode —
+  and every other piece of slide text in this codebase explicitly
+  overrides it per-element (`text-[var(--ink)]`/`-2`/`-3`), which is *why*
+  this doesn't show up as a general "dark mode breaks the slide" problem.
+  These two inputs (and, once checked, a much longer list: the music/
+  key-plan URL row, and nearly every field in the hotspot edit/create
+  popup — Label, Jump-to time, list value/description, zone category,
+  gallery key-plan URL/arrow, concept title/body/image, walkthrough URL,
+  BOQ note, space note) simply never set their own colour, so they fell
+  through to the app chrome's — invisible specifically when the *editor
+  chrome* (not the slide) is in dark mode, which is exactly the state this
+  whole session has been running in. Fixed at the **container** level
+  (three spots: the calibration `<span>`, the music/key-plan `<div>`, and
+  the hotspot popup's own wrapper) rather than patching each input
+  individually — one `text-[var(--ink)]` per container, inherited by every
+  field nested inside, matching how `--surface-2`'s light-gray sub-box
+  already inherits correctly today. Verified live: both computed colour
+  (`rgb(20,26,43)`, an exact match for `--ink`) and a real screenshot,
+  before/after.
+
+**Left off / next up:**
+- Nothing outstanding on either piece. Scratch project deleted after.
+- Still nothing from today committed — stacks on everything else.
+
+---
+
+## 2026-09-22 (cont'd 4) — Linked Views toolbar moved into the title row
+
+**Context:** follow-up to the north-point feature. The per-view toolbar
+(Zoom/pan checkbox, the north-point angle control, and the Rectangle/
+Ellipse/Polygon drawing tools) lived in its own row, squeezed in next to the
+Layout/Render/Walkthrough/Axo view tabs. The user pointed out the empty
+space beside the slide's own title, above that row, and asked for the
+toolbar to move up into it — with the north-point control moving along with
+it, "in line with" the rest.
+
+**Done:**
+- **`LinkedViewsExplorer` now renders its own `Title`**, sharing one flex row
+  with the toolbar (`slide.title` on the left, toolbar right-aligned via
+  `justify-between`), instead of the toolbar sitting in its own row further
+  down. The generic per-layout wrapper in `SlideRenderer`
+  ([SlideRenderer.tsx](src/components/SlideRenderer.tsx)) now skips its own
+  `<Title/>` specifically for `slide.layout === 'linked-views'` so the title
+  isn't rendered twice — every other layout is unaffected, still rendering
+  `<Title/>` exactly as before. `Kicker` stays where it was; only `Title`
+  moved. The view-tabs row (Layout/Render/Walkthrough/Axo) is now on its own
+  line beneath, no longer crowded by the toolbar.
+- Since `Title` already only needs `slide`/`editable`/`dark`, and `dark` is a
+  one-line derivation from `slide.style` (matching the same computation the
+  main component already does), `LinkedViewsExplorer` computes it locally
+  rather than threading a new prop through.
+- **Verified live**: dropped a synthetic image onto a fresh Linked Views
+  slide (so the toolbar's `active.url` gate is satisfied), then read real
+  `getBoundingClientRect()`s rather than trusting a screenshot — the title
+  (`top 318–330`) and the Zoom/pan label / Rectangle button (`top 321–328`)
+  overlap vertically, confirming they're genuinely one row, while the view
+  tabs row starts cleanly below at `top 335`. Enabling north point placed
+  its `N [_]° ✕` control in that same row, and confirmed the already-shipped
+  on-stage compass badge (the one rendered over the plan image itself in
+  both editor and Presenter) is a completely separate element, untouched by
+  this change. Also added a second, non-Linked-Views slide
+  (`Title + Content`) and confirmed its title still renders normally with no
+  toolbar, proving the `!== 'linked-views'` guard doesn't affect any other
+  layout. `tsc --noEmit` clean. Scratch project deleted afterward.
+
+**Left off / next up:**
+- Nothing outstanding on this one. Stacks on everything else from today,
+  still uncommitted.
+
+---
+
+## 2026-09-22 (cont'd 3) — Design options: multiple plan/concept groups per project
+
+**Context:** while showing the north-point feature live, the user pointed at
+Presenter's "1 / 5" slide counter on a real pre-existing project ("xx") and
+asked why one slide had 5 layouts — a misreading of that counter (it's the
+deck's total slide count, unrelated to the Layout/Zoning/Adjacency/Dimensions
+overlay system already built in Phase H), but investigating it surfaced a
+real, separate ask underneath: "xx" turned out to have 4 separate Linked
+Views slides, and the user wants a real way to express **multiple design
+options within one project** — e.g. Option 1 and Option 2 for the same
+brief, each with its own concept, plan, and renders. Clarified the shape of
+that with two questions: options are a **tag across existing slide types**
+(a Concept + a Layout + some Renders sharing a label), not a new slide type
+or a bigger new entity — and the "xx" project itself is scratch/test data
+(placeholder name, matches this codebase's own established convention),
+left untouched.
+
+**Done:**
+- **New `Slide.designOption?: string`** ([slide.ts](src/types/slide.ts)) —
+  free text, matched by exact string, same convention as
+  `ViewHotspot.zoneCategory` already uses: no central registry to keep in
+  sync, two slides typed "Option 1" just belong together. New
+  `setDesignOption` store action ([editorStore.ts](src/lib/editorStore.ts)),
+  mirroring `setBrandOverride` exactly.
+- **Editor**: a new "Design Option" section at the very top of the
+  Properties panel ([PropertiesPanel.tsx](src/components/PropertiesPanel.tsx))
+  — above Background/Layout/Style, since it groups across the whole deck
+  rather than describing one slide. A plain text input with a `<datalist>`
+  of every option already used in the project, so a second "Option 1" is one
+  keystroke, not a near-miss.
+- **Slide rail**: consecutive slides sharing an option now get a small
+  labelled header (an accent dot + the option name) above the run
+  ([SlideRail.tsx](src/components/SlideRail.tsx)) — shown once per
+  contiguous run, not repeated per slide, recomputed live off array order so
+  drag-to-reorder can never leave it stale.
+- **Presenter's nav-dot grouping** (already split the dot row at each
+  section-starter slide) now also splits wherever a slide's `designOption`
+  changes ([present/page.tsx](src/app/p/[id]/present/page.tsx)) — a deck
+  that never sets it is provably unaffected, since every comparison is
+  `undefined !== undefined`, which is always false.
+- **`cloneSlide` needed no changes** — `designOption` is a plain string with
+  nothing to remap, and the function's existing `{ ...slide, ... }` spread
+  already carries it over automatically, the same way `brandOverride`/
+  `skipped`/`background` already do. Confirmed by reading the spread, not
+  assumed.
+- **Verified live**, and a real mistake in my own test script became part of
+  the proof: tagging the title slide by accident instead of the first
+  Linked Views slide produced `[Option 1, untagged, Option 1]` — correctly
+  rendered as **two** separate rail headers, since the run was genuinely
+  broken by the untagged slide in between. Fixed the mistake, re-tagged the
+  two actually-adjacent Linked Views slides, and got exactly **one** header
+  this time — proving both the "split on any real change" and "don't repeat
+  within a run" halves of the logic, not just the happy path. The datalist
+  correctly offered "Option 1" exactly once (deduplicated). Presenter's dot
+  groups came out as `[1, 2]` — the untagged title alone, then both
+  Option-1 slides together, un-split — confirmed by counting dots per group
+  container, not by eye.
+- **Nearly touched a real project by accident while setting up the
+  demo for this**: a misclick during project-list navigation opened "xx"
+  (a real, pre-existing project) instead of creating a new scratch one.
+  Caught immediately by checking the Undo button's `disabled` state before
+  touching anything further — confirmed `true` (nothing to undo), proving
+  zero edits had actually landed, and backed out. Worth remembering: check
+  `disabled` on Undo as a cheap, reliable "did I actually change anything
+  yet" signal whenever a misclick is suspected, rather than guessing from
+  what's on screen.
+
+**Left off / next up:**
+- This is the tagging mechanism only — there's no dedicated "manage design
+  options" UI (rename one everywhere, reorder them, delete one and see what
+  used it), no cross-referencing between an option's Concept/Layout/Render
+  slides beyond the shared tag, and no Presenter-level "jump to option"
+  navigation beyond what the extended dot-grouping already gives for free.
+  All deliberately out of scope for this first pass — the user's own answer
+  described the *shape* (existing slide types, tagged, grouped), not these
+  extras; worth revisiting once the tagging itself has been used for real.
+- The "xx" project's own 4 Linked Views slides (2 real, different plans; 2
+  empty) were explicitly left untouched, per the user's own call — not
+  migrated into this new tagging, not cleaned up.
+- Nothing from today is committed yet.
+
+---
+
+## 2026-09-22 (cont'd 2) — Small follow-ups: dev port, image URL field, collapsible seating
+
+**Done:**
+- **Eliminated port 3000 as an option entirely**, rather than just relying on
+  remembering to type `dev-3001`. `.claude/launch.json` previously had two
+  configs (`dev` on 3000, `dev-3001` on 3001) both running the same bare
+  `npm run dev` — the `"port"` field was purely informational, since
+  `next dev` defaults to 3000 regardless of it unless a `-p` flag is actually
+  passed. Collapsed to a single `dev` entry running
+  `npm run dev -- -p 3001` explicitly. Verified by reading the real server
+  log line (`next dev -p 3001`, `Local: http://localhost:3001`), not just
+  the tool's own reported port. Now the natural-default name (`dev`) can only
+  ever bind to 3001; port 3000 stays free for the user's own use with no
+  config left that could bind it.
+- **Removed the "Paste image URL…" fallback input from `MediaBox`, image-kind
+  only** ([SlideRenderer.tsx](src/components/SlideRenderer.tsx)). Checked
+  first whether this was safe to remove globally — it isn't: `kind="video"`
+  MediaBox instances (walkthrough/hero video) have no upload path at all by
+  design (a base64 video would be tens of megabytes in the project row), so
+  that same input is their *only* way to ever get a source. Scoped the
+  removal to `kind === 'image'` only, after confirming all 5 image call
+  sites already pass `onChangeTransform` (meaning the standalone Upload
+  button never showed for them anyway — they already fully rely on
+  drag-drop, "Choose a file," PDF upload, and the on-image Replace toolbar).
+  Verified live: uploaded an image, no URL box appears, ✕ Remove still
+  works; switched to a Walkthrough view, "Paste video URL…" is still there
+  unchanged.
+- **Seating Capacity panel is now collapsible**
+  ([SeatingTable.tsx](src/components/SeatingTable.tsx)) — a small ▾ toggle
+  next to the title collapses the Area/Req/Achv rows down to just the title
+  bar (Excel import stays visible either way), ▸ expands it back. Kept as
+  local, non-persisted component state — a viewer convenience like the
+  key-plan card's own visible/expanded state, not authored content, so
+  collapsing it while presenting never edits the deck. Deliberately a
+  sibling `<button>` next to the title rather than wrapping the title in
+  one: the title is `contentEditable` via `EditableText`, and a
+  `contentEditable` element inside a `<button>` is unreliable (a click meant
+  to place the text cursor can fire the button's own click instead).
+  Verified live in both the editor and Presenter mode: added a zone/row,
+  collapsed (content gone, title + Excel still visible), expanded again
+  (content back) — in both places.
+- **Follow-on the same session: collapsing now lets the plan actually reflow
+  into the freed space**, instead of just leaving it empty. The table's root
+  container dropped its fixed `w-72` for a natural `w-auto` while collapsed
+  — the plan's own box is a sibling `flex-1 aspect-video` in the same `flex`
+  row, so it was already built to grow into whatever width a sibling frees;
+  the fix was just letting the table stop claiming that width. Growing the
+  width also grows the height, since `aspect-video` derives height from
+  width. One line, no new layout logic. Verified by measuring
+  `getBoundingClientRect()` before/after collapsing, not just eyeballing it:
+  in the editor, 567.1×319.0 → 633.3×356.2px (+11.6% both dimensions,
+  exactly preserving 16:9); in Presenter, 927.5×521.7 → 1233.8×694.0px, an
+  even bigger jump since Presenter has less competing chrome. Aspect ratio
+  held exact in both.
+- **North-point arrow on a Linked Views plan** — the standard architectural
+  convention of an arrow marking true north, since a plan is rarely drawn
+  with north straight up. Built as a small inline SVG (no image asset to
+  manage) rotated by an authored angle, the same "store the angle, rotate at
+  render time" technique already used for the key-plan card's own
+  camera-direction arrow. New `northDeg?: number` on both `LinkedView` and
+  `LinkedViewStage` ([slide.ts](src/types/slide.ts)) — scoped and derived
+  exactly like `calibration`/`geometry`/`isPdfPlan` already are (a stage
+  showing a different plan can face a different way), written through the
+  existing `setStage()` helper. `undefined` means no arrow at all — nothing
+  changes on any existing deck; `0` is a real, valid angle (north already
+  up) and stays distinguishable from "off" the same way `keyPlanImage`'s own
+  presence, not a truthiness check on its angle, already gates that
+  feature. Editor control sits next to the existing "Zoom/pan" checkbox
+  (identical gating — not restricted to just Layout, any non-walkthrough
+  view): "+ North" when unset, a compact `N [__]°` input + ✕ once set.
+  Originally rendered at `bottom-3 right-3` — the one corner none of the
+  other stage overlays occupied, chosen specifically to avoid Reset
+  Zoom/music mute at top-right. **Corrected same session**: moved to
+  top-right after all, aligned with those other controls rather than kept
+  away from them. Reset Zoom, the music-mute button, "Tap for sound," and
+  North now all live inside **one shared** `absolute right-2 top-2 z-20
+  flex items-center gap-2` row instead of each being independently
+  `absolute`-offset — the old approach was already fragile before North
+  joined it ("Tap for sound"'s own `right-12` only ever worked because it
+  assumed the mute button's exact width at `right-2`); a shared flex row
+  gives genuine alignment regardless of how many of the four controls are
+  actually present, not one more hand-picked offset to keep in sync.
+  North's own badge shrank from `h-10 w-10` to `h-8 w-8` to match the
+  music-mute circle's size (same viewBox SVG, scales with no internal
+  recalculation). Order left-to-right: North, Reset Zoom, music controls.
+  - **Verified live**, not just read off the diff: created the arrow at 0°,
+    confirmed `rotate(0deg)`; set 37°, confirmed the DOM transform actually
+    changed to `rotate(37deg)`; confirmed `pointer-events: none` via
+    *computed* style, not just the class name. Gave a second stage its own
+    image and confirmed it correctly stopped inheriting the view's 37° (the
+    "+ North" button reappeared, exactly mirroring how a new stage doesn't
+    inherit the view's calibration either) — set that stage's own arrow to
+    200°. Then, to genuinely prove independence rather than assume it: added
+    a *third*, image-less stage and confirmed it inherited the *view's* 37°
+    (not either stage's own value), then switched back to the 200° stage and
+    confirmed its own value had survived the round trip untouched. Same
+    200° confirmed again in Presenter mode.
+  - **Re-verified live after the top-right repositioning**, with real pixel
+    measurements rather than trusting the CSS by eye: enabled North alone
+    first, confirmed it sits at top-right on its own (~5px from the
+    corner). Then enabled zoom-in (via a real dispatched wheel event, not a
+    stubbed flag) and background music on the same view simultaneously and
+    measured all three controls' actual `getBoundingClientRect()`s in
+    Presenter — North at x 1077.7–1112.7, Reset Zoom at 1121.4–1207.5, the
+    mute button at 1216.3–1251.3, each pair separated by the same ~8–9px
+    `gap-2`, all top-aligned within 2px (the flex row's own `items-center`
+    correctly reconciling the badge's 35px height against the text
+    button's 31px). No overlap, correct order, genuinely one row.
+
+**Left off / next up:**
+- Nothing outstanding on any of these. Test projects created for
+  verification were deleted from Supabase afterward.
+- Still nothing from today committed — this stacks on top of the Linked
+  Views audit pass below, which stacks on everything before it.
+
+---
+
+## 2026-09-22 (cont'd) — Linked Views audit and fix pass
+
+**Context:** asked to tighten the Linked Views slide until "every aspect
+works perfectly." Ran three parallel investigations first rather than
+guessing at scope: a full line-by-line inventory of `LinkedViewsExplorer`,
+a chronological mining of every Linked-Views-related `PROGRESS.md` entry
+back to 2026-09-15 (bugs already fixed, gaps already flagged, and — just as
+important — decisions already made *deliberately* that a "make it perfect"
+pass could easily mistake for oversights), and a cross-cutting audit of the
+data model, `editorStore.ts`, export, Presenter, and import paths. That
+produced a short, bounded list of real gaps, confirmed with the user (wire up
+both dead fields found rather than delete them; for the export gap, just
+disclose it rather than build per-slide export control), then fixed.
+
+**Done:**
+- **`cloneSlide` wasn't remapping `adjacentHotspotIds`**
+  ([slideDefaults.ts](src/lib/slideDefaults.ts)) despite its own header
+  comment claiming every same-slide cross-reference gets rewritten — it
+  already remapped `targetViewId`, `stageIds`, and seating rows'
+  `hotspotIds` through the id maps it builds, just not this one. A
+  duplicated slide's hotspots were left pointing at the *original* slide's
+  hotspot ids in their adjacency lists. Fixed by adding it through the same
+  `hotspotIdMap`.
+- **`removeHotspot` wasn't cleaning seating-table references**
+  ([SlideRenderer.tsx](src/components/SlideRenderer.tsx)) — it already
+  purged the deleted id out of every other hotspot's `adjacentHotspotIds`
+  (with a comment about exactly this class of staleness) but left
+  `seatingZones[].rows[].hotspotIds` untouched. Extended the same function
+  to filter it there too, in the same `setView` patch.
+- **State-reset consistency.** The one effect that already reset
+  `viewportZoom`/`overlayMode`/`pickMode` on `[activeId, activeStageId]`
+  now also resets: key-plan visibility/expansion (previously scoped to
+  `activeId` only — a stage switch left an expanded card open, unlike every
+  other viewer-facing state, which resets on stage changes too);
+  `hoveredHotspotId`/`hoveredRowHotspotIds` (previously never reset at
+  all — a hover highlight from the last plan could survive onto a new one);
+  and `lightboxHotspotId`/`spaceDetailHotspotId`/`spaceDetailGalleryIndex`
+  (previously relied on the next render's `hotspots.find(...)` quietly
+  returning `undefined` to make the modal disappear, silently skipping
+  each one's own `onClose` cleanup). Separately, `cancelDrawing()` — already
+  called on view switch — is now also called on stage switch (both the
+  stage-tab click and "+ Stage"): editing a hotspot then switching stage
+  could leave `editingHotspotId` set while the popup itself vanished
+  (`editingHotspot` derives to `null` once the hotspot falls outside the new
+  stage's filtered list), a half-cancelled edit session with no visible sign
+  anything was wrong.
+- **Wired up two fields that were fully speced in the type but dead in the
+  UI.** `ViewHotspot.clickAction` — its own doc comment already described
+  exactly what it should do ("what a click does when both a gallery and a
+  nav target are set"), but nothing ever set it and `jumpTo()` never read
+  it, hardcoding its own gallery-then-target priority instead. Added an "On
+  click: Open gallery / Jump to target" toggle to the hotspot popup (shown
+  only once a hotspot actually has both, since otherwise there's nothing to
+  choose between), and `jumpTo()` now checks it before falling back to the
+  same default order. Hotspot-level `keyPlanImage` — `Lightbox` already
+  accepted and rendered it, there was simply no way to set one from the
+  editor. Added a paste-URL + arrow° input to the popup's gallery section,
+  mirroring the existing view-level key-plan inputs almost verbatim.
+- **Seating table rows couldn't open what they link to.** `HotspotSidePanel`
+  rows already called through to `jumpTo`/`startEditingHotspot`; a
+  `SeatingTable` row only ever hover-highlighted, even though its own
+  cursor-pointer styling already hinted a click should do something (a
+  half-finished affordance, not new). Added `onSelectHotspot`, wired only
+  when a row maps to exactly **one** hotspot id — a group row spanning
+  several stays hover-only, same as before, since there's no single obvious
+  target to jump to.
+- **Excel import had no preview step**
+  ([SeatingTable.tsx](src/components/SeatingTable.tsx)) — parsing and
+  committing happened in one step, with the app's global undo as the only
+  way back. Now parses first, shows the same added/updated/matched summary
+  it already computed, and holds it pending an explicit Apply (or Cancel,
+  which discards it untouched).
+- **`targetTime` video-seek was a timing race.** `jumpTo`'s old version set
+  the active view then hoped one `requestAnimationFrame` later the
+  newly-mounted `<video>` would be attached to `videoRef` — fragile, no
+  fallback. Replaced with a `pendingSeekRef` consumed by an effect keyed on
+  `activeId`: applies immediately if the video is already ready, otherwise
+  waits on its own `loadedmetadata` event rather than gambling on a single
+  frame. A same-view timestamp jump (video already mounted) still applies
+  instantly with no effect round-trip needed.
+- **Export-menu notice**, per the user's call rather than building real
+  per-slide export control: when a deck contains any Linked Views slide,
+  the Export menu now says plainly that it exports only that slide's first
+  view/stage — a real, known limitation (confirmed, not fixed, by the same
+  cross-cutting audit: `exportDeck.ts` mounts the component cold with no
+  way to pick a view/stage) that was previously silent.
+- **Verified every one of the above live**, through the real UI, not just
+  by reading the diff — on a disposable scratch project with two real
+  drawn hotspots, a seating row, a walkthrough video, and a multi-stage
+  view: duplicated-slide adjacency remapping (traced by deleting and
+  redrawing a hotspot mid-test, confirming the seating row's dangling
+  reference was gone — see Watch out for), stage-switch popup
+  cancellation (confirmed the tool itself also genuinely reset to `null`,
+  not just the popup disappearing visually), a hotspot with both a gallery
+  and a target correctly navigating instead of opening its gallery once
+  `clickAction` was set to override the default, a seating row opening a
+  full `SpaceDetailOverlay` on click, Excel import leaving the table
+  untouched on Cancel and committing exactly on Apply, and a `targetTime`
+  jump into a walkthrough view that had never been mounted before landing
+  at the exact requested second (`video.currentTime === 3`) rather than
+  silently doing nothing. `tsc --noEmit` clean throughout; `eslint` stayed
+  at or below the branch baseline the whole way (one file's error count
+  actually *dropped* by one, from consolidating two separate reset effects
+  that each independently tripped the same lint rule into one).
+- **Found and ruled out a false alarm, not a real bug, during this pass**:
+  redrawing a hotspot produced a `path` with `NaN` coordinates once, which
+  looked exactly like a real regression in the drag-to-draw math. Isolated
+  by deleting and cleanly redrawing the same hotspot with the viewport held
+  perfectly still — it worked correctly every time once the viewport
+  genuinely stopped moving mid-drag. The corruption traced to this
+  session's own test scripting resizing the browser viewport *while a drag
+  was in flight*, not anything in the app.
+
+**Watch out for:**
+- The rail-thumbnail-vs-main-canvas DOM-duplication hazard flagged in
+  several earlier entries struck again here, compounding with a viewport
+  resize this time: tagging "the largest `.aspect-video` element" is **not
+  enough on its own** once the viewport has just changed size, because a
+  stale reference to a previously-largest element can persist across a
+  render that replaced it. Re-tag fresh (excluding anything with a
+  `scale-[...]` class, which marks a rail/thumbnail preview) immediately
+  before each new interaction rather than trusting a tag set even one tool
+  call earlier — and never resize the viewport mid-drag or mid-gesture.
+- This session's browser pane's own "responsive" width varies a lot
+  between navigations (was seen at 607px, 977px, 1400px, 1677px across
+  this project's various sessions) — if `.aspect-video` widths all come
+  back tiny (rail-thumbnail-sized), check `window.innerWidth` before
+  assuming something is broken; it's very likely just a narrow pane that
+  needs an explicit `resize_window({width, height})`, since the `"desktop"`
+  preset only clears emulation back to the pane's own current (and not
+  necessarily wide) size, it doesn't guarantee a wide one.
+
+**Left off / next up:**
+- Phase 6's same-view immediate-seek branch (clicking a `targetTime`
+  hotspot while already on that walkthrough view) was reviewed, not
+  independently live-tested — the cross-view race case (the harder,
+  riskier path) was verified live; the same-view path is a much simpler,
+  lower-risk direct assignment with no ref/effect indirection.
+- The export-menu notice's negative case (no notice on a deck with zero
+  Linked Views slides) was confirmed correct by reading the `.some()`
+  gate rather than spun up as a second scratch project — trivially correct
+  by construction, not worth the extra project for this pass.
+- Nothing from today is committed yet — stacked on top of everything else
+  already uncommitted (Phase H, the upload-clobber fix, the PDF-plan
+  feature, the home-page field removals). Given how much has piled up,
+  worth committing in deliberately separated commits rather than one giant
+  one, next time this is picked up.
+
+---
+
+## 2026-09-22 — PDF plans with snap-to-line measurement
+
+**Context:** follow-on to Phase H's calibration/measure tool — measuring by
+eye against a raster image means clicking *near* a wall, not *on* it. Ask:
+upload the plan as a PDF and pick measurement points off its own vector lines.
+Confirmed scope: true snap-to-line (not just a crisper raster), plans
+rastered at ~2400px. Plan file:
+`C:\Users\Ritika\.claude\plans\ok-lets-no-do-giggly-snowglobe.md`.
+
+**Done:**
+- **New [pdfPlan.ts](src/lib/pdfPlan.ts)**: `loadPdfDocument` (reuses
+  `importDeck.ts`'s pdfjs/worker setup), `renderPlanPage` (PNG, not JPEG — a
+  plan is thin lines on white, exactly where JPEG ringing smears the edges
+  you're trying to click), and `extractPlanGeometry`. The last one is the
+  risky part: pdf.js v6 changed its path-operator encoding from what training
+  data would suggest — verified against the installed source
+  (`node_modules/pdfjs-dist/legacy/build/pdf.mjs`) before writing a line of
+  extraction code. A `constructPath` op's path data is a flat **Float32Array**
+  buffer (`0,x,y` moveTo · `1,x,y` lineTo · `2,×6` cubic · `3,×4` quad · `4`
+  close) — `Array.isArray()` on it is `false`, a check that would have made
+  extraction silently find nothing. It's also **mutated into a `Path2D`
+  during rendering**, so geometry has to be read before the page renders, not
+  after — extraction runs first for exactly this reason. Curves are sampled
+  (4 segments) in PDF space against their own control points so arcs stay
+  snappable instead of collapsing to a chord.
+- **New `PlanGeometry`** ([slide.ts](src/types/slide.ts)): flat
+  `vertices`/`segments` number arrays (not `{x,y}` objects — this rides next
+  to a ~1MB plan image in the project row, and the object form roughly
+  triples the JSON), normalised into the **same 0–1 frame space hotspots and
+  calibration already use**, with the `contain` letterbox baked in at
+  extraction time — so the runtime needs no aspect maths to place a snap
+  point. Added to both `LinkedView` and `LinkedViewStage`, scoped and cleared
+  exactly like `calibration`. New `isPdfPlan` flag disables the authored
+  crop for a PDF plan — re-cropping would desync both the geometry and the
+  calibration.
+- **`object-cover` was cropping every non-16:9 plan** — an A4/A1 plan is
+  ~1.41:1 against the stage's fixed 16:9, so the top and bottom were being
+  cropped away entirely, uncroppable. New `fit?: 'cover'|'contain'` prop on
+  `MediaBox` ([SlideRenderer.tsx](src/components/SlideRenderer.tsx));
+  `'contain'` for PDF plans, `'cover'` unchanged everywhere else.
+- **`MediaBox` now accepts PDFs** — `accept()` branches on
+  `application/pdf`, a 1-page PDF goes straight through, a multi-page one
+  gets a compact page-number picker (no thumbnail strip — a real 1397-page
+  bid deck exists in this user's workflow, so a blanket thumbnail render
+  would hang). A new `onPdfPlan` callback hands the caller the rendered
+  image *and* geometry together, so the linked-views call site commits both
+  in **one** `setStage()` patch — two writes into the same `views` array in
+  one tick clobber each other, exactly the bug fixed in the entry below this
+  one, and the reason that fix's freshest-state read stayed in `setView`.
+- **New [planSnap.ts](src/lib/planSnap.ts)**: a uniform hash-grid index over
+  a plan's geometry, `snapTo(point, radius)` → nearest vertex within radius,
+  falling back to nearest point along an edge (vertices win outright, not by
+  distance — a wall's own edge passes within a hair of its corner, so
+  nearest-wins would make corners nearly unselectable). Wired into the
+  pick-capture layer already built for calibrate/measure: `onPointerMove`
+  now tracks a live snap candidate (shown as a small on-canvas indicator —
+  a box for a vertex, a dot for an edge point) and the click commits the
+  *snapped* point, not the raw one. Snap radius is a fixed screen-pixel
+  distance divided by viewer zoom, so precision doesn't get coarser the
+  further in you zoom — exactly when it's wanted.
+- **Found and fixed a real bug during verification, not a fluke of the test
+  harness**: the first version's snap radius/distance math treated the
+  16:9 frame as if it were square — comparing raw `dx`/`dy` in
+  frame-normalised units with a single isotropic radius. Since 1 frame-y-unit
+  is worth *fewer* screen pixels than 1 frame-x-unit whenever the frame is
+  wider than tall, an on-screen circle of "equal" radius was actually an
+  oval: generous near the frame's diagonal, silently short in the vertical
+  direction. A live end-to-end test caught it directly — clicking 6px off a
+  known corner sometimes missed the vertex snap and fell through to an edge
+  snap on the adjacent wall instead, producing a measured 5.03 m against a
+  provably-exact 5.00 m edge. Confirmed analytically before touching code
+  (naive frame-distance 0.0426 vs. radius 0.0418 — just outside; the
+  existing `dy/aspect` correction already established in `planOverlay.ts`'s
+  `realDistance` brings it to 0.0296 — comfortably inside). Fixed by
+  threading `aspect` through `buildSnapIndex`/`snapTo`: grid cells and all
+  distance comparisons now work in x-equivalent units (`y` divided by
+  `aspect` for indexing and distance, un-divided again on the point actually
+  returned), the same correction this codebase already uses for real-world
+  distance, just applied to hit-testing too.
+- **Verified end-to-end through the real UI**, not just the extraction
+  module in isolation, using a synthetic vector PDF with exactly known
+  dimensions (reportlab: an 8.00 × 5.00 m room with a 4.00 m interior wall
+  and a 4.00 m partition, at a stated 50pt/m scale, on a deliberately
+  non-16:9 A4-landscape page): uploaded through the actual file input,
+  confirmed "Added — 92KB · 8 snap points" (matching the room's 4 corners +
+  the two interior-wall endpoints + the partition's endpoint pair exactly);
+  confirmed the full-page letterboxed `contain` render shows the whole plan,
+  nothing cropped; calibrated by clicking 6px off both ends of the known
+  8.00 m edge and confirmed both clicks snapped to the *exact* stored vertex
+  coordinates despite the imprecise click; measured the vertical 5.00 m edge
+  (the check that specifically catches a missing aspect correction, since a
+  naive implementation reports the same figure for both axes) — **5.00 m
+  exactly** after the fix, was 5.03 m before it; re-measured the horizontal
+  8.00 m edge for a full closed-loop confirmation — **8.00 m exactly**.
+  Separately uploaded a synthetic *raster-only* PDF (a PNG embedded via
+  `drawImage`, zero vector paths) and confirmed the honest fallback: "Added
+  — 87KB. No vector lines in this PDF (it looks scanned), so picks won't
+  snap." `tsc --noEmit` clean; eslint at the branch baseline (17 errors,
+  unchanged) after fixing one self-inflicted violation — a plain async
+  function named `applyPdfPage` (originally `usePdfPage`) tripped
+  `react-hooks/rules-of-hooks` purely on its name.
+- **A live browser-testing gotcha worth recording, since it cost real time
+  here**: the rail thumbnail preview renders its own independent
+  `LinkedViewsExplorer` instance, so buttons like "Dimensions"/"Measure"/
+  "Recalibrate" exist **twice** in the DOM — once in the tiny non-editable
+  rail preview, once in the real editable main canvas — and a plain
+  text-match `find()` silently grabs whichever renders first, not
+  necessarily the one meant. This produced a very convincing false alarm
+  (the plan's own image appeared to have been silently replaced by an
+  unrelated JPEG mid-test) before the actual cause became clear: several
+  clicks upstream had landed on the rail preview's own controls instead of
+  the main canvas's. Tagging the real target once with a throwaway
+  `data-test-*` attribute and scoping every subsequent query to it resolved
+  it immediately. Same class of issue flagged in the 2026-09-18 entries
+  below — worth remembering as a standing rule for this component
+  specifically, not just a one-off.
+
+**Left off / next up:**
+- Not yet retrofitted onto **stage** switching mid-session — a view's own
+  base plan and a stage's own plan both carry `geometry`/`isPdfPlan`
+  independently and correctly, but there's no dedicated test yet of
+  uploading a PDF specifically *as a stage* (only the no-stage view path was
+  exercised live). The code path is identical (`setStage()` already routes
+  to whichever owns the image), so this is believed correct by
+  construction, not proven live.
+- The page picker for a multi-page PDF was built but not exercised live —
+  only ever tested with 1-page PDFs, which skip it entirely. Worth a real
+  multi-page upload check next time this is touched.
+- Segment/vertex decimation caps (`MAX_SEGMENTS`/`MAX_VERTICES` in
+  `pdfPlan.ts`) are untested against a genuinely dense real-world plan — the
+  synthetic test PDF has only 6 segments, nowhere near the cap.
+- Nothing from today is committed yet — stacked on top of Phase H and
+  everything still uncommitted below it.
+
+---
+
+## 2026-09-21 (cont'd 5) — Linked Views image upload silently discarded
+
+**Context:** user reported "unable to upload image" on a Linked Views image
+slot, with a screenshot showing the upload's own success note ("Added —
+113KB.") next to a still-empty slot. So the file *was* read; something threw
+it away right afterwards.
+
+**Done:**
+- **Root cause**: `MediaBox.accept()` commits two things back-to-back in one
+  tick — `onChangeUrl(dataUrl)` then `onChangeTransform?.(undefined)`. For an
+  ordinary slide those are two *separate* fields, so they can't collide. For a
+  Linked View both land inside the same `views` array, and
+  `LinkedViewsExplorer`'s `setView` mapped over the `views` from **this
+  render's closure** — so the second write was computed from a snapshot taken
+  before the first one, and silently overwrote the just-set url with `''`.
+  Classic stale-closure clobber; it only ever surfaced here because this is
+  the one place two writes into one array field happen in the same tick.
+- **Fix** (one line, [SlideRenderer.tsx](src/components/SlideRenderer.tsx),
+  `setView`): read the freshest views from the store
+  (`useEditorStore.getState()`) instead of the closure before mapping.
+- **Verified by A/B, not by inspection.** With the fix: the note fires, the
+  image renders, and the persisted url is a real 1111-char
+  `data:image/jpeg;base64…`. With the fix reverted and the identical drop
+  replayed: the note still fires ("Added — 1KB.") but no image renders and
+  the url stays empty — exactly the reported symptom, reproduced and then
+  un-reproduced on demand. `tsc --noEmit` clean.
+- **Testing gotcha worth keeping**: the first repro attempt looked like the
+  bug *didn't* exist, because the synthetic drop targeted an ancestor `<div>`
+  rather than the `bg-black/30` frame that actually owns `onDrop` — the
+  handler simply never ran (no note at all). If a scripted drop produces no
+  note, the drop missed the frame; that's not the same signal as a note with
+  no image.
+- Cleaned up the repro project (`proj_7a7735a81a0c429f278`) from Supabase.
+
+**Left off / next up:**
+- **Any other component that commits two patches into the same array field in
+  one tick has this same shape of bug.** `setView` is fixed; nothing else was
+  audited for it. Worth a grep next time someone's in here.
+- Still uncommitted, stacked on Phase H (below) and everything before it.
+
+---
+
+## 2026-09-21 (cont'd 4) — Phase H: layout overlay modes + calibration
+
+**Context:** the last item from the post-demo action plan, scoped with the
+user back when the plan was written: a Layout view should carry several
+readings of the same plan — Zoning, Adjacency, Dimensions — switchable live
+mid-pitch, with dimensions requiring the plan to be calibrated first. Built on
+top of the phases 1-3 UI rework, on that branch.
+
+**Done:**
+- **Three overlay modes plus the plain plan**, as a pill row under the stage
+  switcher in `LinkedViewsExplorer`
+  ([SlideRenderer.tsx](src/components/SlideRenderer.tsx)). The active mode is
+  transient state, deliberately — like the active stage, it's how the plan is
+  being *looked at* right now, not something authored into the deck. It resets
+  on every view/stage change, since an overlay left over from another plan
+  would be describing the wrong image. An overlay with no data behind it is
+  offered only while editing; in Presenter it's hidden rather than being a
+  dead end mid-pitch.
+- **Zoning** — new `ViewHotspot.zoneCategory` (free text). Each space is
+  repainted by its zone, with the colour *derived from the zone's own name*
+  (`zoneColor()` in [planOverlay.ts](src/lib/planOverlay.ts)) rather than
+  configured: two spaces typed "Meeting" always match, in this deck and the
+  next, with nothing to keep in sync. Unzoned spaces stay visible but read as
+  unassigned instead of quietly joining whichever zone looks nearest. A legend
+  of the zones in use sits inline in the pill row. The editor's zone field
+  offers the view's existing zones as a datalist, so a second "Meeting" is one
+  keystroke rather than a near-miss like "meeting ".
+- **Adjacency** — new `ViewHotspot.adjacentHotspotIds`, drawn as connector
+  lines between space centroids. Only one end of a pair has to name the other
+  (the overlay dedupes by sorted id pair), so linking is one click per
+  relationship rather than two. Deleting a space also drops it from everyone
+  else's adjacency list, so a plan that gets rebuilt doesn't accumulate links
+  pointing at nothing.
+- **Dimensions + calibration** — new `PlanCalibration` on both
+  `LinkedViewStage` and `LinkedView` (per stage, because each stage can carry
+  a different plan at a different scale; on the view itself for the common
+  no-stages case). Calibrate by clicking two points and entering the real
+  distance between them; then every space gets an area label and a Measure
+  tool gives point-to-point distances. Uncalibrated, it says so and offers to
+  calibrate rather than showing confident wrong numbers. Replacing the image
+  clears the calibration — a new plan is a new scale.
+- **The one genuinely easy-to-get-wrong part is the units**, so it's worth
+  spelling out: scale is stored as `unitsPerWidth` — how many real units span
+  the frame's full width — not as any kind of pixels-per-unit. Hotspot
+  coordinates are already normalised 0–1 against that same frame, so this one
+  number stays correct at any render size, export scale or viewer zoom with no
+  recalibration. Conversions also need the frame's aspect ratio, because a
+  normalised step sideways covers more ground than the same step downwards;
+  the frame is `aspect-video`, so that's a constant 16:9 rather than something
+  measured. Verified live: the same calibration produced identical areas in
+  the editor (frame 327×184px) and in Presenter (1044×587px).
+- Verified end-to-end against a seeded four-space plan: zoning gave the two
+  "Front of House" spaces the same colour and the other two their own;
+  adjacency drew exactly the 3 expected pairs at the right centroids, with no
+  duplicates, including two spaces that were only ever named *by* others;
+  areas came out at the hand-computed values (59.4 / 177.84 / 42.12 m²); the
+  ruler round-tripped the calibration distance exactly (20.0 m) and read
+  11.25 m for a vertical span of the same normalised length — which is the
+  measurement that actually proves the aspect correction is applied, since a
+  naive version reports 20 m for both. `tsc --noEmit` clean; project-wide
+  eslint unchanged at the branch baseline of 17 errors / 6 warnings.
+
+**Watch out for:**
+- **A wrong calibration I chased as an app bug turned out to be the test
+  harness.** Synthetic clicks were dispatched using a stage rect captured
+  moments earlier, while entering calibrate mode had just re-flowed the
+  toolbar row above the stage and resized it — so the points the handler
+  computed weren't the ones intended, and the stored scale was ~4× off. It
+  looked exactly like a units bug, and the wrong numbers then showed up in
+  Presenter, which made it look like an edit-vs-present mismatch on top.
+  Instrumenting the save path settled it in one run. For any future scripted
+  verification here: re-read the element rect immediately before dispatching,
+  never across a state change that can re-lay-out the toolbar.
+- Calibration is tied to the plan *as currently framed*. The image is drawn
+  `object-cover`, so changing the authored crop (zoom/pan on the image)
+  shifts the plan within the frame and invalidates the scale. Replacing the
+  image clears it automatically; re-cropping does not.
+
+**Left off / next up:**
+- **"Rendered layout" was read as "the plan with no overlay"** and is the
+  `Plan` pill. If what was wanted is a *photoreal render* of the same floor,
+  that's already expressible as a stage (a stage carries its own image), so
+  it may just need wiring rather than new code — worth confirming which was
+  meant.
+- Zoning/adjacency/calibration are all authored per hotspot or per stage
+  through the existing popup; there's no bulk way to zone a whole plan yet.
+  Fine for a plan with a handful of spaces, tedious for a large one.
+- Phases 4-6 of the UI rework (⌘K palette, home redesign, concept-library
+  dialog) are still pending — unchanged by this.
+
+---
+
 ## 2026-09-21 (cont'd 3) — UI/UX rework, phases 1-3
 
 **Context:** asked to make the app feel like a designer-friendly modern tool.

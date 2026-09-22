@@ -323,6 +323,11 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         >
           <MenuItem icon={<IconFile className="h-[15px] w-[15px]" />} onClick={() => handleExport('pdf')}>Export as PDF</MenuItem>
           <MenuItem icon={<IconScreen className="h-[15px] w-[15px]" />} onClick={() => handleExport('pptx')}>Export as PPTX</MenuItem>
+          {project.slides.some((s) => s.layout === 'linked-views') && (
+            <p className="border-t border-ui-line-soft px-2.5 pb-1 pt-2 text-micro leading-snug text-ui-ink-3">
+              Linked Views slides export only their first view/stage — other tabs and stages won&apos;t appear in the file.
+            </p>
+          )}
         </Menu>
 
         <Button variant="primary" icon={<IconPlay className="h-3 w-3" />} onClick={() => router.push(`/p/${project.id}/present`)}>

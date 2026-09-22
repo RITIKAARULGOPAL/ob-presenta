@@ -83,11 +83,26 @@ export function SlideRail() {
           const isSelected = selectedSlideIds.includes(slide.id);
           const isDragging = slide.id === draggedId;
           const showDropLine = dropTarget?.index === i && draggedId !== null && !isDragging;
+          // A label only at the start of a run of same-tagged slides — not
+          // repeated on every thumbnail in the group, and not shown at all
+          // for slides with no option set.
+          const option = slide.designOption?.trim();
+          const showOptionHeader = !!option && option !== project.slides[i - 1]?.designOption?.trim();
           return (
-            // A div rather than a button: the rendered slide inside can itself contain
-            // buttons (the Linked Views tabs), and a button can't nest a button.
+            // A Fragment, not just the thumbnail div: a group header needs to
+            // sit as its own sibling above the thumbnail it introduces, not
+            // inside it (the thumbnail is a fixed aspect-video box already
+            // full of its own absolutely-positioned overlays).
+            <div key={slide.id} className="contents">
+              {showOptionHeader && (
+                <div className="-mb-1.5 mt-1.5 flex items-center gap-1.5 px-0.5 text-[10px] font-bold uppercase tracking-wide text-ui-ink-3 first:mt-0">
+                  <span className="h-1 w-1 rounded-full bg-ui-accent" />
+                  {option}
+                </div>
+              )}
+            {/* A div rather than a button: the rendered slide inside can itself contain
+                buttons (the Linked Views tabs), and a button can't nest a button. */}
             <div
-              key={slide.id}
               role="button"
               tabIndex={0}
               aria-current={slide.id === currentSlideId}
@@ -220,6 +235,7 @@ export function SlideRail() {
                   </button>
                 )}
               </span>
+            </div>
             </div>
           );
         })}

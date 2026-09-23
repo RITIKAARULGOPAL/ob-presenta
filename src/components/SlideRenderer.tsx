@@ -62,6 +62,8 @@ function MediaBox({
   url,
   kind,
   editable,
+  animate = false,
+  posterUrl,
   onChangeUrl,
   transform,
   onChangeTransform,
@@ -75,6 +77,18 @@ function MediaBox({
   url: string;
   kind: 'image' | 'video';
   editable: boolean;
+  /** Same gate as HeroVideo: when false a `kind: 'video'` box renders its
+   *  poster (or an empty frame) instead of a real <video>, so an export never
+   *  reaches html-to-image's tainted-canvas path. Reachable in practice
+   *  whenever a linked-views deck's first view is the walkthrough, since
+   *  `activeId` initialises to views[0].
+   *
+   *  Defaults to false deliberately — matching SlideRenderer's own `animate`.
+   *  A future video slot that forgets to pass it shows a still in the editor,
+   *  which someone notices in seconds; the opposite default would silently
+   *  reintroduce an export that throws. */
+  animate?: boolean;
+  posterUrl?: string;
   onChangeUrl: (url: string) => void;
   transform?: ImageTransform;
   onChangeTransform?: (t: ImageTransform | undefined) => void;
@@ -160,7 +174,14 @@ function MediaBox({
       >
         {url ? (
           kind === 'video' ? (
-            <video ref={mediaRef} src={url} controls className="h-full w-full object-cover" />
+            animate ? (
+              <video ref={mediaRef} src={url} poster={posterUrl || undefined} controls className="h-full w-full object-cover" />
+            ) : posterUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={posterUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-white/40">Walkthrough</div>
+            )
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={url} alt="" style={imageStyle(transform)} className="h-full w-full object-cover" />
@@ -381,9 +402,36 @@ function ClientLogo({ editable, dark }: { editable: boolean; dark: boolean }) {
  *  megabytes in the project row. Renders nothing at all in Presenter/export
  *  when unset, rather than an empty placeholder box, since a title slide
  *  with no video should look exactly like it always has. */
-function HeroVideo({ url, editable, onChangeUrl }: { url?: string; editable: boolean; onChangeUrl: (url: string) => void }) {
+/** The hero video, and its still stand-in.
+ *
+ *  `animate` is false for export, rail thumbnails and dot previews. In those
+ *  cases a real <video> must not reach the DOM at all: html-to-image's
+ *  cloneVideoElement draws the current frame to a canvas and calls
+ *  toDataURL(), and since every heroVideoUrl is a pasted cross-origin URL by
+ *  design, that canvas is tainted and toDataURL() throws — with no try/catch
+ *  around it, unlike the iframe path right below it in that library, so it
+ *  takes the whole export down rather than just this slide. Rendering the
+ *  poster as a plain <img> sidesteps the code path entirely and reuses
+ *  settleStage()'s existing <img> wait for free. */
+function HeroVideo({
+  url,
+  posterUrl,
+  editable,
+  animate,
+  onChangeUrl,
+  onChangePosterUrl,
+}: {
+  url?: string;
+  posterUrl?: string;
+  editable: boolean;
+  animate: boolean;
+  onChangeUrl: (url: string) => void;
+  onChangePosterUrl: (url: string) => void;
+}) {
   const [editingUrl, setEditingUrl] = useState(false);
   const [draft, setDraft] = useState(url ?? '');
+  const [editingPoster, setEditingPoster] = useState(false);
+  const [posterDraft, setPosterDraft] = useState(posterUrl ?? '');
 
   if (!url && !editable) return null;
 
@@ -391,17 +439,81 @@ function HeroVideo({ url, editable, onChangeUrl }: { url?: string; editable: boo
     <>
       {url && (
         <>
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <video
-            src={url}
-            autoPlay
-            muted
-            loop
-            playsInline
-            className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover"
-          />
-          <div className="pointer-events-none absolute inset-0 -z-10 bg-black/45" />
+          {animate ? (
+            // eslint-disable-next-line jsx-a11y/media-has-caption
+            <video
+              src={url}
+              poster={posterUrl || undefined}
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover"
+            />
+          ) : (
+            posterUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={posterUrl}
+                alt=""
+                className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover"
+              />
+            )
+          )}
+          {/* The scrim only makes sense over something dark. Painting it when
+              nothing is behind it is what turned a still export into a grey
+              panel with white-on-white text. */}
+          {(animate || posterUrl) && (
+            <div className="pointer-events-none absolute inset-0 -z-10 bg-black/45" />
+          )}
         </>
+      )}
+      {editable && url && (
+        <div className="absolute inset-x-0 -bottom-7 flex justify-center">
+          {editingPoster ? (
+            <div className="flex items-center gap-1.5 rounded-md border border-[var(--line)] bg-white px-2 py-1 shadow-lg">
+              <input
+                autoFocus
+                value={posterDraft}
+                onChange={(e) => setPosterDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    onChangePosterUrl(posterDraft.trim());
+                    setEditingPoster(false);
+                  } else if (e.key === 'Escape') {
+                    setEditingPoster(false);
+                  }
+                }}
+                placeholder="Paste poster image URL…"
+                className="w-56 text-xs text-[var(--ink)] outline-none"
+              />
+              <button
+                onClick={() => {
+                  onChangePosterUrl(posterDraft.trim());
+                  setEditingPoster(false);
+                }}
+                className="shrink-0 rounded bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold text-white"
+              >
+                Set
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                setPosterDraft(posterUrl ?? '');
+                setEditingPoster(true);
+              }}
+              title="Shown in exports and thumbnails, where the video cannot play"
+              className={`rounded-md border border-dashed px-2.5 py-1 text-[10px] font-semibold transition ${
+                posterUrl
+                  ? 'border-white/30 text-white/70 hover:border-white/60'
+                  : 'border-amber-400/70 text-amber-200 hover:border-amber-300'
+              }`}
+            >
+              {posterUrl ? 'Replace poster' : '⚠ Add a poster for export'}
+            </button>
+          )}
+        </div>
       )}
       {editable && (
         <div className="absolute inset-x-0 -top-8 flex justify-center">
@@ -830,7 +942,7 @@ function isDragTool(tool: DrawTool | null): boolean {
  * vertices, Finish once there are 3+, then pick the target view (+ optional video
  * timestamp); click a finished region to delete it. Non-editable (Presenter): click
  * a region to jump to its target, seeking the target video if a timestamp was set. */
-function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
+function LinkedViewsExplorer({ slide, editable, animate = false }: SlideRendererProps) {
   const updateField = useEditorStore((s) => s.updateField);
   const views = slide.fields.views ?? [];
   const [activeId, setActiveId] = useState<string | undefined>(views[0]?.id);
@@ -1515,6 +1627,8 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           url={stageUrl}
           kind={active.kind === 'walkthrough' ? 'video' : 'image'}
           editable={editable}
+          animate={animate}
+          posterUrl={active.posterUrl}
           onChangeUrl={(url) =>
             activeStage
               ? setView(active.id, { stages: active.stages!.map((s) => (s.id === activeStage.id ? { ...s, url } : s)) })
@@ -2553,30 +2667,47 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
           />
         </div>
       ) : slide.layout === 'title-slide' ? (
-        <div className="relative text-center">
-          <HeroVideo url={slide.fields.heroVideoUrl} editable={editable} onChangeUrl={(url) => updateField('heroVideoUrl', url)} />
-          <div className="relative">
-            <Kicker slide={slide} editable={editable} />
-            <EditableText
-              editable={editable}
-              value={slide.fields.title ?? ''}
-              onChange={(v) => updateField('title', v)}
-              as="h1"
-              placeholder="Presentation title"
-              style={headlineStyle(3)}
-              className={`font-display outline-none ${slide.fields.heroVideoUrl ? 'text-white' : 'text-[var(--accent)]'}`}
-            />
-            <EditableText
-              editable={editable}
-              value={slide.fields.subtitle ?? ''}
-              onChange={(v) => updateField('subtitle', v)}
-              as="p"
-              placeholder="Subtitle"
-              className={`mx-auto mt-4 max-w-lg outline-none ${slide.fields.heroVideoUrl ? 'text-white/80' : 'text-[var(--ink-2)]'}`}
-            />
-            <ClientLogo editable={editable} dark={dark || !!slide.fields.heroVideoUrl} />
-          </div>
-        </div>
+        (() => {
+          /* Whether anything dark is *actually painted* behind the cover type
+             right now — not merely whether a video URL exists. Keying the text
+             colour off the URL alone is what produced white-on-grey covers in
+             every export: with no video playing and no poster, the scrim sat
+             over the white stage at ~#8c8c8c and the title was still white. */
+          const heroDark = !!slide.fields.heroVideoUrl && (animate || !!slide.fields.heroPosterUrl);
+          return (
+            <div className="relative text-center">
+              <HeroVideo
+                url={slide.fields.heroVideoUrl}
+                posterUrl={slide.fields.heroPosterUrl}
+                editable={editable}
+                animate={animate}
+                onChangeUrl={(url) => updateField('heroVideoUrl', url)}
+                onChangePosterUrl={(url) => updateField('heroPosterUrl', url)}
+              />
+              <div className="relative">
+                <Kicker slide={slide} editable={editable} />
+                <EditableText
+                  editable={editable}
+                  value={slide.fields.title ?? ''}
+                  onChange={(v) => updateField('title', v)}
+                  as="h1"
+                  placeholder="Presentation title"
+                  style={headlineStyle(3)}
+                  className={`font-display outline-none ${heroDark ? 'text-white' : 'text-[var(--accent)]'}`}
+                />
+                <EditableText
+                  editable={editable}
+                  value={slide.fields.subtitle ?? ''}
+                  onChange={(v) => updateField('subtitle', v)}
+                  as="p"
+                  placeholder="Subtitle"
+                  className={`mx-auto mt-4 max-w-lg outline-none ${heroDark ? 'text-white/80' : 'text-[var(--ink-2)]'}`}
+                />
+                <ClientLogo editable={editable} dark={dark || heroDark} />
+              </div>
+            </div>
+          );
+        })()
       ) : slide.layout === 'freeform' ? (
         <FreeformSlide slide={slide} editable={editable} />
       ) : slide.layout === 'blank' ? (
@@ -2615,9 +2746,9 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
           {slide.layout === 'two-content' && <TwoContent slide={slide} editable={editable} />}
           {slide.layout === 'merge-diagram' && <MergeDiagram slide={slide} editable={editable} />}
           {slide.layout === 'stat-hero' && <StatHero slide={slide} editable={editable} />}
-          {slide.layout === 'linked-views' && <LinkedViewsExplorer slide={slide} editable={editable} />}
-          {slide.layout === 'orbit' && <OrbitDiagram slide={slide} editable={editable} />}
-          {slide.layout === 'site-locus' && <SiteLocusDiagram slide={slide} editable={editable} />}
+          {slide.layout === 'linked-views' && <LinkedViewsExplorer slide={slide} editable={editable} animate={animate} />}
+          {slide.layout === 'orbit' && <OrbitDiagram slide={slide} editable={editable} animate={animate} />}
+          {slide.layout === 'site-locus' && <SiteLocusDiagram slide={slide} editable={editable} animate={animate} />}
           {slide.layout === 'material-compare' && <MaterialCompare slide={slide} editable={editable} />}
           {slide.style === 'design' && (
             <MediaBox

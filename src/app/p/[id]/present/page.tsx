@@ -117,7 +117,25 @@ export default function PresenterPage({ params }: { params: Promise<{ id: string
               shape the actual browser window happens to be, since nothing
               else here enforces a 16:9 box. */}
           <ScaledStage>
-            <SlideRenderer slide={currentSlide} editable={false} animate />
+            {/* Keyed on the slide id so each slide gets a fresh mount. Two
+                reasons, both bugs without it:
+
+                1. A CSS animation only restarts when `animation-name` changes.
+                   Reusing one DOM node across slides meant advancing between
+                   two consecutive `fadeUp` slides played nothing at all.
+                2. Component state leaked across slides. LinkedViewsExplorer's
+                   `viewportZoom`/`viewportPanX/Y` carried straight over, and
+                   its reset effect is keyed on `[activeId, activeStageId]` —
+                   which doesn't change — so it never fired. The next slide
+                   arrived pre-zoomed into a corner of an image it had never
+                   shown. Same leak in MaterialCompare's `split`,
+                   SiteLocusDiagram's `isRevealed` and MediaBox's `adjusting`.
+
+                Accepted cost: returning to a slide loses whatever you'd
+                explored on it, and a <video> restarts from 0. That matches the
+                existing precedent for key plans, which already reset per view
+                rather than carrying their expanded state over. */}
+            <SlideRenderer key={currentSlide.id} slide={currentSlide} editable={false} animate />
           </ScaledStage>
         </div>
       )}

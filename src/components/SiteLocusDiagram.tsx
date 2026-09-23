@@ -10,8 +10,22 @@ import type { Slide } from '@/types/slide';
  *  photo (with a floor-highlight caption and address) on hover/tap, paired
  *  with a compass/sun-path diagram whose sun-glow only appears while the
  *  reveal is active — one shared `isRevealed` boolean drives both sibling
- *  cards, rather than depending on CSS `:hover ~` sibling selectors. */
-export function SiteLocusDiagram({ slide, editable }: { slide: Slide; editable: boolean }) {
+ *  cards, rather than depending on CSS `:hover ~` sibling selectors.
+ *
+ *  `animate` gates the two infinite loops (the shimmer sweep and the sun's 12s
+ *  orbit) for the same reason OrbitDiagram gates its ring — an export must
+ *  capture a settled frame, not an arbitrary phase of a loop. The sun's rest
+ *  pose is its `translate(90px, -50%)` start, so the ungated render is already
+ *  the correct still. */
+export function SiteLocusDiagram({
+  slide,
+  editable,
+  animate = false,
+}: {
+  slide: Slide;
+  editable: boolean;
+  animate?: boolean;
+}) {
   const updateField = useEditorStore((s) => s.updateField);
   const [isRevealed, setIsRevealed] = useState(false);
   const f = slide.fields;
@@ -51,7 +65,7 @@ export function SiteLocusDiagram({ slide, editable }: { slide: Slide; editable: 
           }`}
         >
           {f.revealImageUrl && (
-            <div className="site-shimmer absolute inset-0 -z-10 overflow-hidden">
+            <div className={`absolute inset-0 -z-10 overflow-hidden ${animate ? 'site-shimmer' : ''}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={f.revealImageUrl} alt="" style={imageStyle(f.revealImageTransform)} className="h-full w-full object-cover" />
             </div>
@@ -93,7 +107,7 @@ export function SiteLocusDiagram({ slide, editable }: { slide: Slide; editable: 
         ) : (
           !editable && <span className="flex h-full items-center justify-center text-sm text-white/40">Compass</span>
         )}
-        <div className="site-sun-orbit absolute inset-0">
+        <div className={`absolute inset-0 ${animate ? 'site-sun-orbit' : ''}`}>
           <div className={`site-sun ${isRevealed ? 'glow' : ''}`} />
         </div>
         {editable && (

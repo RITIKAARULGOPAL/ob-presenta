@@ -21,6 +21,15 @@ function sanitizeFilename(name: string): string {
   return name.trim().replace(/[^a-z0-9-_ ]/gi, '').replace(/\s+/g, '-').slice(0, 80) || 'presenta-deck';
 }
 
+/** A URL that never resolves and never errors would otherwise hang the whole
+ *  export forever — there is no other timeout anywhere in this path. Capping
+ *  the wait means a slow asset costs one slide's fidelity, not the export. */
+const ASSET_WAIT_MS = 10_000;
+
+function withTimeout(p: Promise<void>): Promise<void> {
+  return Promise.race([p, new Promise<void>((res) => setTimeout(res, ASSET_WAIT_MS))]);
+}
+
 /** Wait until what's on the stage is actually what we asked for.
  *
  *  Two things here run on their own clock. React 19 commits asynchronously, so
@@ -32,16 +41,32 @@ function sanitizeFilename(name: string): string {
 async function settleStage(stage: HTMLElement): Promise<void> {
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-  await Promise.all(
-    Array.from(stage.querySelectorAll('img')).map(
-      (img) =>
+  await Promise.all([
+    ...Array.from(stage.querySelectorAll('img')).map((img) =>
+      withTimeout(
         new Promise<void>((res) => {
           if (img.complete && img.naturalWidth > 0) return res();
           img.addEventListener('load', () => res(), { once: true });
           img.addEventListener('error', () => res(), { once: true });
         })
-    )
-  );
+      )
+    ),
+    // SlideRenderer renders posters rather than <video> when `animate` is off,
+    // so this should find nothing during an export. It is here as a backstop:
+    // html-to-image draws a video's current frame to a canvas and calls
+    // toDataURL(), which throws on a cross-origin (tainted) source and takes
+    // the whole export with it. If a <video> ever does reach this stage, at
+    // least let it reach a decodable frame first.
+    ...Array.from(stage.querySelectorAll('video')).map((video) =>
+      withTimeout(
+        new Promise<void>((res) => {
+          if (video.readyState >= 2) return res();
+          video.addEventListener('loadeddata', () => res(), { once: true });
+          video.addEventListener('error', () => res(), { once: true });
+        })
+      )
+    ),
+  ]);
 
   // One more frame, so a just-decoded image is painted before we serialize.
   await new Promise((r) => requestAnimationFrame(r));

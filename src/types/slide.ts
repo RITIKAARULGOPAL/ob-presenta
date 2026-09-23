@@ -217,6 +217,11 @@ export interface LinkedView {
    *  same reasoning as every other media field in this file: no server-side
    *  storage, so a base64 track would bloat the project row. */
   musicUrl?: string;
+  /** Still shown in place of a `walkthrough` view's video wherever it cannot
+   *  play — export, rail thumbnails, dot previews. Without one an exported
+   *  walkthrough view is an empty frame, and (before the render was gated) a
+   *  cross-origin clip could take the whole export down. */
+  posterUrl?: string;
   /** "You are here" orientation crop shown floating over this view's stage
    *  (Render/Axo, typically) — toggleable, and click-to-expand, matching the
    *  reference deck's key-plan card. Fresh per view; never carries an
@@ -295,6 +300,13 @@ export interface SlideFields {
    *  the cover title/subtitle/logo. URL only, like a linked-views walkthrough
    *  — a base64 video would be tens of megabytes in the project row. */
   heroVideoUrl?: string;
+
+  /** The still shown wherever the hero video cannot play — export, rail
+   *  thumbnails, dot previews. Without it those renders have nothing dark
+   *  behind the white cover type, so the scrim is suppressed too and the
+   *  slide falls back to its normal light treatment rather than going
+   *  white-on-grey. URL only, same reasoning as heroVideoUrl. */
+  heroPosterUrl?: string;
 
   /** site-locus layout: the reveal photo shown when the locus map (imageUrl)
    *  is hovered/tapped. */

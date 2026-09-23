@@ -23,6 +23,7 @@ function OrbitNodeDot({
   angleIndex,
   count,
   editable,
+  animate,
   hovered,
   onHover,
   onChangeLabel,
@@ -33,6 +34,7 @@ function OrbitNodeDot({
   angleIndex: number;
   count: number;
   editable: boolean;
+  animate: boolean;
   hovered: boolean;
   onHover: (id: string | null) => void;
   onChangeLabel: (label: string) => void;
@@ -56,7 +58,9 @@ function OrbitNodeDot({
 
   return (
     <div
-      className="orbit-node-counter group/orb absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1.5"
+      className={`group/orb absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1.5 ${
+        animate ? 'orbit-node-counter' : ''
+      }`}
       style={pos}
       onMouseEnter={() => onHover(node.id)}
       onMouseLeave={() => onHover(null)}
@@ -115,8 +119,22 @@ function OrbitNodeDot({
  *  nodes orbiting it. Hovering a node swaps the core's own text to that
  *  node's; the whole ring pauses while hovered so the swapped text stays
  *  readable, then resumes. CSS-only rotation (respects prefers-reduced-motion
- *  globally, see globals.css) — the only JS state is which node is hovered. */
-export function OrbitDiagram({ slide, editable }: { slide: Slide; editable: boolean }) {
+ *  globally, see globals.css) — the only JS state is which node is hovered.
+ *
+ *  `animate` gates that rotation, for the same reason ConceptDiagram gates its
+ *  own classes: a headless screenshot must capture a settled frame. Ungated, an
+ *  exported orbit slide landed at whatever phase of the 70s loop the capture
+ *  happened to hit, and every rail thumbnail ran its own rotation forever. Rest
+ *  pose (rotation 0) is the plain node layout, so the still is already right. */
+export function OrbitDiagram({
+  slide,
+  editable,
+  animate = false,
+}: {
+  slide: Slide;
+  editable: boolean;
+  animate?: boolean;
+}) {
   const updateField = useEditorStore((s) => s.updateField);
   const addOrbitNode = useEditorStore((s) => s.addOrbitNode);
   const removeOrbitNode = useEditorStore((s) => s.removeOrbitNode);
@@ -131,7 +149,11 @@ export function OrbitDiagram({ slide, editable }: { slide: Slide; editable: bool
 
   return (
     <div className="relative mx-auto mt-6 aspect-video w-full max-w-2xl">
-      <div className={`orbit-ring absolute inset-0 ${hoveredId ? 'paused' : ''}`}>
+      <div
+        className={`absolute inset-0 ${animate ? 'orbit-ring' : ''} ${
+          animate && hoveredId ? 'paused' : ''
+        }`}
+      >
         {nodes.map((node, i) => (
           <OrbitNodeDot
             key={node.id}
@@ -139,6 +161,7 @@ export function OrbitDiagram({ slide, editable }: { slide: Slide; editable: bool
             angleIndex={i}
             count={nodes.length}
             editable={editable}
+            animate={animate}
             hovered={hoveredId === node.id}
             onHover={setHoveredId}
             onChangeLabel={(label) => setNode(node.id, { label })}

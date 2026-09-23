@@ -13,6 +13,10 @@ export type SnapKind = 'vertex' | 'edge';
 export interface SnapResult {
   point: Point;
   kind: SnapKind;
+  /** The full segment this point was snapped onto, in true frame space —
+   *  only present when kind === 'edge', so the UI can highlight the whole
+   *  line being snapped to rather than just the point on it. */
+  segment?: { x1: number; y1: number; x2: number; y2: number };
 }
 
 /** A uniform grid over the frame. A plan's lines are spread across the whole
@@ -140,6 +144,7 @@ export function snapTo(index: SnapIndex | null, p: Point, radius: number): SnapR
   let bestVertexDist = radiusSq;
   let bestEdge: Point | null = null;
   let bestEdgeDist = radiusSq;
+  let bestEdgeSegment: { x1: number; y1: number; x2: number; y2: number } | null = null;
 
   for (let ix = cx - reachX; ix <= cx + reachX; ix++) {
     for (let iy = cy - reachX; iy <= cy + reachX; iy++) {
@@ -174,6 +179,10 @@ export function snapTo(index: SnapIndex | null, p: Point, radius: number): SnapR
             // q.y is in x-equivalent space (divided by aspect) — undo that
             // before handing the point back, so it lands in true frame space.
             bestEdge = { x: q.x, y: q.y * aspect };
+            // raw.segments[i..i+3] are already true frame-space coordinates
+            // (only the *comparison* above works in x-equivalent space) — no
+            // aspect-undoing needed here, unlike bestEdge's point.
+            bestEdgeSegment = { x1: raw.segments[i], y1: raw.segments[i + 1], x2: raw.segments[i + 2], y2: raw.segments[i + 3] };
           }
         }
       }
@@ -181,6 +190,6 @@ export function snapTo(index: SnapIndex | null, p: Point, radius: number): SnapR
   }
 
   if (bestVertex) return { point: bestVertex, kind: 'vertex' };
-  if (bestEdge) return { point: bestEdge, kind: 'edge' };
+  if (bestEdge) return { point: bestEdge, kind: 'edge', segment: bestEdgeSegment! };
   return null;
 }

@@ -166,6 +166,33 @@ export interface ViewHotspot {
    *  drawn as connector lines between centroids in the Adjacency overlay.
    *  Only one end of a pair needs to name the other; the overlay dedupes. */
   adjacentHotspotIds?: string[];
+  /** Per-stage override of `points`, keyed by **stage id** (not label — a
+   *  stage's label is a free-text role name matched elsewhere for the
+   *  Zoning/Circulation auto-overlays; this is "what does this specific
+   *  stage instance's copy of this hotspot look like," the same
+   *  by-id relationship `stageIds` already models). Falls back to the base
+   *  `points` above when the active stage has no entry here, so nothing
+   *  drawn before this existed needs migrating. Lets a space's outline
+   *  refine from a rough zoning blob into a precise wall outline across the
+   *  plan-evolution timeline, animated between the two in
+   *  LinkedViewsExplorer's stage-transition morph. `cloneSlide` must remap
+   *  these keys through its stage-id map, the same way it already remaps
+   *  `stageIds` — see the comment there. */
+  pointsByStage?: Record<string, { x: number; y: number }[]>;
+  /** The id of this hotspot's one real parent zone hotspot on another stage
+   *  — e.g. a "Reception" room on the Walls stage pointing at the "Public
+   *  Zone" hotspot on the Zoning stage. Drives the split/merge burst
+   *  transition (see `LinkedView.splitAnimation`): several children sharing
+   *  one `parentHotspotId` morph out of (or into) that one parent's shape
+   *  instead of independently fading. Deliberately a real id reference, not
+   *  a `zoneCategory` name match — a name can legitimately repeat across
+   *  more than one zone instance on the same plan, which would make a
+   *  name-based join ambiguous; an id can't. `cloneSlide` must remap this
+   *  through its hotspot-id map, the same way it already remaps
+   *  `adjacentHotspotIds`; `removeHotspot` must clear it when the hotspot it
+   *  points at is deleted, the same way it already clears
+   *  `adjacentHotspotIds` pointing at a deleted hotspot. */
+  parentHotspotId?: string;
 }
 
 /** Real-world scale for one plan image, set by clicking two points on it and
@@ -263,6 +290,16 @@ export interface LinkedViewStage {
    *  walkthrough) — `undefined` just means "never dragged from its 0°/up
    *  default," not "off"; there's no way to hide it once an image exists. */
   northDeg?: number;
+  /** Set automatically the moment `northDeg` is committed by an actual drag
+   *  (not merely a stray click on the handle — see the `moved` guard in
+   *  `endNorthDrag`). While true, the toolbar handle is non-interactive
+   *  until explicitly unlocked; unlocking clears only this flag, never
+   *  `northDeg` itself, so a small correction never means re-dragging from
+   *  scratch. */
+  northLocked?: boolean;
+  /** Set automatically the moment `calibration` is committed via "Set
+   *  scale." Same unlock behaviour as `northLocked`. */
+  calibrationLocked?: boolean;
 }
 
 export interface LinkedView {
@@ -289,6 +326,18 @@ export interface LinkedView {
   isPdfPlan?: boolean;
   /** See LinkedViewStage.northDeg — covers the (common) no-stages case. */
   northDeg?: number;
+  /** See LinkedViewStage.northLocked — covers the (common) no-stages case. */
+  northLocked?: boolean;
+  /** See LinkedViewStage.calibrationLocked — covers the (common) no-stages case. */
+  calibrationLocked?: boolean;
+  /** How a stage transition animates a hotspot with no same-id counterpart
+   *  on the other side, when it has a `parentHotspotId` relationship to one
+   *  that does: `'burst'` morphs it out of (or into) its shared parent's
+   *  shape; `'fade'`, or unset, is exactly today's plain independent
+   *  fade-in/fade-out — no new code runs on this path at all, so every
+   *  existing project is unaffected until an author opts in. Per view, not
+   *  per zone or per transition, matching `zoomPanEnabled`/`musicUrl`. */
+  splitAnimation?: 'burst' | 'fade';
   /** Looping ambient background track played while this view is active —
    *  matches the reference deck's render/axo viewer having its own mutable
    *  background music, faded in on arrival and out on leaving. URL only,

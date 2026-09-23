@@ -208,6 +208,17 @@ export function cloneSlide(slide: Slide): Slide {
         // stageIds — missed originally, which left a clone's adjacency lines
         // pointing at the *original* slide's hotspot ids.
         adjacentHotspotIds: h.adjacentHotspotIds?.map((id) => hotspotIdMap.get(id) ?? id),
+        // Same-slide cross-reference to another hotspot's id — needs the
+        // exact same rewrite as adjacentHotspotIds above, for the exact
+        // same reason.
+        parentHotspotId: h.parentHotspotId ? (hotspotIdMap.get(h.parentHotspotId) ?? h.parentHotspotId) : undefined,
+        // Keyed by *stage* id, not hotspot id — needs stageIdMap, the same
+        // map stageIds above already uses. Same class of bug as
+        // adjacentHotspotIds above if this is ever missed: a clone would
+        // silently fall back to the base `points` instead of erroring.
+        pointsByStage: h.pointsByStage
+          ? Object.fromEntries(Object.entries(h.pointsByStage).map(([stageId, pts]) => [stageIdMap.get(stageId) ?? stageId, pts]))
+          : undefined,
         listEntry: h.listEntry ? { ...h.listEntry, id: makeId('list') } : undefined,
         gallery: h.gallery?.map((g) => ({ ...g, id: makeId('gal') })),
       })),

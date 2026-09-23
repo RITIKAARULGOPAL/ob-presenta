@@ -396,6 +396,29 @@ body {
   .site-shimmer::after, .site-sun-orbit { animation: none !important; }
 }
 
+/* ---- Split-style preview icon (SplitStylePreviewIcon.tsx) --------------
+   Purely decorative, generic-shape demo used to compare the Burst/Fade
+   toggle before any real plan exists — never driven by shapeMorph.ts or
+   real hotspot data. Burst's room rects share one keyframe parameterised by
+   --ss-x/--ss-y (each room's own starting offset, set inline per element)
+   so all three genuinely emerge from one shared point rather than each
+   needing its own named keyframe. */
+@keyframes ss-zone-fade { 0%, 15% { opacity: 1; } 55%, 100% { opacity: 0; } }
+@keyframes ss-burst-room {
+  0%, 8% { transform: translate(var(--ss-x), var(--ss-y)) scale(0.3); opacity: 0; }
+  24% { opacity: 1; }
+  65%, 100% { transform: translate(0, 0) scale(1); opacity: 1; }
+}
+@keyframes ss-fade-inout { 0%, 8% { opacity: 0; } 28%, 68% { opacity: 1; } 92%, 100% { opacity: 0; } }
+
+.ss-zone { animation: ss-zone-fade 3.2s ease-in-out infinite; }
+.ss-burst-room { animation: ss-burst-room 3.2s ease-in-out infinite; }
+.ss-fade-el { animation: ss-fade-inout 3.2s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-zone, .ss-burst-room, .ss-fade-el { animation: none !important; }
+}
+
 /* ---- Empty-field hints ----------------------------------------------------
    A fresh slide starts with every text field empty (see slideDefaults.ts), so
    each field names itself until someone types into it. EditableText only emits

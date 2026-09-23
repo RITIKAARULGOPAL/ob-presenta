@@ -32,6 +32,448 @@ or re-explain anything.
 
 ---
 
+## 2026-09-23 (cont'd 2) — Linked Views: zone-to-rooms split/merge burst transition
+
+**Context:** follow-on to the plan-evolution timeline just below — that
+engine morphs a hotspot's shape across stages by matching **the same
+hotspot id** on both sides, correct for "this space's outline gets refined,"
+but the user raised a real, different case: *"in zoning, one zone that I'm
+defining is public zone in the zoning drawing and in walls drawing which is
+rooms drawing, reception, toilet, pantry can be under public zone."* One
+Zoning-stage hotspot corresponds to several genuinely distinct Walls-stage
+hotspots — different ids, a one-to-many grouping, not the same entity
+reshaping itself. Planned properly: asked how this should animate (given the
+real cost of each option honestly), got an answer that made it an authored
+per-view choice between two styles rather than picking one — then a
+Plan-agent critique of that design caught a real bug before any code was
+written (see below) and a real structural gap in the first version of the
+plan (grouping by `zoneCategory` text breaks down the moment the same zone
+name legitimately appears twice on one plan — confirmed by the user as a
+real, expected case, not a hypothetical), which changed the join from a name
+match to a dedicated id reference. Full design at
+`C:\Users\Ritika\.claude\plans\ok-lets-no-do-giggly-snowglobe.md`.
+
+**Done:**
+- **New `ViewHotspot.parentHotspotId?: string`** ([slide.ts](src/types/slide.ts))
+  — a child (room) hotspot's real id-reference to its one parent (zone)
+  hotspot, deliberately **not** a `zoneCategory` name match: a category is a
+  repeatable *type* (two unrelated "Meeting" zones sharing a colour is
+  correct), while this needs to resolve to exactly one specific parent,
+  which only an id can guarantee. `cloneSlide`
+  ([slideDefaults.ts](src/lib/slideDefaults.ts)) remaps it through the same
+  `hotspotIdMap` `adjacentHotspotIds` already uses; `removeHotspot`
+  ([SlideRenderer.tsx](src/components/SlideRenderer.tsx)) clears it when the
+  parent it points at is deleted — both the exact same shape of fix this
+  file has already needed once before for `adjacentHotspotIds`, so both went
+  in correctly the first time instead of waiting to be found again.
+  Single-select "Parent zone" picker added to the hotspot popup, styled
+  like the existing multi-select "Adjacent to" picker (a "None" option plus
+  every other hotspot, toggle-to-select/deselect).
+- **New `LinkedView.splitAnimation?: 'burst' | 'fade'`** — a per-view toggle
+  (two pill buttons near the timeline), not a single hardcoded behaviour:
+  `'fade'` (or unset, the default) is **exactly** today's already-shipped
+  independent fade-in/ghost-fade-out, reaching zero new code — every
+  existing project is unaffected until an author opts in. `'burst'` groups
+  the *leftovers* (hotspots with no same-id match on the other stage) by
+  `parentHotspotId`: a clean one-parent-ghost-to-many-children-fade-ins
+  split morphs each child out of a **shared copy of the parent's own
+  shape**; the reverse (many-ghosts-to-one-child) merge morphs each
+  outgoing hotspot toward the single incoming target. Reuses `morphShapes`
+  from the already-built engine as-is, called with a shared endpoint
+  instead of requiring a strict 1:1 id match — no new interpolation math.
+- **A real bug the Plan-agent critique caught before any code was
+  written**: the original plan modified matched hotspots by *appending* a
+  new entry, which would have rendered a bursting zone simultaneously as
+  its own frozen ghost *and* as the implicit source of three diverging
+  copies. Fixed by construction — the grouping pass replaces each matched
+  entry **in place** (`entries[entries.indexOf(child)] = {...}`), so there
+  is only ever one render per hotspot at any instant, never two competing
+  ones.
+- **New `src/components/SplitStylePreviewIcon.tsx`** — a tiny, always-
+  looping, purely decorative demo (generic blob + 3 rectangles, plain CSS
+  `@keyframes` in [globals.css](src/app/globals.css), matching this
+  codebase's existing `orbit-spin`/`site-shimmer-sweep` convention of named
+  keyframes + a class, not component-scoped styles) so the two styles can
+  be told apart **before any real plan/zone/rooms exist** — the user's own
+  framing of "give a preview" as a cold style comparison, not a live
+  rehearsal against real data. Never touches `shapeMorph.ts` or real
+  hotspot data.
+- **Verified live, on a disposable scratch project**: built a real "Public
+  Zone" hotspot on Zoning plus three real, independently-drawn "Reception"/
+  "Toilet"/"Pantry" hotspots on Walls, each with `parentHotspotId` set via
+  the new picker, each stage-scoped via "Active on" so they genuinely
+  appear/disappear across the transition rather than coexisting on both
+  stages unchanged (a real setup mistake caught and fixed mid-verification
+  — see Watch out for). With the toggle on `'fade'`: confirmed the three
+  rooms' rendered `d` never changes shape at all (their own fixed 4-point
+  rectangle throughout) while opacity ramps smoothly 0→0.25, and the zone
+  ghost-fades in place — byte-identical to the pre-existing behaviour, as
+  designed. With the toggle on `'burst'`: confirmed the three rooms' `d`
+  balloons to a 24-vertex resampled shape for the entire transition window
+  then collapses back to their own plain 4-point rectangle the instant it
+  ends — and, the most direct proof available, **sampled all three rooms'
+  first three coordinate pairs at t≈90ms and found them numerically
+  identical to the zone's own corners** (`(10.0,15.0), (50.0,15.0),
+  (50.0,85.0)` on all four paths at once) — definitive confirmation they
+  genuinely start the morph from a shared copy of the parent's shape, not
+  merely "some resampled curve." The zone's own ghost fade was confirmed
+  unaffected throughout (still a plain `1 - t` opacity ramp in place).
+  Duplicated the slide and confirmed via a direct data read that the
+  clone's children's `parentHotspotId` points at the **clone's own**
+  remapped parent id, not the original's; deleted the original's parent
+  hotspot and confirmed its former children's `parentHotspotId` field was
+  removed entirely, not left dangling, while the untouched duplicate slide
+  kept its own independent, fully-intact relationship. Confirmed both demo
+  icons render with genuinely different CSS `animation-name`s applied.
+  `tsc --noEmit` clean; structured eslint diff (stash-based) shows zero new
+  issues. Scratch project deleted from Supabase after.
+
+**Watch out for:**
+- **A whole first verification pass was invalid and had to be redone**,
+  caught by the results looking wrong rather than assumed correct: every
+  hotspot was drawn without ever setting "Active on," so all four (the zone
+  and all three rooms) were visible on *every* stage by default — meaning
+  none of them ever actually appeared or disappeared between Zoning and
+  Walls, so the transition had nothing to burst or fade in the first place.
+  The tell was the rooms' opacity sitting at a flat, unchanging `0.25`
+  through an entire transition instead of ramping — a same-id match
+  (unchanged presence) renders at full opacity immediately, which looks
+  superficially plausible but is not a fade at all. Re-scoped every hotspot
+  via its own "Active on" checkboxes before retesting, and confirmed the
+  fix by watching the room count itself change (3 on Walls, 1 on Zoning)
+  rather than just trusting an opacity number in isolation.
+- **A long-lived browser tab accumulated enough state to produce a
+  convincing false bug**: after many rounds of drawing/editing hotspots in
+  one tab, a stage transition stopped clearing at all (two stage images
+  stuck visible simultaneously indefinitely, tested past 2.4s against a
+  1.2s duration). A **fresh tab**, same project, same edit, transitioned
+  and cleared correctly in exactly 1.2s. Not chased further — matches this
+  session's own repeated finding that this browser-automation pane's tabs
+  can accumulate odd state over a long interactive session; a fresh tab is
+  the reliable way to get a trustworthy read, not a reason to suspect the
+  app.
+- Toggling a drawing tool button without first checking whether it's
+  already active can **turn it off** instead of on — these are plain
+  toggle buttons (`tool === t.key ? null : t.key`), so a second click on an
+  already-armed tool disarms it. Check the button's own active class before
+  clicking it in any future scripted verification here, rather than
+  clicking unconditionally.
+
+**Left off / next up:**
+- Not independently tested live: two zone hotspots sharing the same
+  `zoneCategory`/label with their own separate children (the exact scenario
+  that motivated moving off name-based matching). The id-based join
+  sidesteps this by construction — there's no shared string to collide on
+  — so this is believed correct by construction rather than proven live;
+  worth a real check if it's ever genuinely doubted.
+- A zone with only one child (which should never qualify as a split, since
+  the grouping pass explicitly requires 2+) was reviewed via the guard
+  clause (`if (children.length < 2) continue;`) rather than spun up as a
+  live test — a simple, low-risk clause, not worth a second scratch project
+  for this pass.
+- Nothing from today (this entry, the timeline entry below, or the
+  CAD-snap entry further below) is committed yet.
+
+---
+
+## 2026-09-23 (cont'd) — Linked Views: plan-evolution timeline, auto-overlays, locked North/Calibrate
+
+**Context:** ask was to replace the Layout stage-pill-row + separate Zoning/
+Adjacency/Dimensions pill row with a single Sidvin-style timeline (Zoning →
+Walls → Circulation → Furniture), have reaching a stage auto-apply its
+matching overlay, move Dimensions next to North in Presenter and Calibrate
+next to North in Editor, and lock both North and Calibrate the instant a
+value is set. Planned properly first: an initial Explore/Sidvin pass, three
+`AskUserQuestion` answers from the user (real shape-morph animation over a
+plain crossfade; auto-apply the old overlays onto the matching stage rather
+than drop them; auto-lock on set rather than a manual lock button), then a
+Plan-agent critique that read the live code and Sidvin's actual source
+before pushing back on parts the literal reading implied — full design at
+`C:\Users\Ritika\.claude\plans\ok-lets-no-do-giggly-snowglobe.md`.
+
+**Done:**
+- **Data model** ([slide.ts](src/types/slide.ts)): `northLocked?`/
+  `calibrationLocked?` on both `LinkedViewStage` and `LinkedView`, scoped
+  exactly like `northDeg`/`calibration`. `ViewHotspot.pointsByStage?:
+  Record<string, Point[]>` — a per-**stage-id** shape override (not
+  per-label: labels are for matching semantic *role*, e.g. the new Zoning/
+  Circulation stage-name matching below; a shape override is "what does
+  this stage instance's copy of this hotspot look like," the same
+  by-id relationship `stageIds` already models). `cloneSlide`
+  ([slideDefaults.ts](src/lib/slideDefaults.ts)) remaps `pointsByStage`'s
+  keys through the same stage-id map it already builds — this is the exact
+  failure shape `adjacentHotspotIds` had before an earlier audit caught it
+  (a clone silently pointing at the *original* slide's ids), so it went in
+  from the start this time rather than waiting to be found.
+- **New [PlanTimeline.tsx](src/components/PlanTimeline.tsx)**: the
+  progress-track-plus-dot-markers stepper, scoped to `active.kind ===
+  'layout'` only — Render/Axo keep the plain pill row unchanged, since they
+  use stages for non-progression purposes (day/night, camera angle) where a
+  linear progress bar would misrepresent what switching stages means.
+  Double-click a marker to rename the stage inline — added as a
+  near-prerequisite, not a nice-to-have: the new auto-overlay matching
+  below is label-based, so an existing project's plain "Stage 1"/"Stage 2"
+  needed *some* way to opt in.
+- **Auto-applied overlays**: `overlayMode` state and its whole Plan/Zoning/
+  Adjacency/Dimensions pill-row navigation is gone. A stage's own label
+  (trimmed/lower-cased, exact match — same precision as `zoneCategory`'s
+  convention) now derives `activeOverlay: 'zoning' | 'circulation' | null`
+  directly — "zoning" auto-paints hotspots by zone colour, "zoning" or
+  "corridor" auto-draws adjacency connector lines, with zero button click.
+  A small eye/eye-slash toggle (badge row, both editor and Presenter) lets
+  a presenter suppress the auto-paint for a moment without touching the
+  underlying zone/adjacency data — the escape hatch the old "Plan" pill
+  used to be.
+- **Dimensions and Calibrate relocated next to North**, both riding the
+  existing on-stage badge row (already un-gated from `editable`, so it
+  already reaches both editor and Presenter identically — exactly why it's
+  the right home for something asked for "in presenter mode"). Dimensions
+  is a plain on/off toggle now (removed the separate "Measure" mode
+  entirely — turning Dimensions on already means "click two points to
+  measure," nothing left to toggle separately). Calibrate/Recalibrate moved
+  into the title-row toolbar next to North's handle, editor-only; its
+  two-point pick's own mini-form is now a floating bottom-right bar reusing
+  the drawing-hint-bar's exact visual pattern, instead of living in the
+  now-deleted pill row.
+- **Both lock, the instant a value commits** — `calibrationLocked` alongside
+  "Set scale" (no accidental-fire risk, already gated behind a deliberate
+  two-point pick + typed distance + button press); `northLocked` alongside
+  `endNorthDrag`'s commit, but **only when the drag actually moved** — a
+  real, non-hypothetical bug the Plan-agent critique caught before any code
+  was written: `startNorthDrag` arms unconditionally on `pointerdown`, so a
+  plain curious tap on the handle would otherwise lock North at its
+  untouched default before anyone ever rotated it. Fixed with a
+  shortest-angular-distance check against the drag's own start angle.
+  Locked: the toolbar handle (not the passive, always-`pointer-events-none`
+  Presenter badge, which needed no change) gets `cursor-not-allowed` +
+  dimmed + a `🔒 Unlock` button; Calibrate/Recalibrate gets the same
+  treatment. Unlocking clears only the boolean — the stored angle/
+  calibration survives untouched, so a small correction never means
+  redoing either from scratch.
+- **The transition — crossfade + shape morph, one shared clock.** New
+  `src/lib/shapeMorph.ts`: arc-length resampling to a shared vertex count,
+  winding-direction alignment, then a brute-force best-rotation-offset
+  search (generalizing Sidvin's own technique, which only ever resamples a
+  *circle* to match one fixed destination — Presenta's case is two
+  independently hand-drawn arbitrary polygons on both sides, a genuinely
+  harder correspondence problem). `LinkedViewsExplorer`'s `selectStage`
+  snapshots the outgoing stage (resolved image/transform/overlay/hotspot
+  shapes) before switching `activeStageId`, then runs one ~1.2s
+  `requestAnimationFrame` loop blending: the base image (a plain crossfade
+  between two absolutely-stacked `<img>`s — skipped entirely as a free
+  no-op when adjacent stages share the same url), each hotspot's shape
+  (morphed when present+different on both sides, faded in/out via opacity
+  when only on one side — a "ghost" render for a hotspot leaving the
+  destination stage), and the auto-overlay's own opacity (fades rather than
+  cuts, matching Sidvin's choice to fade its label layer the same way).
+  Known, accepted limitation, not fixed here: very divergent shapes (a
+  rough blob vs. a precise rectangle) can self-intersect into a momentary
+  "bowtie" mid-morph frame — inherent to per-vertex lerp, flagged by the
+  critique before building, not treated as a defect.
+- **Two real bugs found live during verification, both fixed**, neither
+  visible from reading the diff alone:
+  1. The title-row toolbar (Zoom/pan, North, Calibrate, drawing tools) and
+     `drawable()` were both still gated on `active.url` (the view's own
+     base image) rather than `stageUrl` — meaning a Layout view whose
+     images live entirely on its stages (exactly the pattern the new
+     4-stage default actively encourages) made the *entire* toolbar,
+     including the brand-new Calibrate button, unreachable. Pre-existing
+     gap, only became consequential once stage-only images became the
+     common case instead of an edge one. Fixed both call sites to use
+     `stageUrl`.
+  2. `pointsByStage`'s redraw commit only worked when a polygon was closed
+     by clicking back near its first point (`finishShape`) — the drawing-
+     hint bar's own explicit "Finish" button called `startPickingTarget()`
+     directly, bypassing `finishShape` (and therefore the whole
+     `redrawShapeFor` branch) entirely. Caught by actually finishing a
+     redraw via the button rather than only the click-to-close path. Fixed
+     by routing the button through `finishShape(drawingPoints!)` instead.
+- **Verified live, on a disposable scratch project, not just via `tsc`/
+  `eslint`**: created all 4 suggested stages in one click; confirmed the
+  timeline (dots/fill/labels) renders correctly and Render/Axo still show
+  the plain pill row; drew a hotspot with `zoneCategory: "Meeting"` on
+  Zoning and confirmed it auto-paints `#1f8a9c` at 0.38 opacity with zero
+  clicks, confirmed the hide toggle reverts it to the default accent fill
+  and back; calibrated a plan and confirmed `calibrationLocked` disabled
+  Recalibrate with a working Unlock, confirmed Dimensions went from
+  disabled to enabled the moment calibration existed; dispatched a real
+  synthetic drag on the North handle and confirmed it committed *and*
+  locked, then dispatched a **plain click with zero movement** on the same
+  handle and confirmed it did **not** lock (the specific bug this session's
+  plan review exists to prevent) — both via the handle's live `title`
+  string and computed class, not assumed; redrew one hotspot's shape
+  specifically on "Walls" via the popup's new "Redraw for this stage" +
+  the Finish button, confirmed Zoning kept the original shape completely
+  independently; switched Zoning → Walls and sampled the rendered `<path
+  d="">` **11 times across the ~1.2s transition** — watched it move through
+  a real 24-vertex resampled interpolation before landing exactly on the
+  destination's own 4-point rectangle; separately sampled the image
+  crossfade **9 times** and confirmed the outgoing/incoming opacities
+  summed to 1.0 at every instant (0.501/0.499 almost exactly at the
+  midpoint); duplicated the slide and confirmed via a direct Supabase REST
+  read that the clone's `pointsByStage` key matches the **clone's own** new
+  Walls stage id, not the original's; renamed a stage inline and confirmed
+  the label updated with siblings untouched. `tsc --noEmit` clean
+  throughout; structured eslint diff (by file+rule, stashing this session's
+  changes for a clean baseline) shows zero new issues at two separate
+  checkpoints. Scratch project deleted from Supabase after.
+
+**Watch out for:**
+- This session's browser-automation pane needed real troubleshooting before
+  any of the above could be verified: at the emulated 1600×1000 size,
+  `computer`'s coordinate-based clicks silently missed their targets
+  (confirmed by dispatching the identical click via `element.click()` in
+  `javascript_tool` instead, which worked immediately) — screenshots also
+  came back mostly blank despite `read_page`/`get_page_text`/direct DOM
+  queries all showing a perfectly normal, correctly-laid-out page. Prefer
+  direct JS-dispatched events/queries over `computer` coordinate clicks or
+  screenshots at this viewport size; treat a screenshot that looks broken
+  as a capture artifact until DOM inspection actually confirms a problem.
+- The DOM-duplication hazard flagged repeatedly in earlier entries (the
+  rail thumbnail renders its own independent `LinkedViewsExplorer`) bit
+  again here in a new way: a global query for "the fill bar" or "the
+  Unlock button" can silently grab the rail preview's own stale copy
+  instead of the main canvas's, reading as a convincing false bug (a fill
+  width stuck at 0% while the dots showed the correct active stage) before
+  re-scoping the query to a tagged main-canvas root resolved it instantly.
+  Tag the real target once, query inside it always.
+- Not independently exercised: a hotspot that exists on only ONE side of a
+  transition (the "ghost fades out" / "new hotspot fades in" paths) — the
+  logic is a direct, symmetric extension of the same-hotspot-both-sides
+  path that *was* verified live, but only the shared-identity morph case
+  was actually watched frame-by-frame.
+- The kind-change overlay-fade simplification (an instant cut rather than
+  a genuine dual cross-fade when a transition changes *which* overlay kind
+  applies, e.g. Zoning stage directly to a Circulation stage with no Walls
+  in between) was a deliberate, documented scope trim, not tested live —
+  the common case (toggling one overlay on/off across adjacent stages in
+  the suggested order) was.
+
+**Left off / next up:**
+- Nothing outstanding from this pass — every piece in the plan was built
+  and live-verified, including both bugs this same verification pass found.
+- Nothing from today (either this entry or the CAD-snap entry below) is
+  committed yet.
+
+---
+
+## 2026-09-23 — CAD-style snap while calibrating: discoverability, not new engineering
+
+**Context:** ask was "while calibrating, the cursor should snap to points and
+lines like how CAD snaps." Investigated before writing anything (an Explore
+pass, then a live query across all 17 real projects, then a Plan-agent
+critique) rather than assuming this meant building new snapping logic — see
+the plan at `C:\Users\Ritika\.claude\plans\ok-lets-no-do-giggly-snowglobe.md`
+for the full writeup. Short version: the snap engine
+([pdfPlan.ts](src/lib/pdfPlan.ts)/[planSnap.ts](src/lib/planSnap.ts)) already
+exists and already works precisely — but **it has never once activated on
+real content**. Every Linked Views plan in every real/client-named project
+in this database is a plain raster image with zero snap geometry; the only 3
+genuine PDF-vector uploads ever made were in disposable test projects, never
+taken through to a finished calibration. The user confirmed their plans are
+"(or can be) vector PDFs," so the gap isn't capability, it's that nothing in
+the product ever surfaced this path, nudged toward the file format that
+unlocks it, or gave any lasting sign of whether the currently-open plan would
+snap at all.
+
+**Done:**
+- **A persistent, three-state snap-status indicator**, in the Dimensions
+  overlay row, `editable`-only, computed fresh every render straight from
+  `isPdfPlan`/`planGeometry` (both already correctly re-resolved per stage/
+  view) rather than reusing `MediaBox`'s own upload toast. That toast is a
+  real, confirmed trap: component-local state with no key tied to the active
+  stage/view, so it silently shows *stale* text after switching plans —
+  confirmed live before fixing anything (uploaded a PDF to one stage, switched
+  to an image-only stage, watched the old toast's text just sit there). The
+  new indicator reads: "Upload as a vector PDF for point/line snapping while
+  calibrating" (no PDF yet), "This PDF has no vector line-work — export it
+  directly from the drawing tool, not flattened, scanned, or printed to PDF"
+  (PDF uploaded, zero vectors extracted — a genuinely different situation
+  from no-PDF-at-all, and the copy says so instead of ignoring what the user
+  just did), or "⌖ N snap points" (+ a truncation note when applicable).
+- **Upload prompt names the actual ask** — `MediaBox`'s empty-state text for
+  a Linked Views plan slot changed from neutral ("Drag an image or PDF plan
+  here") to naming the mechanism: "Drag a plan here — a vector PDF snaps to
+  points and lines while calibrating."
+- **The whole snapped-to line highlights now, not just a dot.** `SnapResult`
+  ([planSnap.ts](src/lib/planSnap.ts)) gained an optional `segment` (the
+  matched edge's true endpoints) — free to capture, since `snapTo`'s
+  edge-branch already reads them on every candidate check. Rendered as a
+  `<line>` in the existing SVG overlay (reusing the exact pattern the
+  two-point calibration connector already used), not the HTML marker (which
+  would go oblong under that overlay's `preserveAspectRatio="none"`). The
+  point marker itself is untouched.
+- **Deliberately not extending snapping to hotspot-drawing** — the ask was
+  specifically "while calibrating," a click-to-pick-two-points gesture,
+  materially different from hotspot-drawing's drag-to-author-a-region task
+  (`pointAt`, unrelated code path, never touched `snapIndex` before this and
+  still doesn't). Flagged plainly rather than left to surprise someone: once
+  a plan is calibrated, a hotspot drawn freehand over a precisely-defined
+  wall will *not* align with it pixel-for-pixel the way a measurement on
+  that same wall will — deliberate scope, not a bug, but worth knowing before
+  a demo.
+
+**A real, honest limitation found while verifying truncation — not fixed,
+documented:** built a genuinely dense synthetic test PDF (one real rectangle
+with 4 known corners, plus ~15,000 tiny hatch lines flooding the vertex
+budget, deliberately drawn *between* corner A and corners B/C/D to mimic a
+real CAD export's drawing order) specifically to stress-test
+`MAX_VERTICES`/`MAX_SEGMENTS` honestly rather than assume decimation is
+harmless. Confirmed live: corner A (drawn before the hatch flood) resolved to
+an exact **vertex**-snap (square marker); corners B, C, and D (drawn after
+~30,000 hatch-line vertices had already filled the 20,000-vertex budget) all
+degraded to **edge**-snaps (dot marker) despite their own wall segments
+surviving fine in `segments` (sorted longest-first, so hatch never displaces
+real walls there). Root cause, read directly from
+[pdfPlan.ts](src/lib/pdfPlan.ts)'s `decimate()`: `segments` truncate by
+importance (longest survives), but `vertices` truncate by first-encountered
+order with no importance sort at all, and still include endpoints from
+short/hatch segments that `MIN_SEGMENT` already filtered *out* of
+`segments` — that filter never touches `vertices`. Since `snapTo` prefers a
+vertex hit over an edge hit outright regardless of distance, a corner that
+lost its vertex entry this way degrades to "nearest point along one of the
+two walls meeting there" instead of "the exact corner" — a real precision
+loss for exactly the kind of dense real-world plan most likely to hit the
+cap (all 3 real uploads on record already do). Not fixing the
+decimation/vertex-retention strategy itself in this pass, per the plan's own
+scoping — flagging it precisely so it's a documented, reproducible follow-up
+rather than a vague "might be an issue."
+- **Verified live**, all of the above, on a scratch project: the dense test
+  PDF (real upload, not a script pretending to be one) correctly reported
+  "20000 snap points (plan is dense, trimmed to the busiest lines)"; the
+  indicator and the vertex-vs-edge split above were confirmed by dispatching
+  real pointer moves at each of the 4 known corners and reading the actual
+  marker shape/class and the SVG `<line>` elements back from the DOM, not
+  assumed from the code; stage-scoped PDF upload (flagged in an earlier
+  entry as "believed correct by construction, not proven live") now
+  genuinely proven — uploaded the dense PDF directly as a stage's own image
+  and confirmed both the snap engine and the indicator activate correctly
+  for it; switching between three differently-statused stages (PDF-with-
+  geometry / plain-raster / a second PDF-with-geometry) confirmed the
+  indicator updates correctly every time with zero stale carryover in either
+  direction. `tsc --noEmit` clean; structured eslint diff against `main`
+  shows zero new errors/warnings. Scratch project and temporary public test
+  files deleted after.
+
+**Left off / next up:**
+- The vertex-truncation precision gap above is real and reproducible, not
+  fixed. If it turns out to matter in practice (a user reports an exact
+  corner not snapping crisply on a real, dense plan), the fix is in
+  `decimate()`'s vertex-selection strategy — e.g., prioritise vertices that
+  belong to a segment which survived its own length-sort, the same way
+  `segments` already prioritises walls over hatching, instead of keeping
+  first-encountered order.
+- Not touched: whether copy changes alone actually move real users toward
+  vector-PDF uploads. A Plan-agent critique pushed back on over-promising
+  this — the deeper friction is that this tool's users typically work from
+  an already-flattened "pitch deck," several steps removed from a CAD seat,
+  and no amount of in-app copy changes that. Worth revisiting only if real
+  usage data (a future live check, same technique used here) shows the
+  raster rate hasn't budged at all.
+- Nothing from today committed yet.
+
+---
+
 ## 2026-09-22 (cont'd 6) — Presenter: Linked Views plan no longer overflows the slide
 
 **Context:** in Presenter, a Linked Views "Layout" slide with a Stage

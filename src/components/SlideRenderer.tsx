@@ -33,6 +33,9 @@ import { SiteLocusDiagram } from './SiteLocusDiagram';
 import { MaterialCompare } from './MaterialCompare';
 import { ImageAdjustOverlay } from './ImageAdjustOverlay';
 import { LogoAdjustOverlay } from './LogoAdjustOverlay';
+import PlanTimeline from './PlanTimeline';
+import { SplitStylePreviewIcon } from './SplitStylePreviewIcon';
+import { morphShapes } from '@/lib/shapeMorph';
 import { clamp, imageStyle, maxPan, MAX_ZOOM, MIN_ZOOM } from '@/lib/imageTransform';
 import { makeId } from '@/lib/id';
 import type { Brand, FreeformElement, HotspotGalleryImage, ImageTransform, LinkedView, PlanCalibration, PlanGeometry, Slide, ViewHotspot } from '@/types/slide';
@@ -247,7 +250,15 @@ function MediaBox({
           >
             {canUpload ? (
               <>
-                <span>{dragging ? 'Drop to add' : busy ? 'Reading…' : onPdfPlan ? 'Drag an image or PDF plan here' : 'Drag an image here'}</span>
+                <span>
+                  {dragging
+                    ? 'Drop to add'
+                    : busy
+                      ? 'Reading…'
+                      : onPdfPlan
+                        ? 'Drag a plan here — a vector PDF snaps to points and lines while calibrating'
+                        : 'Drag an image here'}
+                </span>
                 <button
                   onClick={(e) => { e.stopPropagation(); openPicker(); }}
                   className="rounded-md border border-dashed border-white/30 px-2.5 py-1 text-xs font-semibold text-white/70 hover:border-white/60 hover:text-white"
@@ -940,6 +951,12 @@ function BrandFooter({ slide, dark }: { slide: Slide; dark: boolean }) {
 
 type DrawTool = 'rect' | 'ellipse' | 'polygon';
 
+/** How long a Layout-view stage transition's crossfade/shape-morph/overlay
+ *  -fade runs, all three driven off one shared clock so they land in sync —
+ *  the same reasoning the Sidvin reference gives for its own single rAF
+ *  clock (avoiding drift between its image crossfade and its shape morph). */
+const MORPH_DURATION_MS = 1200;
+
 const TOOLS: { key: DrawTool; label: string; hint: string }[] = [
   { key: 'rect', label: '▭ Rectangle', hint: 'Drag a box over the area. Shift for a square.' },
   { key: 'ellipse', label: '◯ Ellipse', hint: 'Drag to size it. Shift for a circle.' },
@@ -1022,11 +1039,40 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   /** Which named stage is active — undefined means "no stages defined" or
    *  "first one," both of which fall back to the view's own url/transform. */
   const [activeStageId, setActiveStageId] = useState<string | undefined>(undefined);
-  /** Which reading of the plan is on screen. Transient like the active stage:
-   *  it's how the plan is being *looked at* right now, mid-pitch, not
-   *  something authored into the deck. 'plan' is the plan as drawn, no
-   *  overlay. */
-  const [overlayMode, setOverlayMode] = useState<'plan' | 'zoning' | 'adjacency' | 'dimensions'>('plan');
+  /** A snapshot of the stage just switched *away* from, kept only for the
+   *  duration of a Layout-view stage transition — `activeStageId` above has
+   *  already moved on to the destination stage the instant a transition
+   *  starts (so every other derived value in this component is already
+   *  "the new stage"), and rendering blends this outgoing snapshot against
+   *  that current data using `transitionProgress`. `null` outside a
+   *  transition, or for any view kind other than 'layout'. */
+  const [transitionFrom, setTransitionFrom] = useState<{
+    url: string | undefined;
+    transform: ImageTransform | undefined;
+    isPdfPlan: boolean | undefined;
+    overlay: 'zoning' | 'circulation' | null;
+    hotspots: { id: string; points: Point[]; shape: ViewHotspot['shape']; parentHotspotId: string | undefined }[];
+  } | null>(null);
+  const [transitionProgress, setTransitionProgress] = useState(1);
+  const transitionRafRef = useRef<number | null>(null);
+  /** Whether the Zoning/Circulation auto-overlay that matches the active
+   *  stage's own label (see `activeOverlay` below) is suppressed for a
+   *  moment — a presenter's "show me the bare plan" escape hatch, since
+   *  reaching a stage named e.g. "Circulation" now paints its overlay
+   *  automatically with no separate mode to opt out of otherwise. Transient
+   *  like the active stage; resets on every view/stage change below. */
+  const [overlayHidden, setOverlayHidden] = useState(false);
+  /** Whether the Dimensions toggle (badge row, next to North) is on for the
+   *  active stage — shows every space's calibrated area and puts the plan
+   *  into click-two-points-to-measure. Transient, resets below; distinct
+   *  from `pickMode === 'calibrate'`, which is a deliberate editor-only
+   *  action independent of whether this viewer toggle is on. */
+  const [dimensionsOn, setDimensionsOn] = useState(false);
+  /** Set while redrawing one existing hotspot's shape specifically for the
+   *  active stage (see the hotspot popup's "Shape on this stage" section) —
+   *  `finishShape` branches on this to commit into `pointsByStage` instead
+   *  of opening the normal create-a-new-hotspot target picker. */
+  const [redrawShapeFor, setRedrawShapeFor] = useState<{ hotspotId: string; stageId: string } | null>(null);
   /** A two-point pick in progress on the plan: either establishing the scale
    *  ('calibrate') or just measuring between two points ('measure'). Both
    *  collect points the same way, so they share one bit of state. */
@@ -1044,6 +1090,8 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
    *  matching fields on ViewHotspot. */
   const [pendingZoneCategory, setPendingZoneCategory] = useState('');
   const [pendingAdjacentIds, setPendingAdjacentIds] = useState<string[]>([]);
+  /** This hotspot's one real parent zone hotspot — see ViewHotspot.parentHotspotId. */
+  const [pendingParentId, setPendingParentId] = useState('');
   /** Rows in the seating table (if any) whose hotspot(s) should highlight
    *  right now — fed by hovering a SeatingTable row; consumed by the hotspot
    *  <path> rendering below alongside the simple side-list's own
@@ -1178,10 +1226,12 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     setViewportPanY(0);
     // A different plan is a different reading: an overlay (or a half-finished
     // measurement) from the last one would be describing the wrong image.
-    setOverlayMode('plan');
+    setOverlayHidden(false);
+    setDimensionsOn(false);
     setPickMode(null);
     setPickPoints([]);
     setSnapHit(null);
+    setRedrawShapeFor(null);
     // Fresh key-plan state per view/stage — never carries an expanded card
     // over from whichever plan was showing before, matching the reference
     // deck. Scoped to activeStageId too (not just activeId): a stage swaps
@@ -1201,6 +1251,22 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     setSpaceDetailHotspotId(null);
     setSpaceDetailGalleryIndex(null);
   }, [activeId, activeStageId]);
+
+  // Separate from the reset above and keyed on activeId alone (not
+  // activeStageId): a stage transition's own progress is what that effect
+  // must NOT stomp on the very render it starts (selectStage sets
+  // transitionFrom/transitionProgress and activeStageId together, in one
+  // batch). Switching to a completely different view, though, should always
+  // cut a mid-flight transition short rather than let it keep blending
+  // against a plan that's no longer on screen.
+  useEffect(() => {
+    return () => {
+      if (transitionRafRef.current != null) cancelAnimationFrame(transitionRafRef.current);
+      transitionRafRef.current = null;
+      setTransitionFrom(null);
+      setTransitionProgress(1);
+    };
+  }, [activeId]);
 
   // Background music for the active view: fades in on arrival, stops on
   // leaving (or when this view has none). A play() promise can reject if
@@ -1250,6 +1316,8 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   const isPdfPlan = activeStage?.url ? activeStage.isPdfPlan : active.isPdfPlan;
   const northDeg = activeStage?.url ? activeStage.northDeg : active.northDeg;
   const displayNorthDeg = dragNorthDeg ?? northDeg ?? 0;
+  const northLocked = activeStage?.url ? activeStage.northLocked : active.northLocked;
+  const calibrationLocked = activeStage?.url ? activeStage.calibrationLocked : active.calibrationLocked;
 
   /** Where a pointer at these client coordinates should actually place a point.
    *
@@ -1270,7 +1338,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
    *  showing the view's. Setting a url is therefore what makes a stage
    *  image-owning, which is why that case targets the stage even though the
    *  check above would still say the view. */
-  function setStage(patch: Partial<Pick<LinkedView, 'url' | 'transform' | 'calibration' | 'geometry' | 'isPdfPlan' | 'northDeg'>>) {
+  function setStage(patch: Partial<Pick<LinkedView, 'url' | 'transform' | 'calibration' | 'geometry' | 'isPdfPlan' | 'northDeg' | 'northLocked' | 'calibrationLocked'>>) {
     const targetsStage = !!activeStage && (!!activeStage.url || patch.url !== undefined);
     if (targetsStage) {
       setView(active.id, { stages: active.stages!.map((s) => (s.id === activeStage!.id ? { ...s, ...patch } : s)) });
@@ -1298,6 +1366,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   }
 
   function startNorthDrag(e: React.PointerEvent<HTMLButtonElement>) {
+    if (northLocked) return;
     e.stopPropagation();
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -1320,19 +1389,40 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   }
 
   function endNorthDrag(e: React.PointerEvent<HTMLButtonElement>) {
-    if (!northDragRef.current) return;
+    const drag = northDragRef.current;
+    if (!drag) return;
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
     } catch {
       // Capture may already be gone; nothing to release.
     }
+    const finalDeg = dragNorthDeg ?? displayNorthDeg;
     northDragRef.current = null;
-    setStage({ northDeg: dragNorthDeg ?? displayNorthDeg });
+    // Auto-lock only on a real drag, not a plain click: startNorthDrag arms
+    // this ref unconditionally on pointerdown, before any movement happens,
+    // so a mere curious tap on the handle would otherwise lock North at its
+    // untouched default before anyone ever rotated it. Shortest angular
+    // distance, not a raw subtraction, so e.g. 359° -> 1° (a 2° nudge across
+    // the wrap point) doesn't read as "moved 358°".
+    const rawDiff = normalizeDeg(finalDeg - drag.startDeg);
+    const moved = Math.min(rawDiff, 360 - rawDiff) > 0.5;
+    setStage({ northDeg: finalDeg, ...(moved ? { northLocked: true } : {}) });
     setDragNorthDeg(null);
   }
 
+  function unlockNorth() {
+    setStage({ northLocked: false });
+  }
+
+  function unlockCalibration() {
+    setStage({ calibrationLocked: false });
+  }
+
   function setCalibration(cal: PlanCalibration | undefined) {
-    setStage({ calibration: cal });
+    // Unlike North, there's no accidental-fire path to guard against here —
+    // this only ever runs from "Set scale", already gated behind a
+    // deliberate two-point pick, a typed distance, and a button press.
+    setStage({ calibration: cal, calibrationLocked: !!cal });
   }
 
   const zoneCategories = [...new Set(hotspots.map((h) => h.zoneCategory?.trim()).filter((z): z is string => !!z))].sort();
@@ -1350,7 +1440,21 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
       adjacencyPairs.push({ a: h, b: other });
     }
   }
-  const overlaysAvailable = !!stageUrl && active.kind !== 'walkthrough' && (editable || zoneCategories.length > 0 || adjacencyPairs.length > 0 || !!calibration);
+  // Which auto-overlay (if any) belongs on the active stage, matched by its
+  // label — exact match after normalizing, same precision as zoneCategory's
+  // own free-text convention, so a stage titled "Zoning Notes" doesn't
+  // accidentally match. "Circulation" and "corridor" alias to the same
+  // adjacency-lines behaviour, matching the ask's own "corridor/circulation"
+  // phrasing for what is clearly one phase.
+  const activeOverlayLabel = activeStage?.label.trim().toLowerCase();
+  const activeOverlay: 'zoning' | 'circulation' | null =
+    activeOverlayLabel === 'zoning' ? 'zoning' : activeOverlayLabel === 'circulation' || activeOverlayLabel === 'corridor' ? 'circulation' : null;
+  /** A hotspot's shape, resolved for the active stage — falls back to the
+   *  base `points` when this stage has no override, so nothing drawn before
+   *  `pointsByStage` existed needs migrating. */
+  function pointsFor(h: ViewHotspot): Point[] {
+    return (activeStage && h.pointsByStage?.[activeStage.id]) ?? h.points;
+  }
   // Unset means "show it exactly when something would appear in it" — computed
   // here, once, rather than re-derived wherever it's read.
   const showHotspotList = active.showHotspotList ?? hotspots.some((h) => h.listEntry);
@@ -1384,7 +1488,12 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   }
 
   function drawable(): boolean {
-    return drawing && editable && !!active.url && active.kind !== 'walkthrough' && !pickingTarget;
+    // stageUrl, not active.url: a Layout view whose images live entirely on
+    // its stages (the pattern the plan-evolution timeline actively
+    // encourages — 4 suggested stages, no base-view image at all) still
+    // needs to be drawable on. Pre-existing gap, newly consequential now
+    // that stage-only images are the common case rather than an edge one.
+    return drawing && editable && !!stageUrl && active.kind !== 'walkthrough' && !pickingTarget;
   }
 
   /** Whether the viewer's own magnifier (distinct from the authored crop) is
@@ -1518,8 +1627,20 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     finishShape(tool === 'ellipse' ? pts : rectPoints(pts[0], pts[1]));
   }
 
-  /** Hands a completed outline to the target picker. */
+  /** Hands a completed outline to the target picker — or, if this drag was
+   *  started via "Shape on this stage" in the hotspot popup, commits it
+   *  straight into that one hotspot's pointsByStage instead: only the shape
+   *  changed, there's no new metadata to pick. */
   function finishShape(points: Point[]) {
+    if (redrawShapeFor) {
+      const { hotspotId, stageId } = redrawShapeFor;
+      setView(active.id, {
+        hotspots: allHotspots.map((h) => (h.id === hotspotId ? { ...h, pointsByStage: { ...h.pointsByStage, [stageId]: points } } : h)),
+      });
+      setRedrawShapeFor(null);
+      resetShape();
+      return;
+    }
     setDrawingPoints(points);
     startPickingTarget(points);
   }
@@ -1545,11 +1666,53 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     setDragging(false);
     setOrtho(false);
     setEditingHotspotId(null);
+    setRedrawShapeFor(null);
   }
 
   function selectView(id: string) {
     setActiveId(id);
     cancelDrawing();
+  }
+
+  /** Switches the active stage — animated for Layout views (the plan-
+   *  evolution timeline), instant for every other kind, matching how the
+   *  plain pill row already worked and still works for Render/Axo/etc.
+   *  `activeStageId` moves to the destination immediately either way, so
+   *  every other derived value in this component (hotspots, stageUrl,
+   *  activeOverlay...) is already "the new stage" the instant this
+   *  returns — the animated case renders a blend against `transitionFrom`
+   *  on top of that for `MORPH_DURATION_MS`, it doesn't delay the switch
+   *  itself. */
+  function selectStage(toStageId: string) {
+    if (toStageId === activeStage?.id) return;
+    cancelDrawing();
+    if (active.kind !== 'layout' || !activeStage) {
+      setActiveStageId(toStageId);
+      return;
+    }
+    if (transitionRafRef.current != null) cancelAnimationFrame(transitionRafRef.current);
+    setTransitionFrom({
+      url: stageUrl,
+      transform: stageTransform,
+      isPdfPlan,
+      overlay: activeOverlay,
+      hotspots: hotspots.filter((h) => hasEnoughPoints(pointsFor(h), h.shape)).map((h) => ({ id: h.id, points: pointsFor(h), shape: h.shape, parentHotspotId: h.parentHotspotId })),
+    });
+    setTransitionProgress(0);
+    setActiveStageId(toStageId);
+
+    const start = performance.now();
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / MORPH_DURATION_MS);
+      setTransitionProgress(t);
+      if (t < 1) {
+        transitionRafRef.current = requestAnimationFrame(step);
+      } else {
+        transitionRafRef.current = null;
+        setTransitionFrom(null);
+      }
+    };
+    transitionRafRef.current = requestAnimationFrame(step);
   }
 
   /** Shared by both the create-a-new-hotspot flow and the edit-an-existing-one
@@ -1580,6 +1743,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     setSpaceDetailOpen(!!h?.spaceDetail);
     setPendingZoneCategory(h?.zoneCategory ?? '');
     setPendingAdjacentIds(h?.adjacentHotspotIds ?? []);
+    setPendingParentId(h?.parentHotspotId ?? '');
   }
 
   function buildSpaceDetail(): ViewHotspot['spaceDetail'] {
@@ -1651,6 +1815,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
       spaceDetail: buildSpaceDetail(),
       zoneCategory: pendingZoneCategory.trim() || undefined,
       adjacentHotspotIds: pendingAdjacentIds.length ? pendingAdjacentIds : undefined,
+      parentHotspotId: pendingParentId || undefined,
     };
     setView(active.id, { hotspots: [...allHotspots, hotspot] });
     // Stay on the tool rather than dropping out after every single region.
@@ -1681,6 +1846,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               spaceDetail: buildSpaceDetail(),
               zoneCategory: pendingZoneCategory.trim() || undefined,
               adjacentHotspotIds: pendingAdjacentIds.length ? pendingAdjacentIds : undefined,
+              parentHotspotId: pendingParentId || undefined,
             }
           : h,
       ),
@@ -1695,9 +1861,14 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
       hotspots: allHotspots
         .filter((h) => h.id !== id)
         .map((h) => {
-          if (!h.adjacentHotspotIds?.includes(id)) return h;
-          const rest = h.adjacentHotspotIds.filter((x) => x !== id);
-          return { ...h, adjacentHotspotIds: rest.length ? rest : undefined };
+          const adjacentHotspotIds = h.adjacentHotspotIds?.includes(id)
+            ? h.adjacentHotspotIds.filter((x) => x !== id) : h.adjacentHotspotIds;
+          // Same reasoning: a child left pointing at a deleted parent would
+          // just silently never burst/merge again rather than erroring, so
+          // clear it the same way adjacency is cleared above.
+          const parentHotspotId = h.parentHotspotId === id ? undefined : h.parentHotspotId;
+          if (adjacentHotspotIds === h.adjacentHotspotIds && parentHotspotId === h.parentHotspotId) return h;
+          return { ...h, adjacentHotspotIds: adjacentHotspotIds?.length ? adjacentHotspotIds : undefined, parentHotspotId };
         }),
       // Same reasoning as the adjacency cleanup above, for the seating
       // table's own hotspot links — otherwise a deleted space leaves a
@@ -1709,6 +1880,36 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
       })),
     });
     setEditingHotspotId((cur) => (cur === id ? null : cur));
+  }
+
+  /** Arms drawing a fresh shape for one existing hotspot, scoped to the
+   *  active stage only — closes the edit popup (metadata isn't changing,
+   *  only the shape) and defaults the tool to match the hotspot's own
+   *  shape kind. `finishShape` commits the result into `pointsByStage`
+   *  instead of opening the normal create-a-new-hotspot flow. */
+  function startRedrawShape(h: ViewHotspot) {
+    if (!activeStage) return;
+    setDrawingPoints(null);
+    setPickingTarget(false);
+    setCursor(null);
+    setDragging(false);
+    setOrtho(false);
+    setEditingHotspotId(null);
+    setTool(h.shape === 'ellipse' ? 'ellipse' : 'polygon');
+    setRedrawShapeFor({ hotspotId: h.id, stageId: activeStage.id });
+  }
+
+  /** Drops this stage's shape override, back to the hotspot's base `points`. */
+  function clearShapeOverride(h: ViewHotspot) {
+    if (!activeStage || !h.pointsByStage) return;
+    const stageId = activeStage.id;
+    setView(active.id, {
+      hotspots: allHotspots.map((x) => {
+        if (x.id !== h.id || !x.pointsByStage) return x;
+        const rest = Object.fromEntries(Object.entries(x.pointsByStage).filter(([id]) => id !== stageId));
+        return { ...x, pointsByStage: Object.keys(rest).length ? rest : undefined };
+      }),
+    });
   }
 
   /** The seating-table row (if any) linked to this hotspot, wherever it
@@ -1771,10 +1972,103 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   }
 
   const centroid: Point | null = drawingPoints ? centroidOf(drawingPoints) : null;
-  const editingCentroid: Point | null = editingHotspot ? centroidOf(editingHotspot.points) : null;
+  const editingCentroid: Point | null = editingHotspot ? centroidOf(pointsFor(editingHotspot)) : null;
   const showPopup = pickingTarget || !!editingHotspotId;
   const popupCentroid = editingHotspotId ? editingCentroid : centroid;
   const dark = slide.style === 'section-starter' || slide.style === 'design';
+
+  /** Every hotspot actually drawn this frame, mid-transition or not — the
+   *  destination stage's own list, each shape-morphed against its outgoing
+   *  counterpart when one exists and differs, plus "ghost" entries for a
+   *  hotspot that existed on the outgoing stage but not the incoming one
+   *  (fading out rather than just vanishing). A hotspot only on the
+   *  incoming side fades in; one present on both sides with an unchanged
+   *  shape needs no morph math run on it at all. */
+  const displayHotspots: { hotspot: ViewHotspot; points: Point[]; fadeOpacity: number; ghost: boolean }[] = (() => {
+    const currentList = hotspots.filter((h) => hasEnoughPoints(pointsFor(h), h.shape));
+    if (!transitionFrom) return currentList.map((h) => ({ hotspot: h, points: pointsFor(h), fadeOpacity: 1, ghost: false }));
+
+    const fromMap = new Map(transitionFrom.hotspots.map((f) => [f.id, f]));
+    const currentIds = new Set(currentList.map((h) => h.id));
+    const entries = currentList.map((h) => {
+      const from = fromMap.get(h.id);
+      const to = pointsFor(h);
+      if (!from) return { hotspot: h, points: to, fadeOpacity: transitionProgress, ghost: false };
+      const samePoints = from.points.length === to.length && from.points.every((p, i) => p.x === to[i].x && p.y === to[i].y);
+      return { hotspot: h, points: samePoints ? to : morphShapes(from.points, to, transitionProgress), fadeOpacity: 1, ghost: false };
+    });
+    for (const from of transitionFrom.hotspots) {
+      if (currentIds.has(from.id)) continue;
+      const ghost = allHotspots.find((h) => h.id === from.id);
+      if (ghost) entries.push({ hotspot: ghost, points: from.points, fadeOpacity: 1 - transitionProgress, ghost: true });
+    }
+
+    // Burst/merge: a leftover with no same-id match that names a *different*
+    // leftover as its parentHotspotId morphs out of (or into) that parent's
+    // shape instead of fading independently. Only when explicitly turned on
+    // — unset/'fade' never reaches this, so every existing project's
+    // transitions are byte-identical to before this feature existed.
+    if (active.splitAnimation === 'burst') {
+      // "Leftover" means no same-id match on the other side — distinguished
+      // by membership in fromMap/currentIds (already computed above), not by
+      // fadeOpacity/ghost values, since a same-id 1:1 morph can also land on
+      // fadeOpacity 1 and must never be re-grouped here.
+      const leftoverFadeIns = entries.filter((e) => !e.ghost && !fromMap.has(e.hotspot.id));
+      const leftoverGhosts = entries.filter((e) => e.ghost);
+
+      // Split: one leftover ghost is the parent; 2+ leftover fade-ins name it.
+      const childrenByParent = new Map<string, typeof leftoverFadeIns>();
+      for (const e of leftoverFadeIns) {
+        const parentId = e.hotspot.parentHotspotId;
+        if (!parentId) continue;
+        const list = childrenByParent.get(parentId);
+        if (list) list.push(e);
+        else childrenByParent.set(parentId, [e]);
+      }
+      for (const [parentId, children] of childrenByParent) {
+        if (children.length < 2) continue;
+        const parent = leftoverGhosts.find((g) => g.hotspot.id === parentId);
+        if (!parent) continue;
+        // Replace each child's entry in place — never append alongside it,
+        // or it would render both its plain fade-in and this burst at once.
+        for (const child of children) {
+          entries[entries.indexOf(child)] = { ...child, points: morphShapes(parent.points, child.points, transitionProgress), fadeOpacity: 1 };
+        }
+      }
+
+      // Merge — the reverse direction: one leftover fade-in is the target;
+      // 2+ leftover ghosts name it as their parentHotspotId.
+      const exitingByTarget = new Map<string, typeof leftoverGhosts>();
+      for (const e of leftoverGhosts) {
+        const parentId = e.hotspot.parentHotspotId;
+        if (!parentId) continue;
+        const list = exitingByTarget.get(parentId);
+        if (list) list.push(e);
+        else exitingByTarget.set(parentId, [e]);
+      }
+      for (const [targetId, exiting] of exitingByTarget) {
+        if (exiting.length < 2) continue;
+        const target = leftoverFadeIns.find((e) => e.hotspot.id === targetId);
+        if (!target) continue;
+        // Keeps each exiting hotspot's own fade-out opacity (1 - t) — only
+        // its points change, so it visibly converges onto the target's
+        // shape while fading, rather than popping away at the last instant.
+        for (const leaving of exiting) {
+          entries[entries.indexOf(leaving)] = { ...leaving, points: morphShapes(leaving.points, target.points, transitionProgress) };
+        }
+      }
+    }
+
+    return entries;
+  })();
+  // Fades the active auto-overlay in on the same clock as the shape morph
+  // above, matching Sidvin's own choice to fade its label layer rather than
+  // cut it — 1 outside a transition, or when the overlay kind is unchanged
+  // across it (nothing to fade). A transition that *changes* which overlay
+  // kind applies (rather than just toggling one on/off) shows the outgoing
+  // kind disappear instantly rather than cross-fading two different paints
+  // at once — a deliberate simplification, not attempted here.
+  const overlayFadeIn = !transitionFrom || transitionFrom.overlay === activeOverlay ? 1 : transitionProgress;
 
   return (
     // `h-full min-h-0`: this fills exactly the 720px the slide has to give
@@ -1792,7 +2086,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           owning a row of its own further down. */}
       <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-4">
         <Title slide={slide} editable={editable} dark={dark} />
-        {editable && active.url && active.kind !== 'walkthrough' && (
+        {editable && stageUrl && active.kind !== 'walkthrough' && (
           <div className="flex flex-wrap items-center justify-end gap-1.5">
             <label className="flex items-center gap-1 text-[11px] font-medium text-[var(--ink-3)]" title="Lets viewers wheel-zoom and drag-pan this image (Presenter/view mode only)">
               <input
@@ -1807,9 +2101,13 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               onPointerDown={startNorthDrag}
               onPointerMove={moveNorthDrag}
               onPointerUp={endNorthDrag}
-              title={`North: ${Math.round(displayNorthDeg)}° — drag to rotate`}
+              title={northLocked ? `North: ${Math.round(displayNorthDeg)}° — locked, unlock to drag` : `North: ${Math.round(displayNorthDeg)}° — drag to rotate`}
               style={{ transform: `rotate(${displayNorthDeg}deg)` }}
-              className="flex h-7 w-7 shrink-0 cursor-grab items-center justify-center rounded-full border border-[var(--line)] text-[var(--ink-3)] outline-none [touch-action:none] hover:border-[var(--accent)] hover:text-[var(--accent)] active:cursor-grabbing"
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[var(--ink-3)] outline-none [touch-action:none] ${
+                northLocked
+                  ? 'cursor-not-allowed border-[var(--line)] opacity-50'
+                  : 'cursor-grab border-[var(--line)] hover:border-[var(--accent)] hover:text-[var(--accent)] active:cursor-grabbing'
+              }`}
             >
               <svg viewBox="0 0 40 40" className="h-full w-full">
                 <circle cx="20" cy="21" r="17" fill="none" stroke="currentColor" strokeOpacity="0.6" strokeWidth="1.5" />
@@ -1817,6 +2115,72 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
                 <path d="M20 12 L24 19 L20 16.5 L16 19 Z" fill="currentColor" />
               </svg>
             </button>
+            {northLocked && (
+              <button
+                onClick={unlockNorth}
+                title="Unlock to drag North again"
+                className="rounded-full border border-[var(--line)] px-2 py-1 text-[11px] font-medium text-[var(--ink-3)] hover:border-[var(--ink-3)]"
+              >
+                🔒 Unlock
+              </button>
+            )}
+            {calibration ? (
+              <>
+                <button
+                  onClick={() => {
+                    if (calibrationLocked) return;
+                    setPickMode('calibrate');
+                    setPickPoints([]);
+                    setPendingCalDistance('');
+                  }}
+                  disabled={calibrationLocked}
+                  className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${
+                    calibrationLocked
+                      ? 'cursor-not-allowed border-[var(--line)] text-[var(--ink-3)] opacity-50'
+                      : 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--ink-3)]'
+                  }`}
+                >
+                  Recalibrate
+                </button>
+                {calibrationLocked && (
+                  <button
+                    onClick={unlockCalibration}
+                    title="Unlock to recalibrate"
+                    className="rounded-full border border-[var(--line)] px-2 py-1 text-[11px] font-medium text-[var(--ink-3)] hover:border-[var(--ink-3)]"
+                  >
+                    🔒 Unlock
+                  </button>
+                )}
+              </>
+            ) : (
+              <button
+                onClick={() => {
+                  setPickMode('calibrate');
+                  setPickPoints([]);
+                  setPendingCalDistance('');
+                }}
+                className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+                  pickMode === 'calibrate'
+                    ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                    : 'border-[var(--accent-soft-line)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                }`}
+              >
+                {pickMode === 'calibrate' ? 'Click two points a known distance apart' : 'Calibrate'}
+              </button>
+            )}
+            {/* Whether picks will snap at all, computed fresh from
+                isPdfPlan/planGeometry every render — both already correctly
+                re-resolved per stage/view — rather than reusing MediaBox's
+                own upload toast, which is component-local state with no key
+                tied to the active stage/view and would show stale text
+                after switching to a different plan. */}
+            <span className="text-[11px] text-[var(--ink-3)]">
+              {!isPdfPlan
+                ? 'Upload as a vector PDF for point/line snapping while calibrating.'
+                : !planGeometry?.vertices.length
+                  ? 'This PDF has no vector line-work — export it directly from the drawing tool, not flattened, scanned, or printed to PDF.'
+                  : `⌖ ${planGeometry.vertices.length / 2} snap points${planGeometry.truncated ? ' (trimmed to the busiest lines)' : ''}`}
+            </span>
             {TOOLS.map((t) => (
               <button
                 key={t.key}
@@ -1854,187 +2218,108 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
         ))}
       </div>
       {(active.stages?.length || editable) && active.kind !== 'walkthrough' && (
-        <div className="mb-3 flex shrink-0 flex-wrap items-center gap-1.5">
-          {active.stages?.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => {
-                // Same reasoning as selectView: a hotspot mid-edit, or a
-                // half-drawn shape, belongs to the stage it was started on —
-                // switching away should cancel it, not leave it dangling
-                // against a filtered hotspot list that may no longer include it.
+        active.kind === 'layout' ? (
+          // The Sidvin-style plan-evolution stepper — scoped to Layout
+          // views specifically. Render/Axo also use stages for
+          // non-progression purposes (a day/night toggle, a camera angle),
+          // where a linear progress bar would misrepresent what switching
+          // stages means, so those kinds keep the plain pill row below.
+          <div className="mb-3 shrink-0">
+            <PlanTimeline
+              stages={active.stages ?? []}
+              activeStageId={activeStage?.id}
+              editable={editable}
+              onSelect={selectStage}
+              onAddStage={() => {
                 cancelDrawing();
-                setActiveStageId(s.id);
+                if (!active.stages?.length) {
+                  // A fresh Layout view's first "+ Stage" click offers the
+                  // whole suggested progression at once, not one generically
+                  // -named stage at a time — still free-text labels
+                  // underneath (renamable, same as any other stage), just a
+                  // starting point matching the ask's own phrasing.
+                  const fresh = ['Zoning', 'Walls', 'Circulation', 'Furniture'].map((label) => ({ id: makeId('stage'), label }));
+                  setView(active.id, { stages: fresh });
+                  setActiveStageId(fresh[0].id);
+                } else {
+                  const stage = { id: makeId('stage'), label: `Stage ${active.stages.length + 1}` };
+                  setView(active.id, { stages: [...active.stages, stage] });
+                  setActiveStageId(stage.id);
+                }
               }}
-              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
-                s.id === activeStage?.id
+              onRenameStage={(id, label) => setView(active.id, { stages: (active.stages ?? []).map((s) => (s.id === id ? { ...s, label } : s)) })}
+            />
+          </div>
+        ) : null
+      )}
+      {editable && active.kind === 'layout' && (
+        <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2">
+          <span className="text-[11px] font-medium text-[var(--ink-3)]">Split style:</span>
+          {([
+            ['fade', 'Fade'],
+            ['burst', 'Burst'],
+          ] as const).map(([style, label]) => (
+            <button
+              key={style}
+              onClick={() => setView(active.id, { splitAnimation: style })}
+              title="How a hotspot with no same-id match on the other stage animates when it names (or is named by) a parent zone via 'Parent zone' in the hotspot popup"
+              className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold transition ${
+                (active.splitAnimation ?? 'fade') === style
                   ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
                   : 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--ink-3)]'
               }`}
             >
-              {s.label}
+              <SplitStylePreviewIcon variant={style} />
+              {label}
             </button>
           ))}
-          {editable && (
-            <button
-              onClick={() => {
-                const stage = { id: makeId('stage'), label: `Stage ${(active.stages?.length ?? 0) + 1}` };
-                setView(active.id, { stages: [...(active.stages ?? []), stage] });
-                cancelDrawing();
-                setActiveStageId(stage.id);
-              }}
-              className="rounded-full border border-dashed border-[var(--line)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-            >
-              + Stage
-            </button>
-          )}
         </div>
       )}
-      {overlaysAvailable && (
-        <div className="mb-3 flex shrink-0 flex-wrap items-center gap-1.5">
-          {([
-            ['plan', 'Plan'],
-            ['zoning', 'Zoning'],
-            ['adjacency', 'Adjacency'],
-            ['dimensions', 'Dimensions'],
-          ] as const).map(([mode, label]) => {
-            const ready =
-              mode === 'plan'
-                ? true
-                : mode === 'zoning'
-                  ? zoneCategories.length > 0
-                  : mode === 'adjacency'
-                    ? adjacencyPairs.length > 0
-                    : !!calibration;
-            // An overlay with nothing behind it yet is only offered while
-            // editing — in Presenter it would be a dead end mid-pitch.
-            if (!ready && !editable) return null;
-            return (
+      {(active.stages?.length || editable) && active.kind !== 'walkthrough' && active.kind !== 'layout' && (
+          <div className="mb-3 flex shrink-0 flex-wrap items-center gap-1.5">
+            {active.stages?.map((s) => (
               <button
-                key={mode}
+                key={s.id}
                 onClick={() => {
-                  setOverlayMode(mode);
-                  setPickMode(null);
-                  setPickPoints([]);
+                  // Same reasoning as selectView: a hotspot mid-edit, or a
+                  // half-drawn shape, belongs to the stage it was started on —
+                  // switching away should cancel it, not leave it dangling
+                  // against a filtered hotspot list that may no longer include it.
+                  cancelDrawing();
+                  setActiveStageId(s.id);
                 }}
-                title={ready ? undefined : 'Nothing set up for this overlay yet'}
                 className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
-                  overlayMode === mode
+                  s.id === activeStage?.id
                     ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
-                    : ready
-                      ? 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--ink-3)]'
-                      : 'border-dashed border-[var(--line)] text-[var(--ink-3)] opacity-60 hover:opacity-100'
+                    : 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--ink-3)]'
                 }`}
               >
-                {label}
+                {s.label}
               </button>
-            );
-          })}
-
-          {overlayMode === 'zoning' &&
-            zoneCategories.map((z) => (
-              <span key={z} className="flex items-center gap-1 text-[11px] text-[var(--ink-2)]">
-                <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: zoneColor(z) }} />
-                {z}
-              </span>
             ))}
-
-          {overlayMode === 'dimensions' && (
-            <>
-              {calibration ? (
-                <>
-                  <button
-                    onClick={() => {
-                      setPickMode((cur) => (cur === 'measure' ? null : 'measure'));
-                      setPickPoints([]);
-                    }}
-                    className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
-                      pickMode === 'measure'
-                        ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
-                        : 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--ink-3)]'
-                    }`}
-                  >
-                    {pickMode === 'measure' ? 'Measuring — click two points' : 'Measure'}
-                  </button>
-                  {editable && (
-                    <button
-                      onClick={() => {
-                        setPickMode('calibrate');
-                        setPickPoints([]);
-                        setPendingCalDistance('');
-                      }}
-                      className="rounded-full border border-[var(--line)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-3)] hover:border-[var(--ink-3)]"
-                    >
-                      Recalibrate
-                    </button>
-                  )}
-                </>
-              ) : editable ? (
-                <button
-                  onClick={() => {
-                    setPickMode('calibrate');
-                    setPickPoints([]);
-                    setPendingCalDistance('');
-                  }}
-                  className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
-                    pickMode === 'calibrate'
-                      ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
-                      : 'border-[var(--accent-soft-line)] bg-[var(--accent-soft)] text-[var(--accent)]'
-                  }`}
-                >
-                  {pickMode === 'calibrate' ? 'Click two points a known distance apart' : 'Calibrate to enable dimensions'}
-                </button>
-              ) : null}
-
-              {pickMode === 'calibrate' && pickPoints.length === 2 && (
-                <span className="flex items-center gap-1 text-[var(--ink)]">
-                  <input
-                    autoFocus
-                    type="number"
-                    value={pendingCalDistance}
-                    onChange={(e) => setPendingCalDistance(e.target.value)}
-                    placeholder="Distance"
-                    title="How far apart those two points are in the real world"
-                    className="w-20 rounded-md border border-[var(--line)] px-2 py-1 text-[11px] outline-none"
-                  />
-                  <input
-                    value={pendingCalUnit}
-                    onChange={(e) => setPendingCalUnit(e.target.value)}
-                    placeholder="m"
-                    title="Unit — shown after every measurement"
-                    className="w-12 rounded-md border border-[var(--line)] px-2 py-1 text-[11px] outline-none"
-                  />
-                  <button
-                    onClick={() => {
-                      const cal = calibrationFrom(
-                        pickPoints[0],
-                        pickPoints[1],
-                        FRAME_ASPECT,
-                        Number(pendingCalDistance),
-                        pendingCalUnit.trim() || 'm',
-                      );
-                      if (!cal) return;
-                      setCalibration(cal);
-                      setPickMode(null);
-                      setPickPoints([]);
-                    }}
-                    className="rounded-full bg-[var(--accent)] px-2.5 py-1 text-[11px] font-semibold text-white"
-                  >
-                    Set scale
-                  </button>
-                  <button
-                    onClick={() => {
-                      setPickMode(null);
-                      setPickPoints([]);
-                    }}
-                    className="rounded-full border border-[var(--line)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-3)]"
-                  >
-                    Cancel
-                  </button>
-                </span>
-              )}
-            </>
-          )}
+            {editable && (
+              <button
+                onClick={() => {
+                  const stage = { id: makeId('stage'), label: `Stage ${(active.stages?.length ?? 0) + 1}` };
+                  setView(active.id, { stages: [...(active.stages ?? []), stage] });
+                  cancelDrawing();
+                  setActiveStageId(stage.id);
+                }}
+                className="rounded-full border border-dashed border-[var(--line)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              >
+                + Stage
+              </button>
+            )}
+          </div>
+      )}
+      {activeOverlay === 'zoning' && !overlayHidden && zoneCategories.length > 0 && (
+        <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2">
+          {zoneCategories.map((z) => (
+            <span key={z} className="flex items-center gap-1 text-[11px] text-[var(--ink-2)]">
+              <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: zoneColor(z) }} />
+              {z}
+            </span>
+          ))}
         </div>
       )}
       {editable && active.kind !== 'walkthrough' && active.kind !== 'layout' && (
@@ -2097,6 +2382,23 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
         className="h-full w-full transition-transform duration-100 ease-out"
         style={{ transform: `scale(${viewportZoom}) translate(${viewportPanX}%, ${viewportPanY}%)` }}
       >
+        {/* A ghost of the outgoing stage's image, fading out underneath the
+            real (already-switched) MediaBox below fading in — skipped
+            entirely as a free no-op when adjacent stages resolve to the
+            same url (plausible: Zoning/Walls/Circulation sharing one plan
+            render), so an unchanged image never animates. Plain <img>, not
+            a second MediaBox: this layer is a fading photograph, not
+            something the editor's upload/adjust affordances should ever
+            reach. */}
+        {transitionFrom && transitionFrom.url && transitionFrom.url !== stageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={transitionFrom.url}
+            alt=""
+            style={{ ...imageStyle(transitionFrom.transform), opacity: 1 - transitionProgress }}
+            className={`pointer-events-none absolute inset-0 h-full w-full rounded-lg ${transitionFrom.isPdfPlan ? 'bg-white object-contain' : 'object-cover'}`}
+          />
+        )}
         <MediaBox
           url={stageUrl}
           kind={active.kind === 'walkthrough' ? 'video' : 'image'}
@@ -2122,17 +2424,19 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           // rendered, so re-cropping it would silently desync both.
           allowAdjust={tool === null && !isPdfPlan}
           className="h-full w-full"
+          style={transitionFrom && transitionFrom.url !== stageUrl ? { opacity: transitionProgress } : undefined}
           mediaRef={active.kind === 'walkthrough' ? videoRef : undefined}
         />
 
         <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-          {overlayMode === 'adjacency' &&
+          {activeOverlay === 'circulation' &&
+            !overlayHidden &&
             adjacencyPairs.map(({ a, b }) => {
-              const ca = centroidOf(a.points);
-              const cb = centroidOf(b.points);
+              const ca = centroidOf(pointsFor(a));
+              const cb = centroidOf(pointsFor(b));
               if (!ca || !cb) return null;
               return (
-                <g key={`${a.id}|${b.id}`}>
+                <g key={`${a.id}|${b.id}`} opacity={overlayFadeIn}>
                   <line
                     x1={ca.x * 100}
                     y1={ca.y * 100}
@@ -2150,6 +2454,22 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
                 </g>
               );
             })}
+          {/* The whole snapped-to line, not just the point marker below — a
+              corner reads as a point either way, but a wall you're about to
+              measure along should light up as a line, the way a real CAD
+              tool's object-snap does. */}
+          {pickMode && snapHit?.kind === 'edge' && snapHit.segment && (
+            <line
+              x1={snapHit.segment.x1 * 100}
+              y1={snapHit.segment.y1 * 100}
+              x2={snapHit.segment.x2 * 100}
+              y2={snapHit.segment.y2 * 100}
+              vectorEffect="non-scaling-stroke"
+              className="stroke-[var(--accent)]"
+              strokeWidth={2.5}
+              opacity={0.7}
+            />
+          )}
           {pickPoints.length > 0 && (
             <g>
               {pickPoints.length === 2 && (
@@ -2177,29 +2497,31 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               ))}
             </g>
           )}
-          {hotspots.filter((h) => hasEnoughPoints(h.points, h.shape)).map((h) => {
-            const isHot = hoveredHotspotId === h.id || hoveredRowHotspotIds.includes(h.id);
+          {displayHotspots.map(({ hotspot: h, points, fadeOpacity, ghost }) => {
+            const isHot = !ghost && (hoveredHotspotId === h.id || hoveredRowHotspotIds.includes(h.id));
             // Zoning repaints every space by its zone rather than its authored
             // colour — an unzoned space stays visible but reads as unassigned
             // rather than quietly joining whichever zone it looks nearest.
-            const zone = overlayMode === 'zoning' ? h.zoneCategory?.trim() : undefined;
-            const zoning = overlayMode === 'zoning';
+            const zoning = activeOverlay === 'zoning' && !overlayHidden;
+            const zone = zoning ? h.zoneCategory?.trim() : undefined;
             const paint = zoning ? (zone ? zoneColor(zone) : '#94a3b8') : undefined;
             const baseFillOpacity = zoning ? (zone ? 0.38 : 0.1) : (h.fillOpacity ?? DEFAULT_FILL_OPACITY);
             const baseStrokeWidth = zoning ? 1.25 : (h.strokeWidth ?? DEFAULT_STROKE_WIDTH);
             return (
             <path
-              key={h.id}
-              d={shapePath(h.points, h.shape)}
+              key={`${h.id}${ghost ? '-ghost' : ''}`}
+              d={shapePath(points, h.shape)}
               vectorEffect="non-scaling-stroke"
               fill={paint ?? h.fillColor ?? DEFAULT_FILL}
-              fillOpacity={isHot ? Math.min(1, baseFillOpacity * 1.8) : baseFillOpacity}
+              fillOpacity={(isHot ? Math.min(1, baseFillOpacity * 1.8) : baseFillOpacity) * fadeOpacity * (zoning ? overlayFadeIn : 1)}
               stroke={paint ?? h.strokeColor ?? DEFAULT_STROKE}
               strokeWidth={isHot ? baseStrokeWidth * 1.6 : baseStrokeWidth}
-              className={drawing ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer transition-[fill-opacity,stroke-width]'}
-              onMouseEnter={() => !drawing && setHoveredHotspotId(h.id)}
+              strokeOpacity={fadeOpacity * (zoning ? overlayFadeIn : 1)}
+              className={ghost || drawing ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer transition-[fill-opacity,stroke-width]'}
+              onMouseEnter={() => !ghost && !drawing && setHoveredHotspotId(h.id)}
               onMouseLeave={() => setHoveredHotspotId((cur) => (cur === h.id ? null : cur))}
               onClick={(e) => {
+                if (ghost) return;
                 e.stopPropagation();
                 // A pan gesture that ended over a hotspot must not also fire
                 // its click — only a real (near-stationary) click should.
@@ -2304,11 +2626,13 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
             would squash anything drawn as type inside it. Sitting inside the
             same transformed wrapper keeps labels pinned to the plan when a
             viewer zooms. */}
-        {overlayMode === 'dimensions' &&
+        {dimensionsOn &&
           calibration &&
-          hotspots.map((h) => {
-            const c = centroidOf(h.points);
-            const areaNorm = shapeArea(h.points, h.shape);
+          displayHotspots
+            .filter((d) => !d.ghost)
+            .map(({ hotspot: h, points }) => {
+            const c = centroidOf(points);
+            const areaNorm = shapeArea(points, h.shape);
             if (!c || areaNorm <= 0) return null;
             return (
               <span
@@ -2402,6 +2726,39 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
             </div>
           )}
 
+          {stageUrl && active.kind !== 'walkthrough' && (
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => {
+                if (!calibration) return;
+                setDimensionsOn((cur) => {
+                  const next = !cur;
+                  setPickMode(next ? 'measure' : null);
+                  setPickPoints([]);
+                  return next;
+                });
+              }}
+              disabled={!calibration}
+              title={calibration ? 'Toggle calibrated dimensions and click-to-measure' : 'Calibrate this plan first'}
+              className={`rounded-md px-2.5 py-1.5 text-[11px] font-medium text-white ${
+                !calibration ? 'cursor-not-allowed bg-black/40 opacity-60' : dimensionsOn ? 'bg-[var(--accent)] hover:opacity-90' : 'bg-black/60 hover:bg-black/75'
+              }`}
+            >
+              Dimensions
+            </button>
+          )}
+
+          {activeOverlay && (
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => setOverlayHidden((cur) => !cur)}
+              title={overlayHidden ? `Show the ${activeOverlay} overlay` : `Hide the ${activeOverlay} overlay for a moment`}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-sm text-white hover:bg-black/75"
+            >
+              {overlayHidden ? '🙈' : '👁'}
+            </button>
+          )}
+
           {zoomPanActive && viewportZoom > 1 && (
             <button
               onPointerDown={(e) => e.stopPropagation()}
@@ -2461,7 +2818,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
                   Undo
                 </button>
                 <button
-                  onClick={() => startPickingTarget()}
+                  onClick={() => finishShape(drawingPoints!)}
                   disabled={drawingPoints.length < 3}
                   className="rounded bg-[var(--accent)] px-2 py-0.5 font-semibold disabled:opacity-40"
                 >
@@ -2481,6 +2838,63 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
                 : '⇧ to constrain'}
             </span>
             <button onClick={cancelDrawing} className="underline decoration-white/50 hover:decoration-white">
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {/* The calibration pick's own mini-form — reuses the drawing-hint
+            bar's exact visual pattern just above, floating over the stage
+            instead of living in a pill row (that row is gone now that
+            reaching a stage is what turns its overlay on). Bottom-right:
+            the one corner none of top-left (drawing hint), top-right
+            (badge row) or bottom-left (key plan) already claim. */}
+        {pickMode === 'calibrate' && (
+          <div
+            onPointerDown={(e) => e.stopPropagation()}
+            className="absolute bottom-3 right-3 z-20 flex items-center gap-2 rounded-md bg-black/75 px-2.5 py-1.5 text-[11px] font-medium text-white"
+          >
+            {pickPoints.length === 2 ? (
+              <>
+                <input
+                  autoFocus
+                  type="number"
+                  value={pendingCalDistance}
+                  onChange={(e) => setPendingCalDistance(e.target.value)}
+                  placeholder="Distance"
+                  title="How far apart those two points are in the real world"
+                  className="w-16 rounded border border-white/30 bg-black/40 px-1.5 py-0.5 text-[11px] text-white outline-none placeholder:text-white/50"
+                />
+                <input
+                  value={pendingCalUnit}
+                  onChange={(e) => setPendingCalUnit(e.target.value)}
+                  placeholder="m"
+                  title="Unit — shown after every measurement"
+                  className="w-10 rounded border border-white/30 bg-black/40 px-1.5 py-0.5 text-[11px] text-white outline-none placeholder:text-white/50"
+                />
+                <button
+                  onClick={() => {
+                    const cal = calibrationFrom(pickPoints[0], pickPoints[1], FRAME_ASPECT, Number(pendingCalDistance), pendingCalUnit.trim() || 'm');
+                    if (!cal) return;
+                    setCalibration(cal);
+                    setPickMode(null);
+                    setPickPoints([]);
+                  }}
+                  className="rounded bg-[var(--accent)] px-2 py-0.5 font-semibold"
+                >
+                  Set scale
+                </button>
+              </>
+            ) : (
+              <span>Click two points a known distance apart</span>
+            )}
+            <button
+              onClick={() => {
+                setPickMode(null);
+                setPickPoints([]);
+              }}
+              className="underline decoration-white/50 hover:decoration-white"
+            >
               Cancel
             </button>
           </div>
@@ -2665,6 +3079,31 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               </div>
             )}
 
+            {editingHotspotId && !!activeStage && !!active.stages?.length && (
+              <div className="mb-2">
+                <span className="mb-1 block text-[10px] font-semibold text-[var(--ink-3)]">Shape on {activeStage.label}</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] text-[var(--ink-2)]">
+                    {editingHotspot?.pointsByStage?.[activeStage.id] ? 'Custom shape for this stage' : 'Uses the base shape'}
+                  </span>
+                  <button
+                    onClick={() => editingHotspot && startRedrawShape(editingHotspot)}
+                    className="rounded-full border border-[var(--line)] px-2 py-0.5 text-[11px] font-medium text-[var(--ink-3)] hover:border-[var(--ink-3)]"
+                  >
+                    Redraw for this stage
+                  </button>
+                  {editingHotspot?.pointsByStage?.[activeStage.id] && (
+                    <button
+                      onClick={() => editingHotspot && clearShapeOverride(editingHotspot)}
+                      className="rounded-full border border-[var(--line)] px-2 py-0.5 text-[11px] font-medium text-[var(--ink-3)] hover:border-[var(--ink-3)]"
+                    >
+                      Clear override
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="mb-2">
               <span className="mb-1 block text-[10px] font-semibold text-[var(--ink-3)]">Zone</span>
               <input
@@ -2698,6 +3137,46 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
                           onClick={() =>
                             setPendingAdjacentIds((prev) => (on ? prev.filter((id) => id !== h.id) : [...prev, h.id]))
                           }
+                          className={`rounded-full border px-2 py-0.5 text-[11px] transition ${
+                            on
+                              ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                              : 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--ink-3)]'
+                          }`}
+                        >
+                          {h.label || 'Untitled'}
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            {allHotspots.some((h) => h.id !== editingHotspotId) && (
+              <div className="mb-2">
+                <span className="mb-1 block text-[10px] font-semibold text-[var(--ink-3)]">
+                  Parent zone
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    onClick={() => setPendingParentId('')}
+                    title="This hotspot has no parent zone"
+                    className={`rounded-full border px-2 py-0.5 text-[11px] transition ${
+                      !pendingParentId
+                        ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                        : 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--ink-3)]'
+                    }`}
+                  >
+                    None
+                  </button>
+                  {allHotspots
+                    .filter((h) => h.id !== editingHotspotId)
+                    .map((h) => {
+                      const on = pendingParentId === h.id;
+                      return (
+                        <button
+                          key={h.id}
+                          onClick={() => setPendingParentId((cur) => (cur === h.id ? '' : h.id))}
+                          title="On a plan-evolution transition, this hotspot bursts out of (or merges into) this parent's shape instead of fading independently — see the Burst/Fade toggle near the timeline"
                           className={`rounded-full border px-2 py-0.5 text-[11px] transition ${
                             on
                               ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'

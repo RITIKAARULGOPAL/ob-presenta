@@ -1,13 +1,23 @@
 # Mockup — one slide, fully populated
 
-`s062-zoning-it-biophilic.png` is **S062 Zoning** from
-[`../data/slide_library.csv`](../data/slide_library.csv), resolved for the
-**EX1 · IT + Biophilic** profile (`T01 + C01 + G2 + SC3 + N1`) and drawn at
-Presenta's real slide size.
+**S062 Zoning** from [`../data/slide_library.csv`](../data/slide_library.csv),
+resolved for the **EX1 · IT + Biophilic** profile (`T01 + C01 + G2 + SC3 + N1`)
+and drawn at Presenta's real slide size.
 
 It exists to answer one question the CSVs can't: *what does a row of the slide
 library actually look like once the rules have picked it and a project has
 filled it in?*
+
+**Live page:** https://claude.ai/artifact/LhXgwBmFCdhZSFyzdF7oPP — the same
+`.slide` content below, framed in a short page (title, a one-line summary of
+what T01+C01 each contributed, the slide itself scaled to fit, a real/invented
+note). Private; share it from its own page if someone besides the owner needs
+it. `s062-zoning-it-biophilic.html` is its source — republish that same path
+to update the page in place.
+
+`s062-zoning-it-biophilic.png` is a flat crop of just the `.slide` element,
+made before the page grew that surrounding chrome — still accurate, since the
+slide markup itself hasn't changed, just what wraps it.
 
 ## What is real vs. invented
 
@@ -36,7 +46,13 @@ Swap the typology and the same slide changes shape: **T06 BFSI** replaces the
 collaboration spine with a dealing floor and segregates the client suite behind
 an access boundary; **T03 Startup** loses the client suite entirely.
 
-## Rebuilding
+## Rebuilding the PNG
+
+The recipe below is **stale** as of the page gaining its wrapper chrome — it
+assumed `.slide` sat alone at the document's top-left at native 1280×720
+(`body{width:1280px;height:720px}`). It's kept for the history: it's still
+correct for any future file built that same way, and the 85px lesson below
+still applies to this file too.
 
 ```bash
 /opt/pw-browsers/chromium --headless --disable-gpu --no-sandbox --hide-scrollbars \
@@ -54,3 +70,26 @@ clips everything below y≈635 — the brand footer disappears and the side pane
 loses its last line — while still writing a full-height PNG whose bottom rows are
 transparent. `gen_images.py` never hit this because an SVG document has an
 intrinsic size. Render 85 px tall and crop back.
+
+Now that `.slide` sits inside a JS-scaled `.stage-frame` partway down a
+responsive page, reproducing this exact crop means forcing the frame to render
+at its native, unscaled width (viewport ≥ 1280 + the page's own side padding
+so `.stage-frame.clientWidth === 1280` and the JS scale resolves to 1), then
+cropping to `.stage-frame`'s actual rendered rect rather than `(0,0)` — that
+rect now depends on the header's height above it, so it isn't a fixed offset.
+Not yet scripted; the one existing PNG was captured before this was true and
+didn't need it.
+
+**A second, unrelated Chromium quirk, found rebuilding this page responsively:**
+`--window-size` under ~500px wide is **not reliable** in this same bundled
+Chromium — `window.innerWidth` was measured (via an injected script) reporting
+~500 regardless of a smaller requested width, while the screenshot's own pixel
+dimensions still exactly matched the smaller request. The page gets laid out
+at that wider internal size, then the screenshot canvas simply **crops** it
+down to the requested pixel dimensions — text and boxes appear to overflow the
+right edge, looking exactly like a CSS bug, when the actual page is correct
+(confirmed: identical CSS renders pixel-perfect, zero horizontal scroll, at
+1200px). Don't trust a `--window-size` narrower than ~550px from this
+Chromium for responsive/mobile-width checks — verify with the injected
+`getBoundingClientRect()` + `innerWidth` trick before believing what a narrow
+screenshot appears to show, or just reason about the CSS directly.

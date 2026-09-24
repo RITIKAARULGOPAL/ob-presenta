@@ -1,11 +1,77 @@
-<!doctype html>
-<meta charset="utf-8">
-<title>S062 Zoning — IT + Biophilic</title>
+<title>Zoning — IT + Biophilic</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Archivo:wght@700;800&display=swap">
 <style>
+  *{box-sizing:border-box}
+
+  /* Page chrome — adapts to the viewer's theme. The embedded slide below does
+     NOT use these: it is a faithful reproduction of a fixed, always-light
+     Presenta slide canvas (the app has no dark mode), so it keeps its own
+     tokens fixed regardless of how this wrapper page is themed — the same way
+     a screenshot embedded in a dark-mode document doesn't invert itself. */
+  :root{
+    --page-bg:#f7f7f5;
+    --page-text:#1a1a1a;
+    --page-text-2:#6b6b6b;
+    --page-border:#e5e3dd;
+    --page-accent:#2a78d6; /* same blue as the diagram's own Arrival/Client zone */
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --page-bg:#111318; --page-text:#f2f3f5; --page-text-2:#9aa0ab;
+      --page-border:#2a2e38; --page-accent:#6fa8e8; color-scheme:dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --page-bg:#111318; --page-text:#f2f3f5; --page-text-2:#9aa0ab;
+    --page-border:#2a2e38; --page-accent:#6fa8e8; color-scheme:dark;
+  }
+
+  body{
+    margin:0;
+    background:var(--page-bg);
+    color:var(--page-text);
+    font-family:Inter,"Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding-block:48px;
+    padding-inline:16px;
+  }
+  /* width:100% (not just max-width) matters: a flex container's width:auto can
+     size to its content's intrinsic width instead of the available block width
+     when that content can't shrink (the unbroken file-path token below), which
+     silently pushed this whole page wider than the viewport with no visible
+     scrollbar to hint at it. width:100% forces the normal block-fill behaviour. */
+  .page{width:100%;max-width:880px;margin-inline:auto;display:flex;flex-direction:column;gap:28px;min-width:0}
+  /* Column flex items default to a content-based minimum width, which a long
+     unbroken token (the file path below) can exceed — letting the item, and so
+     the page, overflow the viewport with no visible scrollbar to hint at it. */
+  .page>*{min-width:0}
+  .page-desc,.note p,.page-foot{overflow-wrap:break-word;word-break:break-word}
+
+  .page-head{display:flex;flex-direction:column;gap:10px}
+  .eyebrow{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--page-accent)}
+  .page-title{font-family:Archivo,Inter,sans-serif;font-size:clamp(22px,4vw,28px);
+              font-weight:800;letter-spacing:-.01em;line-height:1.18;margin:0}
+  .page-desc{font-size:14.5px;line-height:1.6;color:var(--page-text-2);max-width:64ch;margin:0}
+  .page-desc b{color:var(--page-text);font-weight:600}
+
+  /* The scaled stage — a device-frame around the fixed 1280x720 canvas below.
+     Sized by JS (matching how ScaledStage.tsx scales the real app's own
+     fixed-size slide to fit its container) rather than by CSS transform
+     tricks, so it stays pixel-crisp and works with no modern-CSS dependency. */
+  .stage-frame{
+    position:relative;width:100%;max-width:1280px;margin-inline:auto;
+    aspect-ratio:1280/720;overflow:hidden;border-radius:12px;
+    border:1px solid var(--page-border);background:#fff;
+    box-shadow:0 1px 2px rgba(20,20,20,.05),0 16px 40px -16px rgba(20,20,20,.22);
+  }
+
   /* Presenta renders every slide on a fixed 1280x720 stage (ScaledStage.tsx).
      Tokens below are the real ones from SlideRenderer.tsx's slide-root style
-     block, so this mockup is measured in the app's own units. */
-  :root{
+     block, so this mockup is measured in the app's own units — scoped to
+     .slide itself (not :root) so they never interact with the page chrome
+     tokens above. */
+  .slide{
     --accent:#000000;            /* DEFAULT_ACCENT, AccentPicker.tsx */
     --accent-soft:#e6e6e6;       /* tintWithWhite(accent, .90) */
     --accent-soft-line:#c7c7c7;  /* tintWithWhite(accent, .78) */
@@ -13,18 +79,13 @@
     --line:#e2e5ec; --surface-2:#f0f2f6;
     /* zone colours: the validated categorical palette already used by every
        diagram in public/template-library (gen_images.py, P[]) */
-    --z1:#2a78d6; --z2:#1baf7a; --z3:#eb6834; --z4:#eda100; --z5:#e87ba4;
-    --z6:#6b6b6b;
+    --z1:#2a78d6; --z2:#1baf7a; --z3:#eb6834; --z4:#eda100; --z5:#e87ba4; --z6:#6b6b6b;
+
+    position:absolute;top:0;left:0;transform-origin:top left;
+    width:1280px;height:720px;min-height:720px;background:#fff;color:var(--ink);
+    font-family:Inter,"Helvetica Neue",Arial,sans-serif;font-size:16px;
+    padding:40px 64px 12px;display:flex;flex-direction:column;
   }
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{width:1280px;height:720px;overflow:hidden}
-  body{
-    background:#fff;color:var(--ink);
-    font-family:Inter,"Helvetica Neue",Arial,sans-serif;
-    font-size:16px;-webkit-font-smoothing:antialiased;
-  }
-  .slide{position:relative;width:1280px;height:720px;min-height:720px;background:#fff;
-         padding:40px 64px 12px;display:flex;flex-direction:column}
   /* explicit height: 40 (pad-top) + 652 + 16 (footer) + 12 (pad-bottom) = 720 */
   .content{min-height:652px;display:flex;flex-direction:column;justify-content:center}
 
@@ -36,7 +97,8 @@
   .kicker .rule{height:1px;width:24px;background:var(--line)}
 
   /* Title — headlineStyle(1.875) => 30px / 800 */
-  h2{font-size:30px;font-weight:800;line-height:1.25;color:var(--accent);letter-spacing:-.01em}
+  .slide h2{font-size:30px;font-weight:800;line-height:1.25;color:var(--accent);
+            letter-spacing:-.01em;margin:0}
 
   /* LinkedViewsExplorer — mt-6, view tabs then stage pills */
   .explorer{margin-top:20px;display:flex;flex-direction:column}
@@ -62,7 +124,7 @@
   .side h3{display:flex;justify-content:space-between;align-items:baseline;
            padding:9px 12px;background:var(--surface-2);
            font-size:10px;font-weight:700;letter-spacing:.07em;
-           text-transform:uppercase;color:var(--ink-2)}
+           text-transform:uppercase;color:var(--ink-2);margin:0}
   .side h3 span{font-size:10px;font-weight:600;color:var(--ink-3);letter-spacing:.02em}
   .row{display:grid;grid-template-columns:8px 1fr auto;gap:9px;align-items:center;
        padding:7px 12px;border-top:1px solid var(--line)}
@@ -75,170 +137,243 @@
   .foot .big{font-size:12px;font-weight:700;color:var(--ink)}
   .foot .small{font-size:10px;color:var(--ink-3);margin-top:2px;line-height:1.35}
 
-  /* BrandFooter — inset-x-6 bottom-3 */
+  /* BrandFooter — inset-x-6 bottom-3. The real component's own fallback for a
+     logo image that fails to load is a plain text wordmark (BrandMark.tsx) —
+     used here directly rather than trying to embed a PNG asset. */
   .brand{margin:0 -40px;display:flex;align-items:flex-end;justify-content:space-between}
-  .brand img{height:16px;width:auto;object-fit:contain}
+  .brand .mark{font-family:Archivo,Inter,sans-serif;font-size:10px;font-weight:700;
+               letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3)}
   .brand .c{font-size:9px;line-height:1.2;color:var(--ink-3)}
+
+  /* Below-stage note */
+  .note{display:grid;grid-template-columns:1fr 1fr;gap:12px 28px;
+        border-top:1px solid var(--page-border);padding-top:24px}
+  .note h4{margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.06em;
+           text-transform:uppercase;color:var(--page-text)}
+  .note p{margin:0;font-size:13.5px;line-height:1.6;color:var(--page-text-2)}
+  @media (max-width:560px){.note{grid-template-columns:1fr}}
+
+  .page-foot{font-size:12px;color:var(--page-text-2)}
+  .page-foot code{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11.5px;
+                  overflow-wrap:anywhere;word-break:break-all}
 </style>
 
-<div class="slide">
-  <div class="content">
-  <div class="kicker">
-    <span class="eyebrow">Planning</span>
-    <span class="rule"></span>
-    <span>04 · Zoning</span>
+<div class="page">
+  <div class="page-head">
+    <span class="eyebrow">Presenta · Template Library</span>
+    <h1 class="page-title">Zoning — IT + Biophilic</h1>
+    <p class="page-desc">
+      <b>S062 Zoning</b>, resolved for the <b>IT + Biophilic</b> profile
+      (T01 + C01) out of Presenta's 106-slide template library. IT's own
+      layout logic — a split workhall, a collaboration spine, phone booths
+      at scale — meets Biophilic's daylight-and-planting treatment, both
+      pulled from the same rules that decide every other slide's content.
+    </p>
   </div>
-  <h2>Zoning</h2>
 
-  <div class="explorer">
-    <div class="tabs">
-      <span class="tab on">Plan</span>
-      <span class="tab">Render</span>
-      <span class="tab">Walkthrough</span>
-    </div>
-    <div class="stages">
-      <span class="lbl">Stage</span>
-      <span class="stage on">Zoning</span>
-      <span class="stage">Layout</span>
-    </div>
-
-    <div class="body">
-      <div>
-        <div class="plan">
-          <svg width="810" height="352" viewBox="-38 0 848 368" xmlns="http://www.w3.org/2000/svg">
-            <rect x="-38" y="0" width="848" height="368" fill="#fcfcfb"/>
-            <defs>
-              <linearGradient id="dlN" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stop-color="#eda100" stop-opacity=".20"/>
-                <stop offset="1" stop-color="#eda100" stop-opacity="0"/>
-              </linearGradient>
-              <linearGradient id="dlS" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0" stop-color="#eda100" stop-opacity=".20"/>
-                <stop offset="1" stop-color="#eda100" stop-opacity="0"/>
-              </linearGradient>
-            </defs>
-            <!-- daylight off the two long elevations: the reason the halls sit outboard -->
-            <rect x="14" y="8" width="782" height="30" fill="url(#dlN)"/>
-            <rect x="14" y="330" width="782" height="30" fill="url(#dlS)"/>
-            <rect x="14" y="8" width="782" height="352" rx="6" fill="none" stroke="#141a2b" stroke-width="2"/>
-
-            <!-- Workhall North -->
-            <rect x="22" y="16" width="612" height="110" rx="5" fill="#1baf7a" opacity=".15"/>
-            <rect x="22" y="16" width="612" height="110" rx="5" fill="none" stroke="#1baf7a" stroke-width="2"/>
-            <text x="36" y="40" font-size="13" font-weight="700" fill="#141a2b">Workhall &#183; North</text>
-            <text x="36" y="57" font-size="11" fill="#6b6b6b">9,400 sq ft &#183; 268 desks &#183; daylit elevation</text>
-
-            <!-- Workhall South -->
-            <rect x="22" y="246" width="612" height="106" rx="5" fill="#1baf7a" opacity=".15"/>
-            <rect x="22" y="246" width="612" height="106" rx="5" fill="none" stroke="#1baf7a" stroke-width="2"/>
-            <text x="36" y="270" font-size="13" font-weight="700" fill="#141a2b">Workhall &#183; South</text>
-            <text x="36" y="287" font-size="11" fill="#6b6b6b">8,600 sq ft &#183; 244 desks &#183; daylit elevation</text>
-
-            <!-- inboard band -->
-            <rect x="22" y="134" width="168" height="104" rx="5" fill="#2a78d6" opacity=".15"/>
-            <rect x="22" y="134" width="168" height="104" rx="5" fill="none" stroke="#2a78d6" stroke-width="2"/>
-            <text x="34" y="157" font-size="12" font-weight="700" fill="#141a2b">Arrival &amp;</text>
-            <text x="34" y="172" font-size="12" font-weight="700" fill="#141a2b">Client Suite</text>
-            <text x="34" y="190" font-size="10.5" fill="#6b6b6b">3,200 sq ft &#183; 6 rooms</text>
-
-            <rect x="198" y="134" width="232" height="104" rx="5" fill="#eb6834" opacity=".15"/>
-            <rect x="198" y="134" width="232" height="104" rx="5" fill="none" stroke="#eb6834" stroke-width="2"/>
-            <text x="210" y="157" font-size="12" font-weight="700" fill="#141a2b">Collaboration Spine</text>
-            <text x="210" y="174" font-size="10.5" fill="#6b6b6b">5,600 sq ft &#183; 14 rooms &#183; 4 war rooms</text>
-            <text x="210" y="211" font-size="10" font-weight="600" fill="#1baf7a">planting spine</text>
-            <path d="M 210 222 H 418" stroke="#1baf7a" stroke-width="3" stroke-dasharray="2 7" stroke-linecap="round" opacity=".9"/>
-
-            <rect x="438" y="134" width="118" height="104" rx="5" fill="#6b6b6b" opacity=".16"/>
-            <rect x="438" y="134" width="118" height="104" rx="5" fill="none" stroke="#6b6b6b" stroke-width="2"/>
-            <text x="450" y="157" font-size="12" font-weight="700" fill="#141a2b">Core &amp;</text>
-            <text x="450" y="172" font-size="12" font-weight="700" fill="#141a2b">Support</text>
-            <text x="450" y="190" font-size="10.5" fill="#6b6b6b">3,900 sq ft</text>
-
-            <rect x="564" y="134" width="70" height="104" rx="5" fill="#eda100" opacity=".18"/>
-            <rect x="564" y="134" width="70" height="104" rx="5" fill="none" stroke="#eda100" stroke-width="2"/>
-            <text x="574" y="157" font-size="11" font-weight="700" fill="#141a2b">Focus &amp;</text>
-            <text x="574" y="171" font-size="11" font-weight="700" fill="#141a2b">Booths</text>
-            <text x="574" y="188" font-size="10" fill="#6b6b6b">22 booths</text>
-
-            <!-- Social / Town Hall -->
-            <rect x="642" y="16" width="146" height="336" rx="5" fill="#e87ba4" opacity=".15"/>
-            <rect x="642" y="16" width="146" height="336" rx="5" fill="none" stroke="#e87ba4" stroke-width="2"/>
-            <text x="654" y="40" font-size="12.5" font-weight="700" fill="#141a2b">Social /</text>
-            <text x="654" y="56" font-size="12.5" font-weight="700" fill="#141a2b">Town Hall</text>
-            <text x="654" y="74" font-size="10.5" fill="#6b6b6b">5,400 sq ft &#183; 180 covers</text>
-            <text x="654" y="94" font-size="10" fill="#6b6b6b">seats the all-hands</text>
-            <text x="654" y="107" font-size="10" fill="#6b6b6b">without a second room</text>
-
-            <!-- entry -->
-            <path d="M -34 186 H 20" stroke="#141a2b" stroke-width="2"/>
-            <path d="M 14 180 L 22 186 L 14 192 Z" fill="#141a2b"/>
-            <text x="-34" y="176" font-size="9.5" font-weight="600" fill="#141a2b">ENTRY</text>
-
-            <!-- one hotspot in its hovered state; the matching side row lights up too -->
-            <rect x="22" y="16" width="612" height="110" rx="5" fill="#000" opacity=".06"/>
-            <rect x="22" y="16" width="612" height="110" rx="5" fill="none" stroke="#141a2b" stroke-width="2" stroke-dasharray="6 4"/>
-            <rect x="19" y="13" width="6" height="6" fill="#fff" stroke="#141a2b" stroke-width="1.5"/>
-            <rect x="631" y="13" width="6" height="6" fill="#fff" stroke="#141a2b" stroke-width="1.5"/>
-            <rect x="19" y="123" width="6" height="6" fill="#fff" stroke="#141a2b" stroke-width="1.5"/>
-            <rect x="631" y="123" width="6" height="6" fill="#fff" stroke="#141a2b" stroke-width="1.5"/>
-            <rect x="424" y="72" width="204" height="44" rx="5" fill="#141a2b"/>
-            <text x="436" y="90" font-size="11.5" font-weight="700" fill="#fff">Workhall &#183; North</text>
-            <text x="436" y="106" font-size="10" fill="#ffffffb3">268 desks &#183; 9,400 sq ft &#183; click for renders</text>
-          </svg>
+  <div class="stage-frame" id="stageFrame">
+    <div class="slide" id="slide">
+      <div class="content">
+        <div class="kicker">
+          <span class="eyebrow">Planning</span>
+          <span class="rule"></span>
+          <span>04 · Zoning</span>
         </div>
-        <div class="cap"><b>Adjacency logic &mdash;</b> both halls take the daylit long elevations; core, support and every enclosed room are pushed inboard, so no desk sits more than 12 m from glass. The collaboration spine separates the two halls and absorbs their noise.</div>
+        <h2>Zoning</h2>
+
+        <div class="explorer">
+          <div class="tabs">
+            <span class="tab on">Plan</span>
+            <span class="tab">Render</span>
+            <span class="tab">Walkthrough</span>
+          </div>
+          <div class="stages">
+            <span class="lbl">Stage</span>
+            <span class="stage on">Zoning</span>
+            <span class="stage">Layout</span>
+          </div>
+
+          <div class="body">
+            <div>
+              <div class="plan">
+                <svg width="810" height="352" viewBox="-38 0 848 368" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="-38" y="0" width="848" height="368" fill="#fcfcfb"/>
+                  <defs>
+                    <linearGradient id="dlN" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0" stop-color="#eda100" stop-opacity=".20"/>
+                      <stop offset="1" stop-color="#eda100" stop-opacity="0"/>
+                    </linearGradient>
+                    <linearGradient id="dlS" x1="0" y1="1" x2="0" y2="0">
+                      <stop offset="0" stop-color="#eda100" stop-opacity=".20"/>
+                      <stop offset="1" stop-color="#eda100" stop-opacity="0"/>
+                    </linearGradient>
+                  </defs>
+                  <!-- daylight off the two long elevations: the reason the halls sit outboard -->
+                  <rect x="14" y="8" width="782" height="30" fill="url(#dlN)"/>
+                  <rect x="14" y="330" width="782" height="30" fill="url(#dlS)"/>
+                  <rect x="14" y="8" width="782" height="352" rx="6" fill="none" stroke="#141a2b" stroke-width="2"/>
+
+                  <!-- Workhall North -->
+                  <rect x="22" y="16" width="612" height="110" rx="5" fill="#1baf7a" opacity=".15"/>
+                  <rect x="22" y="16" width="612" height="110" rx="5" fill="none" stroke="#1baf7a" stroke-width="2"/>
+                  <text x="36" y="40" font-size="13" font-weight="700" fill="#141a2b">Workhall &#183; North</text>
+                  <text x="36" y="57" font-size="11" fill="#6b6b6b">9,400 sq ft &#183; 268 desks &#183; daylit elevation</text>
+
+                  <!-- Workhall South -->
+                  <rect x="22" y="246" width="612" height="106" rx="5" fill="#1baf7a" opacity=".15"/>
+                  <rect x="22" y="246" width="612" height="106" rx="5" fill="none" stroke="#1baf7a" stroke-width="2"/>
+                  <text x="36" y="270" font-size="13" font-weight="700" fill="#141a2b">Workhall &#183; South</text>
+                  <text x="36" y="287" font-size="11" fill="#6b6b6b">8,600 sq ft &#183; 244 desks &#183; daylit elevation</text>
+
+                  <!-- inboard band -->
+                  <rect x="22" y="134" width="168" height="104" rx="5" fill="#2a78d6" opacity=".15"/>
+                  <rect x="22" y="134" width="168" height="104" rx="5" fill="none" stroke="#2a78d6" stroke-width="2"/>
+                  <text x="34" y="157" font-size="12" font-weight="700" fill="#141a2b">Arrival &amp;</text>
+                  <text x="34" y="172" font-size="12" font-weight="700" fill="#141a2b">Client Suite</text>
+                  <text x="34" y="190" font-size="10.5" fill="#6b6b6b">3,200 sq ft &#183; 6 rooms</text>
+
+                  <rect x="198" y="134" width="232" height="104" rx="5" fill="#eb6834" opacity=".15"/>
+                  <rect x="198" y="134" width="232" height="104" rx="5" fill="none" stroke="#eb6834" stroke-width="2"/>
+                  <text x="210" y="157" font-size="12" font-weight="700" fill="#141a2b">Collaboration Spine</text>
+                  <text x="210" y="174" font-size="10.5" fill="#6b6b6b">5,600 sq ft &#183; 14 rooms &#183; 4 war rooms</text>
+                  <text x="210" y="211" font-size="10" font-weight="600" fill="#1baf7a">planting spine</text>
+                  <path d="M 210 222 H 418" stroke="#1baf7a" stroke-width="3" stroke-dasharray="2 7" stroke-linecap="round" opacity=".9"/>
+
+                  <rect x="438" y="134" width="118" height="104" rx="5" fill="#6b6b6b" opacity=".16"/>
+                  <rect x="438" y="134" width="118" height="104" rx="5" fill="none" stroke="#6b6b6b" stroke-width="2"/>
+                  <text x="450" y="157" font-size="12" font-weight="700" fill="#141a2b">Core &amp;</text>
+                  <text x="450" y="172" font-size="12" font-weight="700" fill="#141a2b">Support</text>
+                  <text x="450" y="190" font-size="10.5" fill="#6b6b6b">3,900 sq ft</text>
+
+                  <rect x="564" y="134" width="70" height="104" rx="5" fill="#eda100" opacity=".18"/>
+                  <rect x="564" y="134" width="70" height="104" rx="5" fill="none" stroke="#eda100" stroke-width="2"/>
+                  <text x="574" y="157" font-size="11" font-weight="700" fill="#141a2b">Focus &amp;</text>
+                  <text x="574" y="171" font-size="11" font-weight="700" fill="#141a2b">Booths</text>
+                  <text x="574" y="188" font-size="10" fill="#6b6b6b">22 booths</text>
+
+                  <!-- Social / Town Hall -->
+                  <rect x="642" y="16" width="146" height="336" rx="5" fill="#e87ba4" opacity=".15"/>
+                  <rect x="642" y="16" width="146" height="336" rx="5" fill="none" stroke="#e87ba4" stroke-width="2"/>
+                  <text x="654" y="40" font-size="12.5" font-weight="700" fill="#141a2b">Social /</text>
+                  <text x="654" y="56" font-size="12.5" font-weight="700" fill="#141a2b">Town Hall</text>
+                  <text x="654" y="74" font-size="10.5" fill="#6b6b6b">5,400 sq ft &#183; 180 covers</text>
+                  <text x="654" y="94" font-size="10" fill="#6b6b6b">seats the all-hands</text>
+                  <text x="654" y="107" font-size="10" fill="#6b6b6b">without a second room</text>
+
+                  <!-- entry -->
+                  <path d="M -34 186 H 20" stroke="#141a2b" stroke-width="2"/>
+                  <path d="M 14 180 L 22 186 L 14 192 Z" fill="#141a2b"/>
+                  <text x="-34" y="176" font-size="9.5" font-weight="600" fill="#141a2b">ENTRY</text>
+
+                  <!-- one hotspot in its hovered state; the matching side row lights up too -->
+                  <rect x="22" y="16" width="612" height="110" rx="5" fill="#000" opacity=".06"/>
+                  <rect x="22" y="16" width="612" height="110" rx="5" fill="none" stroke="#141a2b" stroke-width="2" stroke-dasharray="6 4"/>
+                  <rect x="19" y="13" width="6" height="6" fill="#fff" stroke="#141a2b" stroke-width="1.5"/>
+                  <rect x="631" y="13" width="6" height="6" fill="#fff" stroke="#141a2b" stroke-width="1.5"/>
+                  <rect x="19" y="123" width="6" height="6" fill="#fff" stroke="#141a2b" stroke-width="1.5"/>
+                  <rect x="631" y="123" width="6" height="6" fill="#fff" stroke="#141a2b" stroke-width="1.5"/>
+                  <rect x="424" y="72" width="204" height="44" rx="5" fill="#141a2b"/>
+                  <text x="436" y="90" font-size="11.5" font-weight="700" fill="#fff">Workhall &#183; North</text>
+                  <text x="436" y="106" font-size="10" fill="#ffffffb3">268 desks &#183; 9,400 sq ft &#183; click for renders</text>
+                </svg>
+              </div>
+              <div class="cap"><b>Adjacency logic &mdash;</b> both halls take the daylit long elevations; core, support and every enclosed room are pushed inboard, so no desk sits more than 12 m from glass. The collaboration spine separates the two halls and absorbs their noise.</div>
+            </div>
+
+            <div class="side">
+              <h3>Zones <span>38,000 sq ft</span></h3>
+
+              <div class="row hover">
+                <span class="sw" style="background:var(--z2)"></span>
+                <div><span class="nm">Workhall · North</span><span class="sub">daylit elevation</span></div>
+                <span class="ar">9,400<br><span style="font-weight:500;color:var(--ink-3)">268 desks</span></span>
+              </div>
+              <div class="row">
+                <span class="sw" style="background:var(--z2)"></span>
+                <div><span class="nm">Workhall · South</span><span class="sub">daylit elevation</span></div>
+                <span class="ar">8,600<br><span style="font-weight:500;color:var(--ink-3)">244 desks</span></span>
+              </div>
+              <div class="row">
+                <span class="sw" style="background:var(--z3)"></span>
+                <div><span class="nm">Collaboration Spine</span><span class="sub">14 rooms · 4 war rooms</span></div>
+                <span class="ar">5,600</span>
+              </div>
+              <div class="row">
+                <span class="sw" style="background:var(--z5)"></span>
+                <div><span class="nm">Social / Town Hall</span><span class="sub">180 covers</span></div>
+                <span class="ar">5,400</span>
+              </div>
+              <div class="row">
+                <span class="sw" style="background:var(--z6)"></span>
+                <div><span class="nm">Core &amp; Support</span><span class="sub">services, server, stores</span></div>
+                <span class="ar">3,900</span>
+              </div>
+              <div class="row">
+                <span class="sw" style="background:var(--z1)"></span>
+                <div><span class="nm">Arrival &amp; Client Suite</span><span class="sub">6 rooms, segregated</span></div>
+                <span class="ar">3,200</span>
+              </div>
+              <div class="row">
+                <span class="sw" style="background:var(--z4)"></span>
+                <div><span class="nm">Focus &amp; Phone Booths</span><span class="sub">22 booths</span></div>
+                <span class="ar">1,900</span>
+              </div>
+
+              <div class="foot">
+                <div class="big">620 headcount · 512 desks · 1 : 0.83</div>
+                <div class="small">Carried from the attendance slide, so zoning and capacity never disagree.</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="side">
-        <h3>Zones <span>38,000 sq ft</span></h3>
-
-        <div class="row hover">
-          <span class="sw" style="background:var(--z2)"></span>
-          <div><span class="nm">Workhall · North</span><span class="sub">daylit elevation</span></div>
-          <span class="ar">9,400<br><span style="font-weight:500;color:var(--ink-3)">268 desks</span></span>
-        </div>
-        <div class="row">
-          <span class="sw" style="background:var(--z2)"></span>
-          <div><span class="nm">Workhall · South</span><span class="sub">daylit elevation</span></div>
-          <span class="ar">8,600<br><span style="font-weight:500;color:var(--ink-3)">244 desks</span></span>
-        </div>
-        <div class="row">
-          <span class="sw" style="background:var(--z3)"></span>
-          <div><span class="nm">Collaboration Spine</span><span class="sub">14 rooms · 4 war rooms</span></div>
-          <span class="ar">5,600</span>
-        </div>
-        <div class="row">
-          <span class="sw" style="background:var(--z5)"></span>
-          <div><span class="nm">Social / Town Hall</span><span class="sub">180 covers</span></div>
-          <span class="ar">5,400</span>
-        </div>
-        <div class="row">
-          <span class="sw" style="background:var(--z6)"></span>
-          <div><span class="nm">Core &amp; Support</span><span class="sub">services, server, stores</span></div>
-          <span class="ar">3,900</span>
-        </div>
-        <div class="row">
-          <span class="sw" style="background:var(--z1)"></span>
-          <div><span class="nm">Arrival &amp; Client Suite</span><span class="sub">6 rooms, segregated</span></div>
-          <span class="ar">3,200</span>
-        </div>
-        <div class="row">
-          <span class="sw" style="background:var(--z4)"></span>
-          <div><span class="nm">Focus &amp; Phone Booths</span><span class="sub">22 booths</span></div>
-          <span class="ar">1,900</span>
-        </div>
-
-        <div class="foot">
-          <div class="big">620 headcount · 512 desks · 1 : 0.83</div>
-          <div class="small">Carried from the attendance slide, so zoning and capacity never disagree.</div>
-        </div>
+      <div class="brand">
+        <span class="mark">Officebanao</span>
+        <span class="c">© Copyright 2026, Officebanao. All rights reserved.</span>
       </div>
     </div>
   </div>
+
+  <div class="note">
+    <div class="note-col">
+      <h4>What's real</h4>
+      <p>The 1280×720 stage, every colour token, and the <code>linked-views</code>
+        layout itself — view tabs, stage pills, the plan, the two-way-hover
+        side list — all come straight out of Presenta's own
+        <code>SlideRenderer.tsx</code>. Zone colours reuse the same
+        categorical palette used by every generated diagram in the library.</p>
+    </div>
+    <div class="note-col">
+      <h4>What's invented</h4>
+      <p>The floor plate itself — a real project supplies its own. This one
+        is a stand-in with internally consistent numbers (38,000 sq ft ·
+        620 headcount · 512 desks · 1&nbsp;:&nbsp;0.83) so the sharing ratio
+        never disagrees with the attendance slide. No real client is named.</p>
+    </div>
   </div>
 
-  <div class="brand">
-    <img src="/home/user/ob-presenta/public/logos/ob.png" alt="Officebanao">
-    <span class="c">© Copyright 2026, Officebanao. All rights reserved.</span>
+  <div class="page-foot">
+    <code>S062</code> · EX1 profile (T01 IT + C01 Biophilic) ·
+    <code>docs/template-system/mockup/s062-zoning-it-biophilic.html</code>
   </div>
 </div>
+
+<script>
+(function(){
+  var frame = document.getElementById('stageFrame');
+  var slide = document.getElementById('slide');
+  function fit(){
+    var w = frame.clientWidth;
+    slide.style.transform = 'scale(' + (w / 1280) + ')';
+  }
+  try{
+    if ('ResizeObserver' in window){
+      new ResizeObserver(fit).observe(frame);
+    } else {
+      window.addEventListener('resize', fit);
+    }
+  } catch (e) {}
+  fit();
+})();
+</script>

@@ -41,6 +41,10 @@ export function SeatingTable({
   // own visible/expanded state, it stays local rather than persisted, so
   // collapsing it while presenting never edits the deck.
   const [collapsed, setCollapsed] = useState(false);
+  // Goes further than collapsed: no title bar left at all, just a narrow
+  // reopen tab (see the early return below) — same non-persisted
+  // convenience, same free reset on every view/stage switch (a fresh mount).
+  const [hidden, setHidden] = useState(false);
   const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
   const [importBusy, setImportBusy] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -150,6 +154,23 @@ export function SeatingTable({
     }
   }
 
+  // Closed goes further than collapsed — no title bar left, just a narrow
+  // reopen tab, materially thinner than even the collapsed title bar, so the
+  // plan reclaims that much more width (same reflow mechanism: this
+  // component's own root claims less, the plan next to it fills the rest).
+  if (hidden) {
+    return (
+      <button
+        type="button"
+        onClick={() => setHidden(false)}
+        title="Show seating capacity"
+        className="flex w-6 shrink-0 items-center justify-center rounded-md border border-dashed border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+      >
+        <span className="[writing-mode:vertical-rl] text-[10px] font-bold uppercase tracking-wide">Seating</span>
+      </button>
+    );
+  }
+
   // Collapsed drops the fixed width rather than just hiding content below it
   // — the plan sits in a `flex-1 aspect-video` box right next to this one, so
   // freeing the width here lets it actually grow into it (and, via
@@ -168,6 +189,14 @@ export function SeatingTable({
           className="shrink-0 text-[9px] text-[var(--ink-3)] hover:text-[var(--ink)]"
         >
           <span className={`inline-block transition-transform ${collapsed ? '-rotate-90' : ''}`}>▾</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setHidden(true)}
+          title="Close seating capacity"
+          className="shrink-0 text-[10px] text-[var(--ink-3)] hover:text-[var(--ink)]"
+        >
+          ✕
         </button>
         <EditableText
           editable={editable}

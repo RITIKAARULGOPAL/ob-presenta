@@ -32,6 +32,121 @@ or re-explain anything.
 
 ---
 
+## 2026-09-24 — Home filter/sort, close-button UX, a real CSS collision, spline/freehand tools, popup overlap+drag, seating close+reflow
+
+**Context:** a run of small, mostly screenshot-driven UX fixes across the
+home page and the Linked Views editor, each confirmed with the user before
+building (two `AskUserQuestion` rounds on the home-page filter/sort shape
+and the spline-vs-freehand split; a third on how the seating-table close
+button should stay reachable, plus a follow-up ask to fix a reflow
+regression discovered mid-build). No PROGRESS.md entries were written as
+these landed one after another — this entry covers all of them at once.
+
+**Done:**
+- **Home page: filter + sort for "Recent"** ([page.tsx](src/app/page.tsx)).
+  New search input (matches on project name) plus two `SegmentedControl`s —
+  brand filter and a 3-way sort (Last edited / Name / Presentation date).
+  `ProjectSummary` gained `brand` ([slide.ts](src/types/slide.ts),
+  [data.ts](src/lib/data.ts)'s `listProjects` query/mapping) so the brand
+  filter has something to read without a second fetch.
+- **Home page: close (×) instead of "← Back to Presenta"** — new `IconClose`
+  ([icons.tsx](src/components/icons.tsx)), replacing the text link with an
+  `IconButton` floating top-right on the form panel (`absolute right-4
+  top-4`), matching how `Lightbox` positions its own close control.
+- **A real CSS variable collision, found from a screenshot of oddly
+  pill-shaped home-page inputs**: `globals.css`'s top-level `:root` defined
+  bare `--radius-sm/md/lg`/`--shadow-sm/md/lg`, which collided with Tailwind
+  v4's own reserved theme variables of the same name — silently overriding
+  them **app-wide**, not just on slides, which is why plain chrome inputs
+  were rendering with an oversized slide-card radius. Renamed to
+  `--deck-radius-*`/`--deck-shadow-*` (values unchanged) and updated the 5
+  call sites in [SpaceDetailOverlay.tsx](src/components/SpaceDetailOverlay.tsx).
+  Rewrote the explaining comment carefully to avoid embedding a literal
+  `*/` in the prose — an earlier draft of that same comment did exactly
+  this and prematurely closed the CSS block comment, breaking the whole
+  stylesheet (`CssSyntaxError: Unknown word NOT`) until reworded.
+- **Two new drawing tools: Spline and Freehand** ([hotspotShape.ts](src/lib/hotspotShape.ts),
+  [SlideRenderer.tsx](src/components/SlideRenderer.tsx)) — the user's own
+  answer to "should spline be click-based or freehand": both. Spline is
+  click-to-place-points using the existing Catmull-Rom-to-Bezier renderer
+  (already built for a since-removed tool, reused as-is); Freehand samples
+  every pointer-move point during a single drag, then runs a new
+  `simplifyPath()` (full Ramer-Douglas-Peucker implementation,
+  `hotspotShape.ts`) to thin the dense trace down to its defining points
+  before handing it to the same spline renderer. New `boundingBoxOf()`
+  helper added alongside (built for the popup-anchor fix below, lives in
+  the same file).
+- **Hotspot edit/create popup no longer overflows or covers the shape, and
+  is now draggable** (`LinkedViewsExplorer`,`SlideRenderer.tsx`) — three
+  separate but related fixes to the same popup:
+  1. A `ResizeObserver`-backed `stageSize` state clamps the popup inside the
+     stage box and caps its height with a scrollbar, fixing a real overflow
+     where the popup ran off the bottom of the canvas.
+  2. `popupPosition()` now anchors **beside** the shape's bounding box
+     (right of it, or left if there isn't room) instead of centering on its
+     centroid — so the region being edited stays visible while its popup is
+     open, instead of being hidden underneath it.
+  3. The popup's title row is now a drag handle (pointer-capture pattern,
+     `cursor-grab`/`active:cursor-grabbing`), with the dragged offset reset
+     via a render-time ref-comparison check whenever a different hotspot
+     starts being edited (not a `useEffect`, to avoid a
+     `react-hooks/set-state-in-effect` violation the first draft tripped).
+  Two lint violations were caught during this pass (a `react-hooks/refs`
+  read of `stageBoxRef.current` during render, and the `set-state-in-effect`
+  above) via structured (`{file, ruleId, severity}` count) eslint diffing —
+  both fixed before landing, not shipped and cleaned up later.
+- **Seating Capacity: a close (✕) button, and a real reflow fix underneath
+  it** ([SeatingTable.tsx](src/components/SeatingTable.tsx),
+  `SlideRenderer.tsx`). New `hidden` state collapses the whole panel to a
+  narrow (`w-6`) persistent vertical "Seating" reopen tab — chosen over a
+  plain vanish, per the user's own answer, so closing it doesn't strand you
+  with no way back short of switching view/stage. Closing it (or the
+  pre-existing collapse toggle) is meant to let the plan grow into the
+  freed width — while verifying that, found the CSS-only `aspect-video
+  h-full` approach never actually delivered this on typical row
+  proportions (confirmed live: `aspect-ratio` + flex-grow + a separate
+  `max-height` cap don't reliably combine — width can grow via flex-grow
+  and then get capped by height without ever being re-derived from it,
+  breaking the 16:9 ratio outright). Replaced it with a JS-computed
+  `fitSize` (a `ResizeObserver` on the row + aside, computing the largest
+  16:9 box that fits the freed space, applied via an inline `style`) —
+  confirmed correct on a forced-dimension test (hand-computed 96×54 open →
+  360×203 closed) and, un-forced, in real Presenter mode (848×477 →
+  1008×567, since Presenter's own proportions happen to sit in the
+  width-bound regime the real test deck's layout doesn't). The pre-existing
+  collapse toggle now also genuinely benefits from this fix, not just the
+  new close button.
+- **Verified live throughout**: `tsc --noEmit` clean; structured
+  (`{file, ruleId, severity}` count) eslint diffing at each step, avoiding
+  the message-text false positives line-number drift would otherwise cause.
+  All scratch Supabase projects created for verification were deleted
+  afterward.
+
+**Watch out for:**
+- Long-lived browser-automation tabs accumulated stale state repeatedly
+  during this session (freehand-tool tests, popup-drag reset tests) —
+  fixed each time with a fresh tab/reload, not an app bug. Same recurring
+  gotcha this repo's other entries already document.
+- Rail-thumbnail-vs-main-canvas DOM duplication (`LinkedViewsExplorer`
+  renders independently in both) bit again — worked around with an
+  `isInRailPreview()` ancestor-class check (`/scale-\[/`) excluding rail
+  matches from every query, same fix pattern as prior entries.
+
+**Left off / next up:**
+- Two popup-drag verification checklist items were never independently
+  proven live due to repeated viewport/tab interruptions: the popup
+  flipping to the shape's *left* near the stage's right edge, and the
+  dragged position correctly resetting (not persisting) on reopening a
+  different hotspot's popup. Both are believed correct by construction
+  (they mirror an already-proven branch and an already-proven reset
+  pattern respectively) but worth a real check if ever doubted.
+- Nothing from today is committed yet — stacks on top of everything already
+  uncommitted from `1b49267` onward. Given how much has piled up across
+  this whole run of sessions, worth committing in separated commits rather
+  than one giant one next time this is picked up.
+
+---
+
 ## 2026-09-23 (cont'd 2) — Linked Views: zone-to-rooms split/merge burst transition
 
 **Context:** follow-on to the plan-evolution timeline just below — that

@@ -52,7 +52,7 @@ export function SpaceDetailOverlay({
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="max-h-full w-full max-w-lg overflow-y-auto rounded-[var(--radius-lg)] bg-white p-5 shadow-[var(--shadow-lg)]"
+        className="max-h-full w-full max-w-lg overflow-y-auto rounded-[var(--deck-radius-lg)] bg-white p-5 shadow-[var(--deck-shadow-lg)]"
       >
         <div className="mb-3 flex items-center justify-between gap-2">
           <span className="text-xs font-bold uppercase tracking-wide text-[var(--ink-3)]">{label || 'This space'}</span>
@@ -62,7 +62,7 @@ export function SpaceDetailOverlay({
         </div>
 
         {hasConcept && (
-          <div className="mb-4 rounded-[var(--radius-md)] border border-[var(--accent-soft-line)] bg-[var(--accent-soft)] p-3">
+          <div className="mb-4 rounded-[var(--deck-radius-md)] border border-[var(--accent-soft-line)] bg-[var(--accent-soft)] p-3">
             {detail!.concept!.imageUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={detail!.concept!.imageUrl} alt="" className="mb-2 h-32 w-full rounded object-cover" />
@@ -89,12 +89,12 @@ export function SpaceDetailOverlay({
         {hasWalkthrough && (
           <div className="mb-4">
             <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--ink-3)]">Walkthrough</div>
-            <video src={detail!.walkthroughUrl} controls className="w-full rounded-[var(--radius-md)]" />
+            <video src={detail!.walkthroughUrl} controls className="w-full rounded-[var(--deck-radius-md)]" />
           </div>
         )}
 
         {hasOccupancy && (
-          <div className="mb-4 flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--line)] px-3 py-2">
+          <div className="mb-4 flex items-center justify-between rounded-[var(--deck-radius-md)] border border-[var(--line)] px-3 py-2">
             <span className="text-[13px] font-medium text-[var(--ink-2)]">Occupancy</span>
             <span className="text-[13px] font-semibold text-[var(--ink)]">
               {occupancy!.required ? `${occupancy!.required} req. · ${occupancy!.achieved} achieved` : occupancy!.achieved}
@@ -103,7 +103,7 @@ export function SpaceDetailOverlay({
         )}
 
         {hasBoq && (
-          <div className="mb-4 rounded-[var(--radius-md)] border border-dashed border-[var(--line)] px-3 py-2 text-[13px] text-[var(--ink-3)]">
+          <div className="mb-4 rounded-[var(--deck-radius-md)] border border-dashed border-[var(--line)] px-3 py-2 text-[13px] text-[var(--ink-3)]">
             <span className="font-semibold text-[var(--ink-2)]">BOQ — </span>
             {detail!.boq!.note || 'Coming soon.'}
           </div>

@@ -36,9 +36,9 @@
      session tiring; this softens the jump without dimming the slide itself. */
   --app-canvas: #f1f5f9;
 
-  /* Chrome radius, three steps. Deliberately NOT --radius-*: the deck owns
-     that name (the --radius-sm/md/lg further down are referenced by slides
-     via var()), and clobbering it would reshape every exported card. */
+  /* Chrome radius, three steps. Its own --app-radius-* names, not Tailwind's
+     own --radius-* theme variables — see --deck-radius-* further down for
+     why sharing that name is specifically the thing to avoid. */
   --app-radius-sm: 6px;
   --app-radius-md: 10px;
   --app-radius-lg: 14px;
@@ -98,13 +98,25 @@
   /* Deck-wide radius/shadow scale — a designer-deck polish pass, not part of
      the chrome theme above. Ink-tinted rather than pure black so shadows read
      as soft depth instead of a default browser drop-shadow. Slides reference
-     these directly via var(), so they stay the same in both themes. */
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 22px;
-  --shadow-sm: 0 1px 2px rgba(20, 26, 43, 0.06), 0 1px 1px rgba(20, 26, 43, 0.04);
-  --shadow-md: 0 6px 16px rgba(20, 26, 43, 0.08), 0 2px 6px rgba(20, 26, 43, 0.05);
-  --shadow-lg: 0 20px 48px rgba(20, 26, 43, 0.14), 0 6px 16px rgba(20, 26, 43, 0.08);
+     these directly via var(), so they stay the same in both themes.
+
+     Named --deck-radius-* and --deck-shadow-*, NOT the bare --radius-* and
+     --shadow-* names — those are Tailwind's own theme variables (they're
+     what `rounded-lg`/`shadow-lg`/etc. resolve through), and a same-named
+     :root rule here would silently win the cascade over Tailwind's real
+     defaults for every plain rounded-* and shadow-* utility class in the
+     whole app, not just on a slide.
+     That collision existed under the old bare names — e.g. a plain
+     `rounded-lg` anywhere in the chrome (the home screen's own project-name
+     input, among others) was rendering at this scale's 22px instead of
+     Tailwind's own ~8px. Fixed by renaming; anything that deliberately wants
+     this scale spells it out via var(--deck-radius-md) etc. */
+  --deck-radius-sm: 8px;
+  --deck-radius-md: 14px;
+  --deck-radius-lg: 22px;
+  --deck-shadow-sm: 0 1px 2px rgba(20, 26, 43, 0.06), 0 1px 1px rgba(20, 26, 43, 0.04);
+  --deck-shadow-md: 0 6px 16px rgba(20, 26, 43, 0.08), 0 2px 6px rgba(20, 26, 43, 0.05);
+  --deck-shadow-lg: 0 20px 48px rgba(20, 26, 43, 0.14), 0 6px 16px rgba(20, 26, 43, 0.08);
 }
 
 [data-theme="dark"] {

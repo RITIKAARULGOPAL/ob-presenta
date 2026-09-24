@@ -9,6 +9,7 @@ import { dataUrlBytes, fileToDataUrl, fileToSlideImage } from '@/lib/imageFile';
 import { loadPdfDocument, preparePdfPlan, renderPlanPage } from '@/lib/pdfPlan';
 import { buildSnapIndex, snapTo, type SnapResult } from '@/lib/planSnap';
 import {
+  boundingBoxOf,
   centroidOf,
   clamp01,
   distance,
@@ -18,6 +19,7 @@ import {
   hasEnoughPoints,
   shapeArea,
   shapePath,
+  simplifyPath,
   snapAngle,
   squareFrom,
   type ShapeKind,
@@ -211,7 +213,7 @@ function MediaBox({
           // dark mount, so the bars around it are white rather than the
           // usual scrim.
           fit === 'contain' && url ? 'bg-white' : 'bg-black/30'
-        } ${square ? '' : elevated ? 'rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)]' : 'rounded-lg'} ${dragging ? 'ring-2 ring-[var(--accent)]' : ''} ${
+        } ${square ? '' : elevated ? 'rounded-[var(--deck-radius-lg)] shadow-[var(--deck-shadow-lg)]' : 'rounded-lg'} ${dragging ? 'ring-2 ring-[var(--accent)]' : ''} ${
           canAdjust && url && !adjusting ? 'cursor-pointer' : ''
         }`}
         onClick={canAdjust && url && !adjusting ? () => setAdjusting(true) : undefined}
@@ -949,7 +951,7 @@ function BrandFooter({ slide, dark }: { slide: Slide; dark: boolean }) {
   );
 }
 
-type DrawTool = 'rect' | 'ellipse' | 'polygon';
+type DrawTool = 'rect' | 'ellipse' | 'polygon' | 'spline' | 'freehand';
 
 /** How long a Layout-view stage transition's crossfade/shape-morph/overlay
  *  -fade runs, all three driven off one shared clock so they land in sync —
@@ -961,15 +963,28 @@ const TOOLS: { key: DrawTool; label: string; hint: string }[] = [
   { key: 'rect', label: '▭ Rectangle', hint: 'Drag a box over the area. Shift for a square.' },
   { key: 'ellipse', label: '◯ Ellipse', hint: 'Drag to size it. Shift for a circle.' },
   { key: 'polygon', label: '⬡ Polygon', hint: 'Click each corner. Shift locks to 45°. Click the first point, or Enter, to close.' },
+  { key: 'spline', label: '∿ Spline', hint: 'Click each point. Shift locks to 45°. Click the first point, or Enter, to close — edges curve smoothly through your points.' },
+  { key: 'freehand', label: '✎ Freehand', hint: 'Drag along the boundary — released as a smooth curve through your trace.' },
 ];
 
 function shapeForTool(tool: DrawTool): ShapeKind {
-  return tool === 'ellipse' ? 'ellipse' : 'polygon';
+  if (tool === 'ellipse') return 'ellipse';
+  if (tool === 'spline' || tool === 'freehand') return 'spline';
+  return 'polygon';
 }
 
-/** Rect and ellipse are drags; polygon is a series of clicks. */
+/** Rect and ellipse are two-corner drags. Freehand is also a drag, but a
+ *  continuous trace rather than two corners — it needs its own handling
+ *  everywhere this function's "exactly the start and end corner" assumption
+ *  doesn't hold, so it's deliberately NOT included here. */
 function isDragTool(tool: DrawTool | null): boolean {
   return tool === 'rect' || tool === 'ellipse';
+}
+
+/** Polygon and spline are both a series of clicks — same interaction,
+ *  different final edge rendering (straight vs. curved through the points). */
+function isClickTool(tool: DrawTool | null): boolean {
+  return tool === 'polygon' || tool === 'spline';
 }
 
 /** A region drawn as a polygon on a source image. Editable mode: click to place
@@ -1107,6 +1122,88 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   const panRef = useRef<{ startX: number; startY: number; startPanX: number; startPanY: number; moved: boolean } | null>(null);
   const stageBoxRef = useRef<HTMLDivElement>(null);
   const zoomPanActiveRef = useRef(false);
+  // The hotspot popup below clamps its own position against the stage's
+  // current size — tracked here via ResizeObserver (an effect, not a
+  // render-time ref read) rather than reaching into stageBoxRef.current
+  // directly while rendering, which is exactly the "ref access during
+  // render" pattern this file's own lint rule already flags elsewhere.
+  const [stageSize, setStageSize] = useState<{ width: number; height: number } | null>(null);
+  useEffect(() => {
+    const el = stageBoxRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setStageSize({ width, height });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  /** The plan box's own size, computed in JS rather than left to CSS.
+   *
+   *  `aspect-video h-full` alone (the previous approach) pins height to the
+   *  row's own height and derives width from *that* — deliberately, per the
+   *  comment where it's used below: pairing `flex-1` (so width could grow
+   *  into space freed by the aside panel collapsing/closing) with an
+   *  aspect-ratio box leaves nothing "auto" for the aspect ratio to derive,
+   *  so browsers just ignore the ratio outright — confirmed live before
+   *  writing this, not assumed. That trade-off shipped the Presenter
+   *  no-overflow fix, but as a side effect made the plan's width
+   *  permanently blind to how much room the aside actually claims — so
+   *  collapsing or closing the Seating Capacity panel just left empty
+   *  gutter next to the plan instead of the plan actually growing into it.
+   *
+   *  Computing the fit ourselves — largest 16:9 box that satisfies BOTH the
+   *  row's available width (row width minus whatever the aside currently
+   *  claims) AND its available height — gets both properties genuinely:
+   *  never taller than the row (still Presenter-safe) and, whenever the
+   *  aside frees up width, the plan actually uses it. `rowRef`/`asideRef`
+   *  measure via `offsetWidth/Height` (layout size), not
+   *  `getBoundingClientRect()` — the editor's `ScaledStage` visually scales
+   *  the whole canvas down for display, so `getBoundingClientRect()` would
+   *  read post-scale pixels while the size we're computing here has to be
+   *  set as a style *inside* that same scaled subtree; confirmed live that
+   *  using the wrong one silently double-scales the result. */
+  const rowRef = useRef<HTMLDivElement>(null);
+  const asideRef = useRef<HTMLDivElement>(null);
+  const [fitSize, setFitSize] = useState<{ width: number; height: number } | null>(null);
+  useEffect(() => {
+    const row = rowRef.current;
+    if (!row) return;
+    function recompute() {
+      const rowEl = rowRef.current;
+      if (!rowEl) return;
+      const rowW = rowEl.offsetWidth;
+      const rowH = rowEl.offsetHeight;
+      const asideW = asideRef.current?.offsetWidth ?? 0;
+      const GAP = 16; // matches the row's own gap-4
+      const availW = Math.max(0, rowW - (asideW > 0 ? asideW + GAP : 0));
+      if (availW <= 0 || rowH <= 0) return;
+      const ratio = 16 / 9;
+      setFitSize(
+        availW / rowH > ratio ? { width: rowH * ratio, height: rowH } : { width: availW, height: availW / ratio },
+      );
+    }
+    const observer = new ResizeObserver(recompute);
+    observer.observe(row);
+    if (asideRef.current) observer.observe(asideRef.current);
+    recompute();
+    return () => observer.disconnect();
+  }, []);
+  /** Manual override for the hotspot popup's computed position — a pixel
+   *  offset added on top of whatever `popupPosition()` would otherwise
+   *  place it at, so dragging works regardless of which side of the shape
+   *  the popup auto-anchored to. Reset (below the early return, where
+   *  `editingHotspotId`/`pickingTarget` are in scope together) whenever a
+   *  *different* popup opens — a drag is a one-popup-instance override, not
+   *  a persisted preference. That reset compares against `prevPopupKeyRef`
+   *  and calls `setPopupDrag` conditionally during render rather than from
+   *  a useEffect — React's own documented pattern for "reset state when a
+   *  key changes", which skips the extra render-then-effect round trip an
+   *  effect would need and (unlike one) doesn't trip this file's existing
+   *  react-hooks/set-state-in-effect warnings. */
+  const [popupDrag, setPopupDrag] = useState<{ x: number; y: number } | null>(null);
+  const popupDragRef = useRef<{ startX: number; startY: number; startOffset: { x: number; y: number } } | null>(null);
+  const prevPopupKeyRef = useRef<string | null>(null);
   /** Live, uncommitted angle while the north-point handle is being dragged —
    *  `null` when not dragging. Read by both the toolbar icon and the
    *  on-stage badge so they rotate together in real time; committed once, on
@@ -1470,12 +1567,14 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   /** Cursor is within snapping distance of the first vertex, so a click closes
    *  the shape rather than adding another point. */
   const canClose =
-    tool === 'polygon' && !!drawingPoints && drawingPoints.length >= 3 && !!cursor && distance(cursor, drawingPoints[0]) < 0.02;
+    isClickTool(tool) && !!drawingPoints && drawingPoints.length >= 3 && !!cursor && distance(cursor, drawingPoints[0]) < 0.02;
 
   function pointAt(e: React.PointerEvent<HTMLDivElement>): Point {
     const rect = e.currentTarget.getBoundingClientRect();
     const raw = clamp01({ x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height });
-    if (!e.shiftKey) return raw;
+    // A freehand trace has no notion of "square" or "45°-locked" — it's a
+    // continuous gesture, not a series of discrete points to constrain.
+    if (!e.shiftKey || tool === 'freehand') return raw;
 
     const aspect = rect.width / rect.height;
     if (isDragTool(tool)) {
@@ -1543,7 +1642,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     setOrtho(e.shiftKey);
     const point = pointAt(e);
 
-    if (tool === 'polygon') {
+    if (isClickTool(tool)) {
       if (canClose) {
         finishShape(drawingPoints!);
         return;
@@ -1589,6 +1688,10 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
 
     if (isDragTool(tool)) {
       setDrawingPoints((prev) => (prev ? [prev[0], point] : [point]));
+    } else if (tool === 'freehand') {
+      // Every sample, not just start/end — simplifyPath thins this down to
+      // the few points the traced shape actually needs, on release.
+      setDrawingPoints((prev) => (prev ? [...prev, point] : [point]));
     }
   }
 
@@ -1615,6 +1718,18 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     }
     const pts = drawingPoints;
     if (!pts) return;
+
+    if (tool === 'freehand') {
+      const simplified = simplifyPath(pts);
+      // Too short a drag simplifies down to fewer points than a closed
+      // region needs — discard it, same call as a too-small rect/ellipse.
+      if (!hasEnoughPoints(simplified, 'spline')) {
+        setDrawingPoints(null);
+        return;
+      }
+      finishShape(simplified);
+      return;
+    }
 
     if (!isDragTool(tool) || pts.length !== 2) return;
     // pts[1] already carries the square constraint from pointAt. Ignore an
@@ -1895,7 +2010,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     setDragging(false);
     setOrtho(false);
     setEditingHotspotId(null);
-    setTool(h.shape === 'ellipse' ? 'ellipse' : 'polygon');
+    setTool(h.shape === 'ellipse' ? 'ellipse' : h.shape === 'spline' ? 'spline' : 'polygon');
     setRedrawShapeFor({ hotspotId: h.id, stageId: activeStage.id });
   }
 
@@ -1973,9 +2088,101 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
 
   const centroid: Point | null = drawingPoints ? centroidOf(drawingPoints) : null;
   const editingCentroid: Point | null = editingHotspot ? centroidOf(pointsFor(editingHotspot)) : null;
+  const bounds = drawingPoints ? boundingBoxOf(drawingPoints) : null;
+  const editingBounds = editingHotspot ? boundingBoxOf(pointsFor(editingHotspot)) : null;
   const showPopup = pickingTarget || !!editingHotspotId;
   const popupCentroid = editingHotspotId ? editingCentroid : centroid;
+  const popupBounds = editingHotspotId ? editingBounds : bounds;
   const dark = slide.style === 'section-starter' || slide.style === 'design';
+
+  const popupKey = editingHotspotId ?? (pickingTarget ? 'drawing' : null);
+  if (popupKey !== prevPopupKeyRef.current) {
+    prevPopupKeyRef.current = popupKey;
+    if (popupDrag !== null) setPopupDrag(null);
+  }
+
+  /** The hotspot popup used to be pinned to the shape's own centroid with no
+   *  bounds-checking and no height cap — grown over many sessions (label,
+   *  target, fill/stroke, zone, adjacency, gallery, space detail…), it could
+   *  run off the stage's bottom or side edge and, since the stage itself is
+   *  `overflow-hidden`, get silently clipped rather than just spilling onto
+   *  the page, and it sat directly on top of the shape it was editing,
+   *  hiding it. Now anchors *beside* the shape's bounding box (right of it
+   *  by default, left if there isn't room) instead of centered on it, still
+   *  clamped so the whole popup stays inside the stage, still capped in
+   *  height with its own scrollbar — and a manual drag (see the title row's
+   *  handlers below) can override this computed spot, itself still clamped
+   *  to the stage for the same reason. Uses `stageSize` (kept fresh by the
+   *  ResizeObserver above), not a direct `stageBoxRef.current` read here
+   *  during render. */
+  function popupPosition(): { left: string; top: string; maxHeight?: string } {
+    if (!popupCentroid) return { left: '0', top: '0' };
+    if (!stageSize) return { left: `${popupCentroid.x * 100}%`, top: `${popupCentroid.y * 100}%` };
+    const POPUP_WIDTH = 240; // matches the popup's own w-60
+    const GAP = 16; // clearance from the shape's own edge
+    const MARGIN = 8;
+    const maxHeight = stageSize.height * 0.85;
+    const halfW = Math.min(POPUP_WIDTH / 2, stageSize.width / 2);
+    const halfH = Math.min(maxHeight / 2, stageSize.height / 2);
+
+    let centerX: number;
+    let centerY: number;
+    if (popupBounds) {
+      const boxMinX = popupBounds.minX * stageSize.width;
+      const boxMaxX = popupBounds.maxX * stageSize.width;
+      const boxMinY = popupBounds.minY * stageSize.height;
+      const boxMaxY = popupBounds.maxY * stageSize.height;
+      const roomRight = stageSize.width - boxMaxX;
+      const fitsRight = roomRight >= GAP + halfW + MARGIN;
+      centerX = fitsRight ? boxMaxX + GAP + halfW : boxMinX - GAP - halfW;
+      centerY = (boxMinY + boxMaxY) / 2;
+    } else {
+      centerX = popupCentroid.x * stageSize.width;
+      centerY = popupCentroid.y * stageSize.height;
+    }
+
+    let left = Math.min(Math.max(centerX, MARGIN + halfW), stageSize.width - MARGIN - halfW);
+    let top = Math.min(Math.max(centerY, MARGIN + halfH), stageSize.height - MARGIN - halfH);
+
+    if (popupDrag) {
+      left = Math.min(Math.max(left + popupDrag.x, MARGIN + halfW), stageSize.width - MARGIN - halfW);
+      top = Math.min(Math.max(top + popupDrag.y, MARGIN + halfH), stageSize.height - MARGIN - halfH);
+    }
+
+    return { left: `${left}px`, top: `${top}px`, maxHeight: `${maxHeight}px` };
+  }
+
+  /** Drag handlers for the popup's own title row — pointer-capture pattern
+   *  matching the north-point handle and freeform-element drags elsewhere
+   *  in this file. Every handler stops propagation: the title row sits
+   *  inside the stage box, which owns its own pointer handlers for drawing,
+   *  and `drawable()` can still be true while editing an existing hotspot
+   *  (a tool can stay armed across edits) — an unguarded drag would risk
+   *  bubbling into "start a new shape". */
+  function startPopupDrag(e: React.PointerEvent<HTMLDivElement>) {
+    e.stopPropagation();
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // No active pointer to capture; the drag still tracks via move events.
+    }
+    popupDragRef.current = { startX: e.clientX, startY: e.clientY, startOffset: popupDrag ?? { x: 0, y: 0 } };
+  }
+  function movePopupDrag(e: React.PointerEvent<HTMLDivElement>) {
+    e.stopPropagation();
+    const drag = popupDragRef.current;
+    if (!drag) return;
+    setPopupDrag({ x: drag.startOffset.x + (e.clientX - drag.startX), y: drag.startOffset.y + (e.clientY - drag.startY) });
+  }
+  function endPopupDrag(e: React.PointerEvent<HTMLDivElement>) {
+    e.stopPropagation();
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // Capture may already be gone; nothing to release.
+    }
+    popupDragRef.current = null;
+  }
 
   /** Every hotspot actually drawn this frame, mid-transition or not — the
    *  destination stage's own list, each shape-morphed against its outgoing
@@ -2358,21 +2565,18 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
       )}
       {/* `min-h-0 flex-1` on the row: with the chrome rows above all opting
           out via `shrink-0`, this row is the one thing that actually claims
-          "whatever's left" of the 720px budget. `h-full` (not `flex-1`) on
-          the plan box itself is deliberate: `flex-1` would also force its
-          *width* via flex-grow, which — paired with an aspect-ratio box —
-          leaves nothing "auto" left for the aspect ratio to derive, so it'd
-          just ignore the ratio outright. Left with only height definite
-          (`h-full`, matching the row's own default stretch), width derives
-          from *that* via `aspect-video` — exactly inverted from before,
-          where width (from flex-1) drove an unbounded height. `justify-center`
-          on the row absorbs the horizontal space that leaves unclaimed. */}
-      <div className="flex min-h-0 flex-1 justify-center gap-4">
+          "whatever's left" of the 720px budget. The plan box's own size is
+          computed in JS (`fitSize`, see where it's declared) rather than
+          left to `flex-1`+`aspect-video`, which don't combine reliably — see
+          that comment for why. `justify-center` on the row absorbs whatever
+          horizontal space the computed fit doesn't claim. */}
+      <div ref={rowRef} className="flex min-h-0 flex-1 justify-center gap-4">
       <div
         ref={stageBoxRef}
-        className={`relative aspect-video h-full min-w-0 select-none overflow-hidden ${
+        className={`relative min-w-0 select-none overflow-hidden ${fitSize ? '' : 'aspect-video h-full'} ${
           drawing ? 'cursor-crosshair' : zoomPanActive && viewportZoom > 1 ? 'cursor-grab active:cursor-grabbing' : ''
         }`}
+        style={fitSize ? { width: fitSize.width, height: fitSize.height } : undefined}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -2573,8 +2777,8 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
               )}
 
               {/* Rubber band from the last vertex to the cursor, so a polygon
-                  shows the edge you're about to commit. */}
-              {tool === 'polygon' && cursor && !pickingTarget && (
+                  or spline shows the edge you're about to commit. */}
+              {isClickTool(tool) && cursor && !pickingTarget && (
                 <>
                   {/* Guide through the anchor, extended past the cursor, so a
                       locked direction reads as a direction and not just a
@@ -2606,8 +2810,12 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
                 </>
               )}
 
-              {drawingPoints.map((p, i) => (
-                <circle
+              {/* Vertex markers — one per placed point, which is meaningful
+                  for a handful of clicks but not for a freehand trace's
+                  hundreds of raw samples, so it's excluded there. */}
+              {tool !== 'freehand' &&
+                drawingPoints.map((p, i) => (
+                  <circle
                     key={i}
                     cx={p.x * 100}
                     cy={p.y * 100}
@@ -2809,7 +3017,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
 
         {drawing && !pickingTarget && (
           <div onPointerDown={(e) => e.stopPropagation()} className="absolute left-2 top-2 z-20 flex items-center gap-2 rounded-md bg-black/75 px-2.5 py-1.5 text-[11px] font-medium text-white">
-            {tool === 'polygon' && drawingPoints ? (
+            {isClickTool(tool) && drawingPoints ? (
               <>
                 <span>
                   {drawingPoints.length} point{drawingPoints.length === 1 ? '' : 's'}
@@ -2828,15 +3036,19 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
             ) : (
               <span>{TOOLS.find((t) => t.key === tool)?.hint}</span>
             )}
-            <span className={ortho ? 'font-semibold text-[#7fd1ff]' : 'text-white/50'}>
-              {ortho
-                ? tool === 'rect'
-                  ? '⇧ square'
-                  : tool === 'ellipse'
-                    ? '⇧ circle'
-                    : '⇧ 45° locked'
-                : '⇧ to constrain'}
-            </span>
+            {/* Shift has no effect on a freehand trace — a continuous gesture,
+                not discrete points to constrain — so the hint would mislead. */}
+            {tool !== 'freehand' && (
+              <span className={ortho ? 'font-semibold text-[#7fd1ff]' : 'text-white/50'}>
+                {ortho
+                  ? tool === 'rect'
+                    ? '⇧ square'
+                    : tool === 'ellipse'
+                      ? '⇧ circle'
+                      : '⇧ 45° locked'
+                  : '⇧ to constrain'}
+              </span>
+            )}
             <button onClick={cancelDrawing} className="underline decoration-white/50 hover:decoration-white">
               Cancel
             </button>
@@ -2936,10 +3148,16 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
         {showPopup && popupCentroid && (
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ left: `${popupCentroid.x * 100}%`, top: `${popupCentroid.y * 100}%` }}
-            className="absolute z-20 w-60 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--line)] bg-white p-3 text-[var(--ink)] shadow-xl"
+            style={popupPosition()}
+            className="absolute z-20 w-60 -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-[var(--line)] bg-white p-3 text-[var(--ink)] shadow-xl"
           >
-            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--ink-3)]">
+            <div
+              onPointerDown={startPopupDrag}
+              onPointerMove={movePopupDrag}
+              onPointerUp={endPopupDrag}
+              title="Drag to move"
+              className="-m-1 mb-0.5 cursor-grab select-none rounded p-1 text-[10px] font-bold uppercase tracking-wide text-[var(--ink-3)] active:cursor-grabbing"
+            >
               {editingHotspotId ? 'Edit hotspot' : 'New hotspot'}
             </div>
             <input
@@ -3390,6 +3608,12 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           />
         ) : null;
       })()}
+      {/* One stable ref target for the fit-size computation above, regardless
+          of which branch below renders (or neither) — its own width is what
+          `recompute()` subtracts from the row's width to get the plan's
+          available space, so it has to exist unconditionally, not live
+          inside whichever conditional branch happens to be active. */}
+      <div ref={asideRef} className="shrink-0">
       {active.seatingZones?.length || (editable && !showHotspotList) ? (
         <SeatingTable
           view={active}
@@ -3413,6 +3637,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
           />
         )
       )}
+      </div>
       </div>
     </div>
   );
@@ -3507,7 +3732,7 @@ function StatsRow({ slide, editable }: SlideRendererProps) {
         {shownStats.map((st) => (
           <div
             key={st.id}
-            className={`rounded-[var(--radius-md)] p-5 shadow-[var(--shadow-sm)] ${tinted ? 'bg-[var(--accent-wash)]' : 'bg-white border border-[var(--line)]'}`}
+            className={`rounded-[var(--deck-radius-md)] p-5 shadow-[var(--deck-shadow-sm)] ${tinted ? 'bg-[var(--accent-wash)]' : 'bg-white border border-[var(--line)]'}`}
           >
             <EditableText
               editable={editable}

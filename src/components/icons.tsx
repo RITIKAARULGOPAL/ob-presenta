@@ -301,3 +301,12 @@ export function IconEye(props: SVGProps<SVGSVGElement>) {
     </Base>
   );
 }
+
+/** Dismiss / close a panel or dialog. */
+export function IconClose(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="M6 6l12 12M18 6L6 18" />
+    </Base>
+  );
+}

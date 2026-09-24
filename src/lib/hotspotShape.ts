@@ -134,6 +134,18 @@ export function centroidOf(points: Point[]): Point | null {
   };
 }
 
+/** Axis-aligned bounding box, for placing the edit popup *beside* a shape
+ *  instead of on top of it. */
+export function boundingBoxOf(points: Point[]): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  if (!points.length) return null;
+  return {
+    minX: Math.min(...points.map((p) => p.x)),
+    minY: Math.min(...points.map((p) => p.y)),
+    maxX: Math.max(...points.map((p) => p.x)),
+    maxY: Math.max(...points.map((p) => p.y)),
+  };
+}
+
 /** A shape's own area in normalised frame units — 1 would be the whole frame.
  *  Caller converts to real-world area (see PlanCalibration), since that needs
  *  the frame's pixel aspect ratio, which only the renderer knows.
@@ -191,6 +203,48 @@ function roomAlong(from: Point, ux: number, uy: number, aspect: number): number 
   if (uy > 0) limits.push((1 - from.y) / uy);
   else if (uy < 0) limits.push(from.y / -uy);
   return limits.length ? Math.min(...limits) : 0;
+}
+
+/** Ramer-Douglas-Peucker: thins a dense freehand trace down to the few
+ *  points that actually define its shape, within `epsilon` (normalised
+ *  units, same 0–1 space as every point here) of the original path. A real
+ *  drag samples far more points than the curve needs — splinePath/previewPath
+ *  above interpolate through every point they're given, so passing all of
+ *  them would still render correctly, just with a noisier control-point set
+ *  than the trace's actual shape calls for. */
+export function simplifyPath(points: Point[], epsilon = 0.006): Point[] {
+  if (points.length < 3) return points;
+
+  function perpendicularDistance(p: Point, a: Point, b: Point): number {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len === 0) return distance(p, a);
+    return Math.abs(dy * p.x - dx * p.y + b.x * a.y - b.y * a.x) / len;
+  }
+
+  function rdp(pts: Point[]): Point[] {
+    if (pts.length < 3) return pts;
+    const first = pts[0];
+    const last = pts[pts.length - 1];
+    let maxDist = 0;
+    let maxIndex = 0;
+    for (let i = 1; i < pts.length - 1; i++) {
+      const d = perpendicularDistance(pts[i], first, last);
+      if (d > maxDist) {
+        maxDist = d;
+        maxIndex = i;
+      }
+    }
+    if (maxDist > epsilon) {
+      const left = rdp(pts.slice(0, maxIndex + 1));
+      const right = rdp(pts.slice(maxIndex));
+      return [...left.slice(0, -1), ...right];
+    }
+    return [first, last];
+  }
+
+  return rdp(points);
 }
 
 /** Shift on the rectangle tool: a square as drawn, which in normalised

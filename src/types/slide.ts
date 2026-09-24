@@ -628,4 +628,5 @@ export interface ProjectSummary {
   client: string;
   date: string;
   updatedAt: number;
+  brand: Brand;
 }

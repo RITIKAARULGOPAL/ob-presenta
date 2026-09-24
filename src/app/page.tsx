@@ -6,8 +6,10 @@ import { createProject, deleteProject, listProjects } from '@/lib/data';
 import { fileToDataUrl } from '@/lib/imageFile';
 import { useEditorStore } from '@/lib/editorStore';
 import { AccentPicker } from '@/components/AccentPicker';
-import { IconTrash } from '@/components/icons';
+import { IconClose, IconSearch, IconTrash } from '@/components/icons';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { IconButton } from '@/components/ui/Button';
+import { SegmentedControl, type SegmentOption } from '@/components/ui/SegmentedControl';
 import type { Brand, ProjectSummary } from '@/types/slide';
 
 const BRAND_CHOICES: { key: Brand; label: string; hint: string }[] = [
@@ -15,6 +17,27 @@ const BRAND_CHOICES: { key: Brand; label: string; hint: string }[] = [
   { key: 'ob', label: 'OB', hint: 'Officebanao' },
   { key: 'both', label: 'Both', hint: 'Joint project' },
 ];
+
+type SortKey = 'updated' | 'name' | 'date';
+
+const BRAND_FILTER_OPTIONS: SegmentOption<Brand | 'all'>[] = [
+  { key: 'all', label: 'All' },
+  ...BRAND_CHOICES.map((c) => ({ key: c.key, label: c.label })),
+];
+
+const SORT_OPTIONS: SegmentOption<SortKey>[] = [
+  { key: 'updated', label: 'Last edited' },
+  { key: 'name', label: 'Name' },
+  { key: 'date', label: 'Presentation date' },
+];
+
+/** `p.date` is a locale-formatted display string ("22 September 2026"), not
+ *  an ISO value — parsed back to a timestamp only for sorting. An unparsable
+ *  value sorts as epoch 0 (last under newest-first) rather than throwing. */
+function parseProjectDate(value: string): number {
+  const t = Date.parse(value);
+  return Number.isNaN(t) ? 0 : t;
+}
 
 export default function HomePage() {
   const router = useRouter();
@@ -34,10 +57,26 @@ export default function HomePage() {
   const [date] = useState(() => new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }));
   const [error, setError] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [brandFilter, setBrandFilter] = useState<Brand | 'all'>('all');
+  const [sortBy, setSortBy] = useState<SortKey>('updated');
 
   useEffect(() => {
     listProjects().then(setProjects);
   }, []);
+
+  const visibleProjects = projects
+    .filter((p) => brandFilter === 'all' || p.brand === brandFilter)
+    .filter((p) => {
+      const q = searchQuery.trim().toLowerCase();
+      if (!q) return true;
+      return p.name.toLowerCase().includes(q) || p.client.toLowerCase().includes(q);
+    })
+    .sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      if (sortBy === 'date') return parseProjectDate(b.date) - parseProjectDate(a.date);
+      return b.updatedAt - a.updatedAt;
+    });
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -112,9 +151,29 @@ export default function HomePage() {
             </button>
 
             <div className="mb-4 text-xs font-bold uppercase tracking-widest text-hero-ink-2">Recent</div>
+            {projects.length > 0 && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="relative min-w-[180px] flex-1">
+                  <IconSearch className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-hero-ink-3" />
+                  <input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by name or client…"
+                    className="w-full rounded-full border border-hero-line bg-hero-card py-1.5 pl-9 pr-4 text-sm text-hero-ink outline-none placeholder:text-hero-ink-3 focus:border-hero-line-strong"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <SegmentedControl options={BRAND_FILTER_OPTIONS} value={brandFilter} onChange={setBrandFilter} ariaLabel="Filter by brand" tone="hero" />
+                  <SegmentedControl options={SORT_OPTIONS} value={sortBy} onChange={setSortBy} ariaLabel="Sort by" tone="hero" />
+                </div>
+              </div>
+            )}
             <div className="flex flex-col gap-3">
               {projects.length === 0 && <div className="text-sm text-hero-ink-3">No saved presentations yet — start a new one above.</div>}
-              {projects.map((p) => (
+              {projects.length > 0 && visibleProjects.length === 0 && (
+                <div className="text-sm text-hero-ink-3">No presentations match your filters.</div>
+              )}
+              {visibleProjects.map((p) => (
                 <div
                   key={p.id}
                   data-project-id={p.id}
@@ -160,10 +219,13 @@ export default function HomePage() {
             </div>
           </>
         ) : (
-          <div className="mx-auto w-full max-w-md rounded-2xl bg-ui-surface p-10 text-ui-ink shadow-modal">
-            <button onClick={() => setShowForm(false)} className="mb-6 flex items-center gap-1.5 text-xs text-ui-ink-3 hover:text-ui-ink-2">
-              ← Back to Presenta
-            </button>
+          <div className="relative mx-auto w-full max-w-md rounded-2xl bg-ui-surface p-10 text-ui-ink shadow-modal">
+            <IconButton
+              label="Close"
+              icon={<IconClose className="h-4 w-4" />}
+              onClick={() => setShowForm(false)}
+              className="absolute right-4 top-4"
+            />
             <div className="text-xs font-bold uppercase tracking-wider text-ui-accent">Presenta · New Presentation</div>
             <h1 className="mt-2 font-display text-2xl font-bold">Set up this presentation</h1>
             <p className="mt-2 text-sm text-ui-ink-2">Personalises the deck, then opens straight into the editor.</p>

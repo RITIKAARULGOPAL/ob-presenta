@@ -47,7 +47,7 @@ function fromRow(row: ProjectRow): Project {
 export async function listProjects(): Promise<ProjectSummary[]> {
   const { data, error } = await supabase
     .from('projects')
-    .select('id, name, client, date, updated_at')
+    .select('id, name, client, date, updated_at, brand')
     .order('updated_at', { ascending: false });
   if (error) {
     console.error('listProjects failed:', error.message);
@@ -59,6 +59,7 @@ export async function listProjects(): Promise<ProjectSummary[]> {
     client: r.client,
     date: r.date,
     updatedAt: r.updated_at,
+    brand: r.brand,
   }));
 }
 

@@ -10,10 +10,11 @@ import { SlideRenderer } from '@/components/SlideRenderer';
 import { ScaledStage } from '@/components/ScaledStage';
 import { PropertiesPanel } from '@/components/PropertiesPanel';
 import { ConceptLibraryDropdown } from '@/components/ConceptLibraryDropdown';
+import { DiagramLibraryDropdown } from '@/components/DiagramLibraryDropdown';
 import { exportToPdf, exportToPptx } from '@/lib/exportDeck';
 import { DESIGN_PILLARS } from '@/lib/conceptLibrary';
 import { conceptSlide } from '@/lib/conceptSlides';
-import { IconBulb, IconTextBlock, IconStar, IconBars, IconLink, IconFile, IconScreen, IconImage } from '@/components/icons';
+import { IconBulb, IconTextBlock, IconStar, IconBars, IconLink, IconFile, IconScreen, IconImage, IconGrid } from '@/components/icons';
 import { clamp } from '@/lib/imageTransform';
 
 const ECOM_PILLAR = DESIGN_PILLARS.find((p) => p.id === 'ecom-express');
@@ -28,6 +29,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const [notFound, setNotFound] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showConceptPicker, setShowConceptPicker] = useState(false);
+  const [showDiagramPicker, setShowDiagramPicker] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exportStatus, setExportStatus] = useState('');
   const [zoomFactor, setZoomFactor] = useState(ZOOM_DEFAULT);
@@ -283,6 +285,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               + Add slide
             </button>
             {showConceptPicker && <ConceptLibraryDropdown onClose={() => setShowConceptPicker(false)} />}
+            {showDiagramPicker && <DiagramLibraryDropdown onClose={() => setShowDiagramPicker(false)} />}
             {showAddMenu && (
               <div className="absolute right-0 top-10 z-10 w-48 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
                 <button
@@ -293,6 +296,15 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                   className="mb-1 flex w-full items-center gap-2 rounded-md border-b border-slate-100 px-3 py-2 text-left text-xs font-semibold text-[#0b72c2] hover:bg-slate-50"
                 >
                   <IconBulb className="h-3.5 w-3.5 flex-shrink-0" /> Concept library…
+                </button>
+                <button
+                  onClick={() => {
+                    setShowDiagramPicker(true);
+                    setShowAddMenu(false);
+                  }}
+                  className="mb-1 flex w-full items-center gap-2 rounded-md border-b border-slate-100 px-3 py-2 text-left text-xs font-semibold text-[#0b72c2] hover:bg-slate-50"
+                >
+                  <IconGrid className="h-3.5 w-3.5 flex-shrink-0" /> Diagram library…
                 </button>
                 <button
                   onClick={() => {

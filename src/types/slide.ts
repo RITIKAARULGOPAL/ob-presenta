@@ -402,7 +402,39 @@ export type FreeformElement =
       y: number;
       w: number;
       h: number;
+      /** The fill colour. Always present, even when fillOpacity is 0, so a
+       *  colour picker always has a real value to show and set. */
       color: string;
+      /** 'rect' (default when unset — every shape authored before this
+       *  existed was implicitly a plain rectangle, so leaving this absent
+       *  must keep rendering exactly as before), 'ellipse', or 'line' (a
+       *  straight connector — width is its length, height is ignored). */
+      kind?: 'rect' | 'ellipse' | 'line';
+      /** Fill opacity specifically — separate from stroke opacity, because
+       *  the diagrams this exists for lean hard on "tinted fill, solid
+       *  outline" (e.g. a zone at 15% fill with a full-strength border).
+       *  Baking this into `color` as rgba() would silently break the native
+       *  <input type="color"> editor, which only accepts #rrggbb. */
+      fillOpacity?: number;
+      /** Outline colour; unset means no outline, matching today's plain
+       *  filled rectangle. */
+      stroke?: string;
+      strokeWidth?: number;
+      /** One dashed look (not a configurable pattern) — enough for "this is
+       *  a soft connector" vs. "this is a hard edge", which is the only
+       *  distinction the source diagrams ever draw. */
+      dashed?: boolean;
+      /** Corner radius in canvas px (1280-wide canvas). Ignored on 'ellipse'
+       *  and 'line'. */
+      radius?: number;
+      /** Visual rotation in degrees — for a diagonal 'line'. Deliberately
+       *  not a second x2/y2 point: every element stays an axis-aligned x/y/
+       *  w/h box this way, so the existing drag/snap code (which reads those
+       *  four fields off every sibling to compute alignment guides) keeps
+       *  working on a 'line' with no special case. */
+      rotation?: number;
+      /** 'line' only: a solid arrowhead at its end. */
+      arrowEnd?: boolean;
     };
 
 export type AnimationEntry = 'none' | 'fadeUp' | 'fadeIn' | 'scaleIn' | 'slideLeft';

@@ -702,6 +702,15 @@ function FreeformElementWrapper({
   // real pointerup.
   const onMoveEndRef = useRef(onMoveEnd);
   onMoveEndRef.current = onMoveEnd;
+  // A shape drawn purely for its outline (no fill — the "floor plate"
+  // rectangle several of the diagram presets draw on top of everything else
+  // to frame the whole plan) must not block clicks meant for whatever it
+  // visually sits over. A plain div with no background is still fully
+  // hit-testable by default; pointer-events:none is what actually makes it
+  // click-through. Known limitation until Stage 3b's element list exists:
+  // this also makes such a shape unreachable by direct click, so for now it
+  // can only be repositioned by editing the library data it came from.
+  const nonInteractive = el.type === 'shape' && (el.fillOpacity ?? 1) === 0;
   const dragRef = useRef<{ startClientX: number; startClientY: number; startX: number; startY: number; moved: boolean } | null>(null);
   const [live, setLive] = useState<{ x: number; y: number } | null>(null);
   // Mirrors `live` outside React state so onPointerUp can read the final
@@ -765,7 +774,8 @@ function FreeformElementWrapper({
         top: `${(live?.y ?? el.y) * 100}%`,
         width: `${el.w * 100}%`,
         height: `${el.h * 100}%`,
-        cursor: editable ? 'move' : undefined,
+        cursor: editable && !nonInteractive ? 'move' : undefined,
+        pointerEvents: nonInteractive ? 'none' : undefined,
       }}
       onPointerDown={(e) => {
         if (!editable) return;
@@ -782,6 +792,72 @@ function FreeformElementWrapper({
     >
       {children}
     </div>
+  );
+}
+
+/** A freeform 'shape' element — a plain filled rectangle by default (the
+ *  original, only kind this ever supported: an imported PPTX colour block),
+ *  now also an outlined rect/ellipse and a straight connector line, for the
+ *  diagram library (docs/template-system) to draw real floor-plan geometry
+ *  with: zones that are a tint plus a full-strength border, a dashed
+ *  "planting spine" connector, an arrowed entry line. Rendered as plain divs
+ *  — deliberately not inline SVG — because html-to-image (exportDeck.ts)
+ *  serialises through an SVG foreignObject, where a *nested* <svg> is
+ *  exactly what tends to come out wrong; border-radius, dashed borders and a
+ *  CSS transform:rotate() all serialise reliably, so those are the palette
+ *  this draws from instead. */
+function FreeformShape({ el }: { el: Extract<FreeformElement, { type: 'shape' }> }) {
+  const fillOpacity = el.fillOpacity ?? 1;
+  const strokeWidth = el.strokeWidth ?? 2;
+
+  if (el.kind === 'line') {
+    // The wrapper box is the line's axis-aligned bounding box (so drag/snap
+    // need no special case for it); the visible line fills that box's width
+    // at vertical-center and rotates as one piece with it, so a diagonal
+    // connector is still just "a horizontal bar, rotated" underneath.
+    const headPx = strokeWidth * 3.2;
+    return (
+      <div
+        className="flex h-full w-full items-center"
+        style={el.rotation ? { transform: `rotate(${el.rotation}deg)` } : undefined}
+      >
+        <div
+          className="w-full"
+          style={{
+            opacity: fillOpacity,
+            borderTopWidth: strokeWidth,
+            borderTopStyle: el.dashed ? 'dashed' : 'solid',
+            borderTopColor: el.color,
+          }}
+        />
+        {el.arrowEnd && (
+          <div
+            className="shrink-0"
+            style={{
+              width: 0,
+              height: 0,
+              opacity: fillOpacity,
+              borderTop: `${headPx}px solid transparent`,
+              borderBottom: `${headPx}px solid transparent`,
+              borderLeft: `${headPx * 1.3}px solid ${el.color}`,
+              marginLeft: -1,
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="h-full w-full"
+      style={{
+        backgroundColor: el.color,
+        opacity: fillOpacity,
+        border: el.stroke ? `${strokeWidth}px ${el.dashed ? 'dashed' : 'solid'} ${el.stroke}` : undefined,
+        borderRadius: el.kind === 'ellipse' ? '50%' : el.radius ? `${el.radius}px` : undefined,
+      }}
+    />
   );
 }
 
@@ -835,7 +911,7 @@ function FreeformSlide({ slide, editable }: SlideRendererProps) {
           ) : el.type === 'text' ? (
             <FreeformTextBox el={el} editable={editable} onChange={(patch) => setElement(el.id, patch)} />
           ) : (
-            <div className="h-full w-full" style={{ backgroundColor: el.color }} />
+            <FreeformShape el={el} />
           )}
         </FreeformElementWrapper>
       ))}

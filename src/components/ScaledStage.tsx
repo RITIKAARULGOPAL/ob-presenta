@@ -27,11 +27,20 @@ export function ScaledStage({
   stageClassName = '',
   zoomFactor = 1,
   pannable = false,
+  fit = 'contain',
 }: {
   children: React.ReactNode;
   stageClassName?: string;
   zoomFactor?: number;
   pannable?: boolean;
+  /** 'contain' (default): the whole 1280x720 frame always fits inside the
+   *  container, letterboxed on whichever axis doesn't match — what editing
+   *  needs, since it must show 100% of the exact frame the export
+   *  rasterizes. 'cover': scales up to fill the container completely with
+   *  no letterboxing, cropping whichever axis overflows — Presenter's own
+   *  choice, where filling the physical screen matters more than showing
+   *  the entire frame at all times. */
+  fit?: 'contain' | 'cover';
 }) {
   const outerRef = useRef<HTMLDivElement>(null);
   const [fitScale, setFitScale] = useState(0);
@@ -41,19 +50,21 @@ export function ScaledStage({
     if (!el) return;
     const measure = () => {
       const { width, height } = el.getBoundingClientRect();
-      setFitScale(Math.min(width / STAGE_W, height / STAGE_H));
+      const w = width / STAGE_W;
+      const h = height / STAGE_H;
+      setFitScale(fit === 'cover' ? Math.max(w, h) : Math.min(w, h));
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [fit]);
 
   const scale = fitScale * zoomFactor;
 
   if (!pannable) {
     return (
-      <div ref={outerRef} className="relative h-full w-full">
+      <div ref={outerRef} className="relative h-full w-full overflow-hidden">
         <div
           className={stageClassName}
           style={{

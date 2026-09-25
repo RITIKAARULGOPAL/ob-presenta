@@ -6,6 +6,7 @@ import { getProject } from '@/lib/data';
 import { useEditorStore } from '@/lib/editorStore';
 import { SlideRenderer } from '@/components/SlideRenderer';
 import { ScaledStage } from '@/components/ScaledStage';
+import { PresenterSidebar, type PresenterSection } from '@/components/PresenterSidebar';
 import type { Slide } from '@/types/slide';
 
 /** Floating live preview shown above a hovered nav dot — the same
@@ -19,14 +20,14 @@ function DotPreview({ slide }: { slide: Slide }) {
   const label = slide.fields.title || slide.fields.kickerLabel;
   return (
     <div
-      className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-3 -translate-x-1/2 overflow-hidden rounded-lg border border-white/15 bg-black shadow-2xl"
+      className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-3 -translate-x-1/2 overflow-hidden rounded-lg border border-white/15 bg-[#171310] shadow-2xl"
       style={{ width: w, height: h }}
     >
       <div style={{ width: 1280, height: 720, transform: `scale(${w / 1280})`, transformOrigin: 'top left' }}>
         <SlideRenderer slide={slide} editable={false} />
       </div>
       {label && (
-        <div className="absolute inset-x-0 bottom-0 truncate bg-black/75 px-1.5 py-0.5 text-[9px] font-medium text-white/90">
+        <div className="absolute inset-x-0 bottom-0 truncate bg-[#241d16]/75 px-1.5 py-0.5 text-[9px] font-medium text-white/90">
           {label}
         </div>
       )}
@@ -80,13 +81,13 @@ export default function PresenterPage({ params }: { params: Promise<{ id: string
   }, [goNext, goPrev, router, id]);
 
   if (!ready || !project) {
-    return <div className="flex h-screen items-center justify-center bg-black text-white/40">Loading…</div>;
+    return <div className="flex h-screen items-center justify-center bg-[#171310] text-white/40">Loading…</div>;
   }
 
   const shown = project.slides.filter((s) => !s.skipped);
   if (shown.length === 0) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-3 bg-black text-white/50">
+      <div className="flex h-screen flex-col items-center justify-center gap-3 bg-[#171310] text-white/50">
         <p>Every slide in this deck is skipped.</p>
         <button onClick={() => router.push(`/p/${id}/edit`)} className="text-sm underline">
           Back to the editor
@@ -111,42 +112,48 @@ export default function PresenterPage({ params }: { params: Promise<{ id: string
     groups[groups.length - 1].push({ slide: s, index: i });
   });
 
+  // A second, coarser grouping for the sidebar — section-starter slides
+  // only, ignoring designOption changes (unlike `groups` above, which stays
+  // exactly as it was for the dot-row). Hidden entirely (see
+  // PresenterSidebar) when this produces fewer than 2 sections, so a deck
+  // that never authors a section-starter slide shows no sidebar at all.
+  const sections: PresenterSection[] = [];
+  shown.forEach((s, i) => {
+    if (sections.length === 0 || s.style === 'section-starter') {
+      sections.push({ startSlide: s, startIndex: i, endIndex: i });
+    } else {
+      sections[sections.length - 1].endIndex = i;
+    }
+  });
+
   return (
-    <div className="relative h-screen w-screen bg-black">
+    <div className="relative h-screen w-screen bg-[#171310]">
       {currentSlide && (
         <div className="absolute inset-0">
           {/* Same fixed 1280x720 canvas the editor and export use — without
               this, a layout that positions content by exact pixel/percent
               (e.g. a freeform imported slide) would distort to whatever
               shape the actual browser window happens to be, since nothing
-              else here enforces a 16:9 box. */}
-          <ScaledStage>
+              else here enforces a 16:9 box. fit="cover": Presenter fills the
+              physical screen completely (cropping whichever axis overflows
+              on a non-16:9 screen) rather than letterboxing — the one place
+              that matters more than showing the entire frame at all times,
+              unlike the editor's own ScaledStage usage. */}
+          <ScaledStage fit="cover">
             <SlideRenderer slide={currentSlide} editable={false} animate />
           </ScaledStage>
         </div>
       )}
 
-      {/* A translucent dark pill (not the slide-relative white/black tokens SlideRenderer
-          uses) so these controls stay visible over both light and dark slide styles. */}
-      <button
-        onClick={goPrev}
-        disabled={shownIndex <= 0}
-        className="absolute left-6 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-lg text-white shadow-lg backdrop-blur-sm transition hover:bg-black/60 disabled:opacity-20"
-      >
-        ‹
-      </button>
-      <button
-        onClick={goNext}
-        disabled={shownIndex >= shown.length - 1}
-        className="absolute right-6 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-lg text-white shadow-lg backdrop-blur-sm transition hover:bg-black/60 disabled:opacity-20"
-      >
-        ›
-      </button>
+      {/* Floats over the slide, left edge, the same rounded/translucent
+          treatment as every other piece of chrome below — not a layout
+          sibling that reserves its own width. */}
+      <PresenterSidebar sections={sections} currentIndex={shownIndex} onSelect={selectSlide} />
 
       {/* Keyboard legend — kbd-styled keys rather than plain prose, so it
           reads at a glance for someone who's never presented from this app
           before. */}
-      <div className="absolute bottom-6 right-6 flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1.5 text-xs text-white shadow-lg backdrop-blur-sm">
+      <div className="absolute bottom-6 right-6 flex items-center gap-1.5 rounded-full bg-[#241d16]/40 px-3 py-1.5 text-xs text-white shadow-lg backdrop-blur-sm">
         <kbd className="rounded border border-white/25 bg-white/5 px-1.5 py-0.5 font-sans text-[10px] leading-none">←</kbd>
         <kbd className="rounded border border-white/25 bg-white/5 px-1.5 py-0.5 font-sans text-[10px] leading-none">→</kbd>
         <span className="text-white/60">navigate</span>
@@ -160,7 +167,7 @@ export default function PresenterPage({ params }: { params: Promise<{ id: string
           jump-to-slide — the deck's own navigation chrome, not part of any
           one slide's content. */}
       <div className="absolute bottom-6 left-1/2 flex max-w-[70vw] -translate-x-1/2 flex-col items-center gap-2">
-        <div className="flex w-full flex-col items-center gap-1.5 rounded-2xl bg-black/40 px-4 py-1.5 shadow-lg backdrop-blur-sm">
+        <div className="flex w-full flex-col items-center gap-1.5 rounded-2xl bg-[#241d16]/40 px-4 py-1.5 shadow-lg backdrop-blur-sm">
           <div className="flex items-center gap-3 text-xs text-white">
             <span className="font-semibold tabular-nums">
               {shownIndex + 1} / {shown.length}
@@ -178,7 +185,7 @@ export default function PresenterPage({ params }: { params: Promise<{ id: string
             />
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-full bg-black/40 px-3 py-2 shadow-lg backdrop-blur-sm">
+        <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-full bg-[#241d16]/40 px-3 py-2 shadow-lg backdrop-blur-sm">
           {groups.map((group, gi) => (
             <div
               key={group[0]?.slide.id ?? gi}

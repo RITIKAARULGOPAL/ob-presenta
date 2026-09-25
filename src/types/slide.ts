@@ -22,6 +22,11 @@ export type SlideLayout =
 
 export type SlideStyleKind = 'standard' | 'section-starter' | 'company' | 'design';
 
+/** A fixed, closed set — unlike `zoneCategory`'s free text, this drives which
+ *  literal icon renders next to a section in Presenter's sidebar, so it can't
+ *  be open text the way a derived-color category can. */
+export type SectionIconKey = 'file' | 'list' | 'bulb' | 'grid' | 'star' | 'layers' | 'users' | 'wallet' | 'compass' | 'trending';
+
 export interface StatItem {
   id: string;
   value: string;
@@ -597,6 +602,10 @@ export interface Slide {
    *  sync, and the rail's own datalist offers every option already in use so
    *  a second "Option 1" is one keystroke, not a near-miss like "option 1". */
   designOption?: string;
+  /** Icon shown next to this section in Presenter's sidebar — only
+   *  meaningful when `style === 'section-starter'`; ignored otherwise.
+   *  Unset renders a default fallback icon, not a blank space. */
+  sectionIcon?: SectionIconKey;
 }
 
 export interface Project {

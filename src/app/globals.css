@@ -22,19 +22,24 @@
 :root {
   color-scheme: light;
 
-  /* Surfaces, back to front */
-  --app-bg: #f1f5f9;
+  /* Surfaces, back to front. Cool minimal grays — replacing the warm ivory
+     tried earlier today, per the approved "minimal, cool undertone,
+     crisper type" mockup direction
+     (https://claude.ai/artifact/1hZFTo5zPWcm9Dv7iidXTL). */
+  --app-bg: #f5f6f8;
   --app-surface: #ffffff;
-  --app-raised: #f8fafc;
-  --app-raised-hover: #eef2f7;
+  --app-raised: #eef0f3;
+  --app-raised-hover: #e6e9ee;
 
   /* The workspace behind a slide — the editor stage and the rail. It is the
      one surface that does NOT follow the elevation ladder: in dark mode it is
      *lighter* than the panels, because its job is to sit behind a bright white
      page rather than to read as raised. Near-black against a white slide is
      ~19:1 across most of the screen, which is what makes a long editing
-     session tiring; this softens the jump without dimming the slide itself. */
-  --app-canvas: #f1f5f9;
+     session tiring; this softens the jump without dimming the slide itself.
+     Plain white — direct feedback that a tinted canvas (warm beige, before
+     that) didn't read well as a workspace background. */
+  --app-canvas: #ffffff;
 
   /* Chrome radius, three steps. Its own --app-radius-* names, not Tailwind's
      own --radius-* theme variables — see --deck-radius-* further down for
@@ -44,29 +49,33 @@
   --app-radius-lg: 14px;
 
   /* Lines: soft for inner dividers, strong for hover/emphasis */
-  --app-line: #e2e8f0;
-  --app-line-soft: #f1f5f9;
-  --app-line-strong: #cbd5e1;
+  --app-line: #e1e4e9;
+  --app-line-soft: #eceef2;
+  --app-line-strong: #c2c8d1;
 
   /* Text, most to least prominent */
-  --app-ink: #0f172a;
-  --app-ink-2: #475569;
-  --app-ink-3: #64748b;
+  --app-ink: #0f1116;
+  --app-ink-2: #565d6b;
+  --app-ink-3: #8a93a3;
 
   /* Keyboard focus. Its own token rather than the accent: on dark it has to
      stay visible against --app-surface, where the accent is already used as a
-     fill and would not read as a ring. */
+     fill and would not read as a ring. Left as the original product blue —
+     an accessibility signal, not a brand moment, and staying a different hue
+     from the accent is the point (even now that the accent itself is also a
+     blue, they're a deliberately different shade/saturation). */
   --app-focus: #0b72c2;
 
-  /* The product blue. --app-accent-on is what stays readable ON it. */
-  --app-accent: #0b72c2;
-  --app-accent-hover: #095f9f;
+  /* The indigo-blue accent, replacing the terracotta tried earlier today.
+     --app-accent-on is what stays readable ON it. */
+  --app-accent: #2b46c9;
+  --app-accent-hover: #22369e;
   --app-accent-on: #ffffff;
-  --app-accent-soft: #e8f2fb;
-  --app-accent-line: #0b72c2;
+  --app-accent-soft: #e7ebfb;
+  --app-accent-line: #2b46c9;
 
   /* The dark pill in the editor header, which is dark in BOTH themes */
-  --app-pill: #1e293b;
+  --app-pill: #1a1d24;
   --app-pill-ink: #ffffff;
 
   /* Status */
@@ -76,24 +85,25 @@
   --app-warn-soft: #fffbeb;
   --app-warn-ink: #92400e;
 
-  --app-shadow-card: 0 1px 2px rgb(15 23 42 / 0.06), 0 1px 3px rgb(15 23 42 / 0.04);
-  --app-shadow-float: 0 4px 12px rgb(15 23 42 / 0.1), 0 1px 3px rgb(15 23 42 / 0.05);
-  --app-shadow-modal: 0 8px 28px rgb(15 23 42 / 0.16), 0 2px 6px rgb(15 23 42 / 0.06);
+  --app-shadow-card: 0 1px 2px rgb(15 17 22 / 0.07), 0 1px 3px rgb(15 17 22 / 0.05);
+  --app-shadow-float: 0 4px 12px rgb(15 17 22 / 0.12), 0 1px 3px rgb(15 17 22 / 0.06);
+  --app-shadow-modal: 0 8px 28px rgb(15 17 22 / 0.18), 0 2px 6px rgb(15 17 22 / 0.07);
 
   /* The home screen is its own room: a full-bleed brand backdrop rather than
-     a panel, so it gets its own small set. Dark mode keeps the deep navy the
-     landing page always had; light mode is the same composition in daylight. */
-  --app-hero-bg: #f4f7fb;
+     a panel, so it gets its own small set. Dark mode keeps the deep cool
+     near-black the landing page now uses; light mode is the same
+     composition in daylight. */
+  --app-hero-bg: #f2f4f7;
   --app-hero-glow:
-    radial-gradient(1100px 700px at 85% 8%, rgb(11 114 194 / 0.12), transparent 60%),
-    radial-gradient(900px 600px at 90% 95%, rgb(15 23 42 / 0.05), transparent 55%);
-  --app-hero-ink: #0f172a;
-  --app-hero-ink-2: #475569;
-  --app-hero-ink-3: #64748b;
+    radial-gradient(1100px 700px at 85% 8%, rgb(43 70 201 / 0.1), transparent 60%),
+    radial-gradient(900px 600px at 90% 95%, rgb(15 17 22 / 0.05), transparent 55%);
+  --app-hero-ink: #0f1116;
+  --app-hero-ink-2: #565d6b;
+  --app-hero-ink-3: #8a93a3;
   --app-hero-card: #ffffff;
-  --app-hero-card-hover: #f8fbff;
-  --app-hero-line: #dbe3ee;
-  --app-hero-line-strong: #b9c7da;
+  --app-hero-card-hover: #f8f9fb;
+  --app-hero-line: #e1e4e9;
+  --app-hero-line-strong: #c2c8d1;
 
   /* Deck-wide radius/shadow scale — a designer-deck polish pass, not part of
      the chrome theme above. Ink-tinted rather than pure black so shadows read
@@ -122,28 +132,32 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  --app-bg: #0b1119;
-  --app-surface: #121a25;
-  --app-raised: #18212e;
-  --app-raised-hover: #1f2b3a;
-  --app-canvas: #222b38;
+  /* Cool near-black instead of the warm one tried earlier today — matches
+     Presenter's own always-dark canvas (present/page.tsx) for the first
+     time, so the app's dark mode and its presentation surface finally read
+     as one product. */
+  --app-bg: #0d1017;
+  --app-surface: #171a21;
+  --app-raised: #1d212a;
+  --app-raised-hover: #262b35;
+  --app-canvas: #2c313d;
 
-  --app-line: #24303f;
-  --app-line-soft: #1b2533;
-  --app-line-strong: #3a4a60;
+  --app-line: #2a2f39;
+  --app-line-soft: #1c2029;
+  --app-line-strong: #3d4552;
 
-  --app-ink: #e8edf5;
-  --app-ink-2: #a3b0c2;
-  --app-ink-3: #7b8a9f;
+  --app-ink: #eef0f4;
+  --app-ink-2: #aab1bf;
+  --app-ink-3: #7d8494;
   --app-focus: #8ac8fb;
 
-  --app-accent: #4ea6ec;
-  --app-accent-hover: #74bcf5;
-  --app-accent-on: #06131f;
-  --app-accent-soft: #14283a;
-  --app-accent-line: #2f6f9e;
+  --app-accent: #6f8fe8;
+  --app-accent-hover: #8fa8ee;
+  --app-accent-on: #0d1017;
+  --app-accent-soft: #1c2440;
+  --app-accent-line: #43568f;
 
-  --app-pill: #223046;
+  --app-pill: #1f232c;
   --app-pill-ink: #ffffff;
 
   --app-danger: #f87171;
@@ -156,11 +170,11 @@
   --app-shadow-float: 0 4px 14px rgb(0 0 0 / 0.55), 0 1px 3px rgb(0 0 0 / 0.4);
   --app-shadow-modal: 0 10px 34px rgb(0 0 0 / 0.65), 0 2px 8px rgb(0 0 0 / 0.45);
 
-  --app-hero-bg: #0c1420;
+  --app-hero-bg: #0d1017;
   --app-hero-glow:
-    radial-gradient(1100px 700px at 85% 8%, rgb(11 114 194 / 0.16), transparent 60%),
+    radial-gradient(1100px 700px at 85% 8%, rgb(111 143 232 / 0.16), transparent 60%),
     radial-gradient(900px 600px at 90% 95%, rgb(255 255 255 / 0.05), transparent 55%);
-  --app-hero-ink: #ffffff;
+  --app-hero-ink: #eef0f4;
   --app-hero-ink-2: rgb(255 255 255 / 0.72);
   --app-hero-ink-3: rgb(255 255 255 / 0.55);
   --app-hero-card: rgb(255 255 255 / 0.07);
@@ -252,6 +266,36 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-archivo);
+
+  /* Chrome's own display face — deliberately a SEPARATE token from
+     --font-display above. That one is reserved for slide headline text:
+     SlideRenderer redeclares --font-archivo at each slide's own scope so a
+     deck's typography choice reaches every font-display element inside it
+     (see the comment beside '--font-archivo': typography.fontVar there).
+     Reusing --font-display for chrome would mean a slide left on "Default"
+     typography — which resolves straight through to this same root value —
+     would silently pick up whatever chrome's display face happens to be,
+     violating "a slide is not chrome." font-chrome-display is for genuine
+     app chrome only (the Home wordmark/headings, the editor header's logo
+     badge, panel titles) and never appears inside SlideRenderer's own
+     render tree. Inter Tight now, not Fraunces — per the approved "cool,
+     crisper type" direction; wherever this utility is used, weight 700 +
+     -0.02em tracking is applied alongside it, since the tight cut alone
+     isn't what reads as "crisper," that weight/tracking jump is doing real
+     work too. */
+  --font-chrome-display: var(--font-inter-tight);
+
+  /* Chrome's own body/UI face — Helvetica, deliberately NOT touching
+     --font-sans above (which SlideRenderer also redeclares locally for
+     slide body text, the exact same "slide is not chrome" risk
+     --font-display already has — see its own comment). Helvetica itself
+     isn't freely embeddable as a web font, so this is a literal system
+     stack, not a var() into a next/font-loaded family: it renders as true
+     Helvetica on Mac/iOS viewers, Arial elsewhere. Applied only to the
+     same already-vetted genuine-chrome spots font-chrome-display reaches
+     (the Home wordmark/headings, the editor header's logo badge, panel
+     titles) — never a blanket body-text change. */
+  --font-chrome-body: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
 body {

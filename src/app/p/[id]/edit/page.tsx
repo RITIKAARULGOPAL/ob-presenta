@@ -249,7 +249,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           href="/"
           aria-label="All presentations"
           title="All presentations"
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-ui-sm bg-ui-accent font-display text-label font-extrabold text-ui-accent-on"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-ui-sm bg-ui-accent font-chrome-display text-label font-extrabold text-ui-accent-on"
         >
           P
         </Link>

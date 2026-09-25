@@ -126,14 +126,14 @@ export default function HomePage() {
       <div className="relative w-full max-w-3xl">
         {!showForm ? (
           <>
-            <div className="mb-2 font-display text-4xl font-light tracking-[0.3em]">
+            <div className="mb-2 font-chrome-display text-4xl font-light tracking-[0.3em]">
               Presenta<span className="tracking-normal">.</span>
             </div>
-            <p className="mb-1 text-lg font-medium text-hero-ink">An Interactive Presentation Platform</p>
-            <p className="mb-3 max-w-md text-sm leading-relaxed text-hero-ink-2">
+            <p className="mb-1 font-chrome-body text-lg font-medium text-hero-ink">An Interactive Presentation Platform</p>
+            <p className="mb-3 max-w-md font-chrome-body text-sm leading-relaxed text-hero-ink-2">
               Bringing clarity to every decision. Creating spaces that work, inspire and endure.
             </p>
-            <p className="mb-14 text-sm text-hero-ink-3">Powered by Officebanao</p>
+            <p className="mb-14 font-chrome-body text-sm text-hero-ink-3">Powered by Officebanao</p>
 
             <button
               onClick={() => setShowForm(true)}
@@ -145,8 +145,8 @@ export default function HomePage() {
                 </svg>
               </span>
               <span>
-                <span className="block font-display text-lg font-bold">New presentation</span>
-                <span className="block text-sm text-hero-ink-3">Start from a blank project — set the name and date</span>
+                <span className="block font-chrome-display text-lg font-bold">New presentation</span>
+                <span className="block font-chrome-body text-sm text-hero-ink-3">Start from a blank project — set the name and date</span>
               </span>
             </button>
 
@@ -183,8 +183,8 @@ export default function HomePage() {
                   <button onClick={() => router.push(`/p/${p.id}/edit`)} className="flex min-w-0 flex-1 items-center gap-4 text-left">
                     <span className="h-2 w-2 flex-shrink-0 rounded-full bg-ui-accent" />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-display text-sm font-semibold text-hero-ink">{p.name}</span>
-                      <span className="block text-xs text-hero-ink-2">
+                      <span className="block truncate font-chrome-display text-sm font-semibold text-hero-ink">{p.name}</span>
+                      <span className="block font-chrome-body text-xs text-hero-ink-2">
                         {p.client ? `${p.client} · ` : ''}
                         {p.date}
                       </span>
@@ -227,8 +227,8 @@ export default function HomePage() {
               className="absolute right-4 top-4"
             />
             <div className="text-xs font-bold uppercase tracking-wider text-ui-accent">Presenta · New Presentation</div>
-            <h1 className="mt-2 font-display text-2xl font-bold">Set up this presentation</h1>
-            <p className="mt-2 text-sm text-ui-ink-2">Personalises the deck, then opens straight into the editor.</p>
+            <h1 className="mt-2 font-chrome-display text-2xl font-bold tracking-tight">Set up this presentation</h1>
+            <p className="mt-2 font-chrome-body text-sm text-ui-ink-2">Personalises the deck, then opens straight into the editor.</p>
             <form onSubmit={handleCreate} className="mt-6 flex flex-col gap-4">
               <label className="block">
                 <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-ui-ink-2">Project name</span>

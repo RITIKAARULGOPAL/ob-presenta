@@ -6,7 +6,8 @@
 // means each icon just inherits its button's existing text color — no new
 // palette decisions here).
 
-import type { SVGProps } from 'react';
+import type { ComponentType, SVGProps } from 'react';
+import type { SectionIconKey } from '@/types/slide';
 
 function Base({ children, ...props }: SVGProps<SVGSVGElement>) {
   return (
@@ -307,6 +308,77 @@ export function IconClose(props: SVGProps<SVGSVGElement>) {
   return (
     <Base {...props}>
       <path d="M6 6l12 12M18 6L6 18" />
+    </Base>
+  );
+}
+
+/** Section icon — an audience/team, for "Understanding You"-style sections. */
+export function IconUsers(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <circle cx="8.5" cy="8" r="3" />
+      <path d="M2.5 20c0-3.6 2.7-6 6-6s6 2.4 6 6" />
+      <path d="M15 6.2a3 3 0 010 5.6" />
+      <path d="M21.5 20c0-3-1.9-5.2-4.5-5.8" />
+    </Base>
+  );
+}
+
+/** Section icon — a wallet, for costing/budget-style sections. */
+export function IconWallet(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="M3 8a2 2 0 012-2h13a1 1 0 011 1v2" />
+      <rect x="3" y="8" width="18" height="12" rx="2" />
+      <path d="M14 14h4" />
+    </Base>
+  );
+}
+
+/** Section icon — a compass, for direction/goal-style sections. */
+export function IconCompass(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M15 9l-2 6-4-1 2-6z" />
+    </Base>
+  );
+}
+
+/** Section icon — an ascending trend line, for value-engineering/growth-style
+ *  sections (distinct from Stat Hero's plain bar chart, above). */
+export function IconTrendingUp(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="M3 17l6-6 4 4 8-8" />
+      <path d="M15 6.5h6V12.5" />
+    </Base>
+  );
+}
+
+/** The fixed, closed set of icons a section-starter slide can pick from for
+ *  Presenter's sidebar (`Slide.sectionIcon`) — six reused from elsewhere in
+ *  this file plus the four above, each read in a section-nav context rather
+ *  than their original menu/panel use. */
+export const SECTION_ICONS: Record<SectionIconKey, ComponentType<SVGProps<SVGSVGElement>>> = {
+  file: IconFile,
+  list: IconBars,
+  bulb: IconBulb,
+  grid: IconGrid,
+  star: IconStar,
+  layers: IconLayers,
+  users: IconUsers,
+  wallet: IconWallet,
+  compass: IconCompass,
+  trending: IconTrendingUp,
+};
+
+/** Shown for a section-starter slide that hasn't picked a `sectionIcon` yet —
+ *  a plain bookmark, never a blank space or a crash. */
+export function IconSectionDefault(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="M6 3.5h12v17l-6-4-6 4z" />
     </Base>
   );
 }

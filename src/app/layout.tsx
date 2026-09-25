@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
-import { Geist, Geist_Mono, Archivo, Fraunces, Big_Shoulders, Playfair_Display, IBM_Plex_Sans, Source_Serif_4 } from "next/font/google";
+import { Geist, Geist_Mono, Archivo, Fraunces, Big_Shoulders, Playfair_Display, IBM_Plex_Sans, Source_Serif_4, Inter_Tight } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -56,6 +56,15 @@ const sourceSerif = Source_Serif_4({
   weight: ["400", "500"],
 });
 
+// Chrome-only — --font-chrome-display (globals.css) points at this, never
+// --font-display, so a deck's own typography can never inherit it. Not one
+// of the deck typography picker's own alternates above.
+const interTight = Inter_Tight({
+  variable: "--font-inter-tight",
+  subsets: ["latin"],
+  weight: ["500", "700"],
+});
+
 export const metadata: Metadata = {
   title: "Presenta",
   description: "An Interactive Presentation Platform, by Officebanao",
@@ -73,7 +82,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       data-theme="light"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${archivo.variable} ${fraunces.variable} ${bigShoulders.variable} ${playfairDisplay.variable} ${plexSans.variable} ${sourceSerif.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${archivo.variable} ${fraunces.variable} ${bigShoulders.variable} ${playfairDisplay.variable} ${plexSans.variable} ${sourceSerif.variable} ${interTight.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />

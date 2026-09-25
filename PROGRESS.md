@@ -32,6 +32,474 @@ or re-explain anything.
 
 ---
 
+## 2026-09-25 — Linked Views: canvas toolbar moved into the Properties panel
+
+**Context:** feedback from a screenshot + selected-element inspection of the
+Linked Views slide's own on-canvas toolbar (Zoom/pan · North · Calibrate ·
+Rectangle/Ellipse/Polygon/Spline/Freehand, sitting above the view tabs on
+the slide itself): "these tools can come in properties panel in a separate
+tool bar." Planned properly first, since this isn't a copy-paste move — the
+toolbar's buttons are wired to component-local state and drag handlers deep
+inside `LinkedViewsExplorer` ([SlideRenderer.tsx](src/components/SlideRenderer.tsx)),
+which renders inside the slide canvas, while `PropertiesPanel`
+([PropertiesPanel.tsx](src/components/PropertiesPanel.tsx)) is a sibling
+subtree under [edit/page.tsx](src/app/p/[id]/edit/page.tsx)
+(`<ScaledStage><SlideRenderer/></ScaledStage>` and `<PropertiesPanel/>`),
+not a descendant — no React Context can bridge that.
+
+**Done:**
+- **New transient store slice**: `linkedViewToolbar`/`setLinkedViewToolbar`
+  in [editorStore.ts](src/lib/editorStore.ts) (never undo-tracked or
+  persisted, same treatment as `selectedSlideIds`) — a live snapshot of the
+  active Linked Views slide's toolbar values/handlers
+  (`LinkedViewToolbarSnapshot`), registered by `LinkedViewsExplorer` and read
+  by `PropertiesPanel`. `DrawTool` moved from a local type in
+  `SlideRenderer.tsx` to a named export of `editorStore.ts` so both files
+  share one definition.
+- **`LinkedViewsExplorer`**: the inline toolbar JSX block is gone entirely —
+  replaced by a registration `useEffect` that calls `setLinkedViewToolbar`
+  with the exact same handlers the canvas buttons used to call
+  (`startNorthDrag`/`moveNorthDrag`/`endNorthDrag`/`unlockNorth`/
+  `unlockCalibration`/`setTool`/etc. — zero interaction logic rewritten,
+  only where the buttons render moved). The north/calibration-related
+  `const`s (`stageUrl`, `calibration`, `displayNorthDeg`, `northLocked`, …)
+  and their functions were hoisted to before this component's `if (!active)
+  return null` guard so the registration effect (also placed before the
+  guard, to keep every hook unconditionally called every render) can
+  reference them without a lint "accessed before declared" violation.
+- **A real bug caught during verification, not shipped blind**: the slide
+  rail renders its own non-editable `LinkedViewsExplorer` instance per
+  Linked Views slide thumbnail (the same rail/canvas DOM-duplication
+  flagged in several earlier entries) — every one of those also ran the
+  registration effect and, unguarded, would call `setLinkedViewToolbar(null)`
+  right after the real editable instance registered its own snapshot, since
+  this is one shared store slot with no ordering guarantee across sibling
+  component instances. Fixed by gating the whole effect (and its unmount
+  cleanup) on `editable` first — only the single editable instance may ever
+  write to this slot.
+- **A second real bug caught the same way**: `loadProject`'s `set({...})`
+  was resetting `linkedViewToolbar: null` alongside `undoStack`/
+  `selectedSlideIds` — harmless for those fields, but
+  [edit/page.tsx](src/app/p/[id]/edit/page.tsx)'s project-fetch effect calls
+  `loadProject` from an unguarded `.then()` with no cleanup, so in dev
+  (React 19's Strict Mode double-invokes effects) it genuinely fires twice,
+  and the second, later-resolving call clobbered the toolbar snapshot the
+  component had already registered — caught live (traced via temporary
+  instrumentation logging every write to the store field, not guessed at).
+  Fixed by simply not touching `linkedViewToolbar` from `loadProject` at
+  all — the registering component manages its own lifecycle via its mount/
+  unmount effects regardless of which project is loaded.
+- **`PropertiesPanel`**: new "Linked View Tools" `Disclosure` section
+  (reusing the existing `Disclosure` component from the 2026-09-24 panel-
+  declutter pass), shown only when `linkedViewToolbar` is non-null, placed
+  above every other section (this is the slide's primary editing-mode
+  toolbar, not a per-slide setting) and — unlike the other 7 sections —
+  **open by default** whenever present, since there's no "already has a
+  value" concept for a live tool-selector. Same markup/interaction as the
+  removed canvas version, restyled onto this panel's own `ui-*` chrome
+  tokens instead of the slide's `var(--line)`/`var(--accent)` tokens.
+  `LINKED_VIEW_DRAW_TOOLS` (renamed/exported from `SlideRenderer.tsx`,
+  was a local `TOOLS` const) is reused for the 5 tool buttons' labels/hints
+  rather than duplicated.
+- **Verified live** on the "Linking Test" project's real Layout slide (a
+  real plan image + hotspot, not synthetic): the on-canvas toolbar is
+  completely gone (confirmed via `get_page_text` — only the passive North/
+  Dimensions badges remain); the new Properties-panel section renders open
+  by default with all 7 controls; clicking Rectangle in the panel arms the
+  canvas (`cursor: crosshair` on the plan image, confirmed via
+  `getComputedStyle`) and toggles off correctly on a second click; a real
+  dispatched pointer drag (down/move/up) on the panel's North button
+  rotated the on-canvas passive compass badge live during the drag and
+  committed+locked on release, matching exactly; Unlock cleared the lock;
+  Zoom/pan checkbox round-tripped; clicking Calibrate armed `pickMode` and
+  updated the button's own label. Switching to a non-Linked-Views slide
+  hides the section entirely with no stale carryover; switching back
+  brings it back correctly. `tsc --noEmit` clean; structured eslint diff
+  (stash-based baseline) shows zero new issues. All verification-only state
+  changes (north angle, zoom/pan, tool selection) were reverted on the real
+  project afterward.
+
+**Left off / next up:**
+- Nothing outstanding on this pass — every control in the plan was moved,
+  wired, and verified, including both bugs the verification pass itself
+  uncovered.
+- Nothing from today is committed yet — stacks on top of the already-
+  uncommitted 2026-09-24 batch.
+
+---
+
+## 2026-09-24 (cont'd 3) — Whole-app visual refresh, step 1: warm palette + Fraunces chrome headings
+
+**Context:** "the whole look of the app is not that great" — clarified via
+two rounds of questions to: all four surfaces (Home/Editor/Presenter/slides),
+complaint is inconsistency + clutter. Per this app's own precedent
+(2026-09-21's UI rework was itself reviewed as a mockup before any code
+changed), built a 4-artboard Design canvas mockup first
+(https://claude.ai/artifact/1hZFTo5zPWcm9Dv7iidXTL — Home/Editor/Presenter/a
+slide, one shared warm-ivory/near-black/terracotta palette + Fraunces
+display + the app's own existing IBM Plex Sans), got explicit sign-off on
+the whole direction, then started real implementation — this entry covers
+just the first slice: shared tokens + Presenter, per the user's own choice
+of where to start (phases 4-6 of the original 2026-09-21 rework — Home
+redesign, command palette, layout picker — remain unstarted, as does the
+Editor's own toolbar/rail beyond what today's token retint reaches for
+free).
+
+**Done:**
+- **Retinted every `--app-*` chrome token** (both `:root` and
+  `[data-theme="dark"]`, [globals.css](src/app/globals.css)) from the old
+  cool slate/product-blue palette to warm ivory/near-black with a terracotta
+  accent — light mode `#faf7f1` ground, dark mode `#171310` (now the same
+  hex Presenter's own always-dark canvas uses, so app dark mode and
+  Presenter finally read as one product for the first time). Pure token-value
+  edits only, no token renamed and no consuming component touched — every
+  `ui-*`/`hero-*` Tailwind class already wired up by the 2026-09-21 rework
+  picks up the new palette automatically, which is exactly why Home and the
+  Editor's own chrome both retinted correctly with zero component changes.
+  `--deck-radius-*`/`--deck-shadow-*` (slide-facing, not chrome) and the
+  status colors (danger/warn) deliberately left untouched — out of scope,
+  and changing deck shadows would have retroactively changed every existing
+  slide's shadow across every deck.
+- **New `--font-chrome-display: var(--font-fraunces)` token**, deliberately
+  kept **separate** from the existing `--font-display: var(--font-archivo)`
+  — that one is reserved for slide headline text (`SlideRenderer.tsx`
+  redeclares `--font-archivo` at each slide's own scope so a deck's
+  typography choice reaches every `font-display` element inside it; reusing
+  it for chrome would mean a slide left on "Default" typography silently
+  inherits whatever chrome's display face happens to be, violating "a slide
+  is not chrome"). `Fraunces` and `IBM Plex Sans` both already loaded via
+  `next/font/google` in [layout.tsx](src/app/layout.tsx) for the slide
+  typography picker — zero new font dependency. Swapped the 3 genuine-chrome
+  `font-display` usages (confirmed each is chrome, not slide content, before
+  touching it) to the new class: the Home wordmark/headings
+  ([page.tsx](src/app/page.tsx)), the Properties panel title
+  ([PropertiesPanel.tsx](src/components/PropertiesPanel.tsx)), the editor
+  header's logo badge ([edit/page.tsx](src/app/p/[id]/edit/page.tsx)).
+  Left every slide-content `font-display` usage (`SlideRenderer.tsx`,
+  `OrbitDiagram.tsx`, `SeatingTable.tsx`) completely untouched.
+- **Presenter's own hardcoded dark palette retinted** ([present/page.tsx](src/app/p/[id]/present/page.tsx),
+  [PresenterSidebar.tsx](src/components/PresenterSidebar.tsx)) — `bg-black`
+  → `bg-[#171310]` (root canvas, loading states), `bg-black/40`/`bg-black/75`
+  → `bg-[#241d16]/40`/`/75` (every floating chrome pill: arrows' replacement
+  sidebar, keyboard hint, progress rail, dot-preview caption). Presenter
+  stays permanently dark regardless of the app's own light/dark toggle
+  (a deliberate, pre-existing, unchanged rule — "a photo viewer/projection
+  surface wants a dark surround regardless of app theme") — this is a
+  recolor of that fixed dark palette from cool black to warm near-black,
+  not new theme-following behavior.
+- **Verified live** (structured computed-style checks via
+  `getComputedStyle`/CSS custom property reads, not screenshots — this
+  session's viewport-scaling made screenshots unreliable, a recurring,
+  previously-documented issue in this sandbox): Home's body background,
+  wordmark/heading font (`font-chrome-display` → real "Fraunces" font
+  family, not just the class name), and accent color all match the new
+  tokens exactly in both light and dark; Editor header/canvas/accent
+  retinted correctly with no component changes; Presenter's root background
+  and floating-pill background both confirmed at the new warm hex values in
+  both raw `rgb()` and `lab()`-space computed readouts. `tsc --noEmit` and
+  eslint clean on every touched file.
+
+**Watch out for — flagged, not fixed, and NOT something today's changes
+caused:** while verifying, found that `.font-display` (the pre-existing,
+untouched slide-headline utility) computes to the browser's plain `Arial,
+Helvetica, sans-serif` fallback instead of the expected Archivo/deck
+typography font, on a real, pre-existing project's slides (confirmed via
+`getComputedStyle` — the `--font-archivo`/`--font-display` CSS custom
+properties themselves resolve correctly at every level up to `<html>`, so
+this isn't a variable-cascade problem; the Tailwind-generated `.font-display`
+utility rule itself appears not to be applying). Confirmed this is NOT
+something this session's edits caused: `--font-display`'s own declaration is
+byte-identical to before, a brand-new sibling token
+(`--font-chrome-display`) added in the very same `@theme` block resolves
+correctly on the very same pages, and the symptom survives a full `.next`
+cache clear + dev-server restart (so it isn't the stale-Turbopack-cache
+class of issue this session hit and fixed twice earlier today either).
+Archivo and Arial are both plain grotesque sans-serifs and look similar at a
+glance, especially bold, which is the likely reason a screenshot-based
+"looks right" check in an earlier session could have missed this being
+silently on the fallback font rather than Archivo. Not investigated
+further today — out of scope for this pass, and worth a dedicated look
+next time slide typography is touched, since if real, it means every
+slide's headline text using "Default" typography may be rendering in Arial
+rather than the deck's own chosen display face.
+
+**Left off / next up:**
+- Steps still pending from the approved direction: Home's own layout
+  restructure (hero → search/filter → real card grid, per the mockup — not
+  done today, only its *colors/fonts* changed for free via the token
+  retint), the Editor's main toolbar/rail generalized to the same
+  divided-pill pattern already built for Linked Views, and the slide-content
+  typography direction (out of scope today on purpose — slides are
+  data-driven per-deck, not a chrome-only token flip).
+- Worth a dedicated investigation next time slide typography is touched:
+  the `.font-display` anomaly flagged above.
+- **Correction, same session**: live feedback on the Presenter section
+  sidebar — make it collapsible, and drop the per-row bookmark icon (it was
+  the same generic glyph on every row, adding noise without telling
+  sections apart, once icons stopped being an authored per-section field
+  worth setting up). Fixed in
+  [PresenterSidebar.tsx](src/components/PresenterSidebar.tsx): removed the
+  `Icon`/`SECTION_ICONS`/`IconSectionDefault` rendering entirely (rows are
+  now label + slide-count only); added local `collapsed` state (transient,
+  non-persisted — matches the seating-capacity panel's own collapse-to-a-
+  narrow-tab convention from earlier today) — collapsed, the card shrinks to
+  a small floating `›` reopen button in the same corner instead of
+  disappearing with no way back. Verified live on a real project ("xx"):
+  rows render with no `<svg>` icon, the Collapse button shrinks the panel to
+  the reopen button, and clicking it restores the exact same section list.
+  `tsc`/eslint clean. (`Slide.sectionIcon`/the icon picker in
+  PropertiesPanel are left in the data model/editor UI for now — only the
+  sidebar's own rendering changed; worth revisiting whether the picker
+  should go too now that nothing displays it.)
+- **Correction, same session**: screenshot feedback (red-boxed black bars on
+  both sides of the slide) — "the slide should be fully on the screen."
+  Root cause: `ScaledStage` ([ScaledStage.tsx](src/components/ScaledStage.tsx))
+  always did a "contain" fit (`Math.min(width/1280, height/720)`), which
+  letterboxes on any screen that isn't exactly 16:9 — deliberate for the
+  editor (has to show the *entire* frame the export rasterizes), wrong for
+  Presenter, where filling the physical screen matters more. Confirmed via
+  two questions: crop-to-fill (not stretch — no distortion) and always-fill
+  (not just past some mismatch threshold). New `fit?: 'contain' | 'cover'`
+  prop, default `'contain'` (every existing editor call site — main canvas,
+  zoomed/panned stage, rail thumbnails — passes nothing, so all three are
+  byte-for-byte unaffected); `'cover'` swaps `Math.min` for `Math.max` and
+  the container gains `overflow-hidden` to clip the now-larger-than-container
+  stage. [present/page.tsx](src/app/p/[id]/present/page.tsx)'s one
+  `<ScaledStage>` gets `fit="cover"` — the whole change on that file.
+  Verified live on a real project: an ultrawide window (1900×700) fills the
+  full width with the slide's own background visible edge-to-edge (no black
+  bars), height symmetric-cropped; a narrow/tall window (700×1000) fills
+  the full height, width symmetric-cropped — confirmed via real
+  `getBoundingClientRect()` + `elementFromPoint()` sampling at the edges,
+  not eyeballed. Editor's own stage re-confirmed still exact 16:9
+  (`1.778` computed ratio) at both after this change. `tsc`/eslint clean.
+- **Correction, same session**: direct feedback that the editor
+  canvas/rail's new warm beige (`#eee7db`, from the whole-app retint above)
+  "is not looking nice" — changed `--app-canvas` ([globals.css](src/app/globals.css),
+  light mode only) to plain white, matching `--app-surface`. Verified live:
+  both the editor's main canvas (`<main>`) and the slide rail compute to
+  `rgb(255,255,255)`; the slide itself still reads as a distinct surface
+  against it via its existing `ring-1 ring-ui-line` border (a real visible
+  boundary regardless of color contrast, so a white slide on a white canvas
+  still has a clear edge).
+- **Correction, same session — supersedes the warm terracotta/Fraunces
+  direction above, not additive to it.** Live feedback ("give other
+  variations which has minimalistic design and cool undertone," then "use
+  Helvetica and Inter fonts... another variation with crisper font style")
+  led to two mockup rounds on the same Design canvas
+  (https://claude.ai/artifact/1hZFTo5zPWcm9Dv7iidXTL — now 9 artboards: the
+  original warm set, a glass-effect variation, a cool minimal-Inter/
+  Helvetica set, and a crisper Inter-Tight/Helvetica variation), then an
+  explicit "start real implementation now" on the crisper direction.
+  Retinted `--app-*` again (both themes, [globals.css](src/app/globals.css)) —
+  same pure-token-value mechanism as the earlier warm pass, no renames, no
+  components touched: light mode `#f5f6f8` cool-gray ground, dark mode
+  `#0d1017` (now matching Presenter's own hardcoded dark canvas, same
+  reasoning the warm pass used for its own near-black), an indigo-blue
+  accent (`#2b46c9`/dark `#6f8fe8`) replacing the terracotta. `--font-chrome-display`
+  (the chrome-only display-face token built earlier today, deliberately
+  isolated from the slide-facing `--font-display`) now points at a newly
+  loaded **Inter Tight** ([layout.tsx](src/app/layout.tsx), a `next/font/google`
+  load exactly like the deck-typography alternates already there, but *not*
+  one of those alternates — chrome-only) instead of Fraunces. New sibling
+  `--font-chrome-body: 'Helvetica Neue', Helvetica, Arial, sans-serif` — a
+  literal system stack, not a `next/font` load, since Helvetica isn't
+  freely embeddable as a web font; renders as true Helvetica on Mac/iOS,
+  Arial elsewhere. Deliberately did **not** touch `--font-sans` (the token
+  `--font-chrome-body` is a sibling to, not a replacement of) — investigated
+  first and confirmed no element in `SlideRenderer.tsx` explicitly applies
+  a `font-sans` class, meaning slide body-text font resolution is murkier
+  than assumed and this exact area already has one unexplained anomaly
+  flagged earlier today (`.font-display` silently falling back to Arial on
+  a real slide) — touching the shared token now would risk compounding an
+  already-not-understood problem. `font-chrome-body` applied to the same
+  already-vetted genuine-chrome text `font-chrome-display` already reaches
+  ([page.tsx](src/app/page.tsx), [PropertiesPanel.tsx](src/components/PropertiesPanel.tsx));
+  `tracking-tight` added to the two true headline-scale `font-chrome-display`
+  usages (Home's "Set up this presentation", the Properties panel title) —
+  smaller incidental usages (the wordmark, project-list names) keep their
+  own existing weight/tracking, just the font itself changes.
+  **Verified live**: `--app-bg`/`--app-accent` compute to the new hex in
+  both themes; a `.font-chrome-display` element's `fontFamily` resolves to
+  literal `"Inter Tight"` (not a fallback); a `.font-chrome-body` element
+  resolves to the Helvetica stack; re-ran the exact same real-slide check
+  from earlier today and confirmed `.font-display` on an actual deck is
+  **still** the same pre-existing Arial-fallback anomaly, unchanged either
+  way — proving the new chrome-only tokens didn't bleed into slide
+  rendering. `tsc --noEmit` and eslint clean on every touched file.
+  Required a `.next` cache clear + dev-server restart before it took effect
+  (same stale-Turbopack-cache class of issue hit and fixed twice already
+  today after a `next/font` change).
+- **Correction, same session**: "properties panel is too cluttered" —
+  confirmed by reading the whole file: 7 sections
+  ([PropertiesPanel.tsx](src/components/PropertiesPanel.tsx) — Design
+  Option, Section Icon, Background, Logo & Copyright, Linked Slides, Accent
+  Colour, Typography), every one always fully expanded with a permanent
+  explanatory paragraph underneath, regardless of whether it held a real
+  value or was even relevant to that slide. This is the Phase 4 IA work
+  ("contextual inspector with Disclosure groups") flagged as unbuilt back
+  in the 2026-09-21 UI rework entry — picked up now rather than inventing a
+  new pattern. Asked how sections should default on opening a slide —
+  answer: collapsed, except a section that already holds a real value.
+  Built a local `Disclosure` component (header + chevron, no new shared
+  component needed since nothing else uses this shape yet) wrapping all 7
+  sections; one `useState<Record<SectionKey, boolean>>` computes each
+  section's initial open state from its own "has a real value" check
+  (`!!slide.designOption`, `!!slide.sectionIcon`, a background color/image
+  set, `brandOverride !== undefined`, `linkedIds.length > 0`,
+  `!!project?.accentColor`, any of the 5 typography-override keys set),
+  re-derived via a render-time `slide.id`-keyed reset (not a `useEffect`) so
+  switching slides always reflects *that* slide's own values rather than
+  whatever was left manually expanded on the last one. Trimmed the
+  permanent explanatory paragraphs into `title` tooltips on each section's
+  own input/container, matching a pattern several controls on this same
+  panel already used. No functional changes to any control itself.
+  **Verified live** on a real project: all 7 headers render collapsed by
+  default on an untouched slide; manually expanding one and switching away
+  and back correctly resets to the value-derived state (proving a manual
+  toggle doesn't leak onto the wrong slide); setting a real Design Option
+  value and reselecting that slide auto-opened exactly that section while
+  everything else stayed collapsed; the expanded Typography section's own
+  controls (font pairing buttons, all 4 axis rows) still render and read
+  correctly. Reverted the test Design Option value afterward. `tsc --noEmit`
+  and eslint clean.
+- Nothing from today is committed yet — stacks on top of the earlier
+  uncommitted batches from this same date.
+
+---
+
+## 2026-09-24 (cont'd 2) — Linked Views toolbar cleanup + Presenter section sidebar
+
+**Context:** two follow-ups from live use. First, small: removed the CAD-snap
+status indicator (`⌖ N snap points…`) from the Linked Views toolbar per the
+user's direct ask, and grouped the loose row of pills (Zoom/pan, North,
+Calibrate, drawing tools) — previously squeezed into the title's own row and
+prone to wrapping onto a cramped stack — into a real bordered/shaded toolbar
+with dividers, on its own row below the title.
+
+Second, larger: from Sidvin-reference screenshots, a persistent left-hand
+Presenter sidebar listing named sections (icon + label, current one
+highlighted) instead of relying solely on the `‹`/`›` arrows. Planned
+properly first (an Explore pass, then 4 `AskUserQuestion` answers): sidebar
+sits **alongside** the arrows/keyboard nav, not replacing them; a sidebar row
+is defined by **section-starter slides only** (Presenter's existing dot-row
+grouping also splits on `designOption`, which this sidebar deliberately
+ignores); row icons are a **new authored field**, not auto-derived or
+skipped; the reference's per-section eye/visibility toggle is **out of
+scope**. Full design at
+`C:\Users\Ritika\.claude\plans\ok-lets-no-do-giggly-snowglobe.md`.
+
+**Done:**
+- **New `Slide.sectionIcon?: SectionIconKey`** ([slide.ts](src/types/slide.ts))
+  — a closed 10-key union (unlike `zoneCategory`'s free text, since this
+  drives which literal icon renders), only meaningful when `style ===
+  'section-starter'`. `cloneSlide` needed no changes — a plain string
+  carried by its existing spread, same reasoning as `designOption`.
+- **4 new icons** (`IconUsers`/`IconWallet`/`IconCompass`/`IconTrendingUp`)
+  plus a `SECTION_ICONS` registry and `IconSectionDefault` fallback
+  ([icons.tsx](src/components/icons.tsx)), reusing 6 existing icons
+  (`IconFile`/`IconBars`/`IconBulb`/`IconGrid`/`IconStar`/`IconLayers`) for
+  the other 6 keys — same `Base` stroke-SVG convention throughout.
+- **Icon-picker grid** in [PropertiesPanel.tsx](src/components/PropertiesPanel.tsx),
+  shown only when `slide.style === 'section-starter'`, right below Design
+  Option. New `setSectionIcon` store action ([editorStore.ts](src/lib/editorStore.ts)),
+  mirroring `setDesignOption` exactly.
+- **New [PresenterSidebar.tsx](src/components/PresenterSidebar.tsx)**: a
+  fixed `w-56` full-height column, Presenter's own translucent dark chrome
+  tokens (not the slide-scoped `--ink`/`--accent` `HotspotSidePanel`/
+  `SeatingTable` use, since this sits in the black canvas around the slide,
+  not inside any one slide's theme). One row per section-starter-only
+  group (a new, separate grouping pass in
+  [present/page.tsx](src/app/p/[id]/present/page.tsx), independent from the
+  existing dot-row's own group-by-section-starter-or-designOption pass,
+  which is untouched); icon + label (kicker/title, falling back to
+  "Section") + slide-count badge; active section highlighted; click jumps
+  to that section's first slide. **Hidden entirely** when fewer than 2
+  groups exist — a deck that never authors a section-starter slide shows no
+  sidebar at all, matching this codebase's standing convention for additive
+  UI.
+- **Root layout restructured** from a single `relative h-screen w-screen`
+  div with everything absolutely positioned, to a `flex` row: the sidebar,
+  then a `relative flex-1 min-w-0` box wrapping everything that was already
+  there unchanged (`ScaledStage`, arrows, keyboard hint, progress rail + dot
+  row) — no class names inside needed to change, since they're all
+  `absolute` relative to their nearest positioned ancestor, which just
+  became narrower. `ScaledStage` needed no changes — it already measures its
+  own container via `ResizeObserver` and fits to whatever space it's given.
+- **A real, self-inflicted parse error chased down mid-verification**: after
+  the restructure, Turbopack reported `Unexpected token` at the file's final
+  `}` — but `tsc --noEmit` stayed clean throughout, and re-indenting the
+  file didn't change the reported line numbers at all, which was the tell:
+  Turbopack was serving a **stale persistent cache**, not re-reading the
+  actual file, even across a full dev-server restart. Fixed by deleting
+  `.next` and restarting — confirms this project's own documented pattern
+  of filesystem-visibility lag between tools/watchers in this environment,
+  now with a concrete fix (clear `.next`) rather than just a workaround.
+- **Verified live** on a disposable scratch project: confirmed the sidebar
+  is entirely absent with 0 section-starter slides, and that the arrows,
+  dot-row, and full-width slide canvas are pixel-identical to before (real
+  `getBoundingClientRect()` check, not eyeballed); added 2 section-starter
+  slides, confirmed the sidebar renders both as separate rows with correct
+  slide-count badges (2 and 1) and correct active-row highlighting as the
+  current slide changed; confirmed the fallback label ("Section") and
+  fallback icon (`IconSectionDefault`) both render correctly for a
+  section-starter slide with no title/icon set yet, rather than a blank
+  space or a crash; confirmed `IconUsers` itself renders correctly (circle +
+  3 paths) when live-selected in the picker; measured the stage's real
+  rendered box at two different window widths (1600px and 1200px) and
+  confirmed it always fills exactly the space right of the sidebar with no
+  overlap and no overflow. `tsc --noEmit` clean; structured eslint diff on
+  every touched file shows zero new issues.
+
+**Watch out for:**
+- **This session's browser-automation sandbox could not get a `commitProject`
+  → `persist()` write to actually complete** for two specific edits (a
+  slide's title and its `sectionIcon`) — confirmed via `read_network_requests`
+  that **zero** Supabase REST calls were ever made, despite the UI's own
+  save-status pill sitting on "Saving" indefinitely. This matches a
+  previously documented, unrelated sandbox limitation from the 2026-09-17
+  entry ("a real headless-Chrome-driven supabase-js call path stalls in this
+  specific sandbox, even though a raw `fetch()` in the same page completes
+  fine") — not a bug in this feature. Worked around by verifying the
+  sidebar's label/icon-fallback behavior directly (which doesn't depend on
+  persistence surviving a page reload) rather than a full round-trip.
+  Presenter mode always re-fetches fresh from Supabase on mount
+  (pre-existing, unrelated to this feature) — worth remembering that this
+  makes Presenter especially sensitive to this sandbox's save-flakiness for
+  any future verification here.
+
+**Left off / next up:**
+- Not independently proven end-to-end in *this* environment: a real,
+  successfully-saved section-starter title/icon showing up correctly after
+  a full page reload into Presenter (blocked by the sandbox limitation
+  above, not a known code defect — the same data flow this codebase already
+  uses successfully for `designOption`/every other slide field). Worth a
+  quick real-browser check outside this automation sandbox if it's ever
+  genuinely doubted.
+- **Correction, same session**: live feedback on the sidebar's first cut —
+  remove the `‹`/`›` arrow buttons, and the sidebar itself didn't match the
+  slide's design language. Root cause: every other piece of Presenter chrome
+  (Reset Zoom, music-mute, the keyboard-hint pill, the progress rail) is a
+  small floating rounded `bg-black/40 backdrop-blur-sm shadow-lg` card
+  overlaying the slide — nothing reserves dedicated layout space. The
+  sidebar broke that twice: a flush hard-edged full-height panel (not a
+  floating card), and a left-accent-bar active state foreign to this app's
+  own pill/soft-fill convention. Fixed: removed the two arrow buttons
+  (keyboard arrows still work, untouched); reverted the flex-row root layout
+  back to plain absolute-overlay (`ScaledStage` is `absolute inset-0` again,
+  full-screen); restyled `PresenterSidebar` as a floating `rounded-2xl`
+  card (`absolute left-6 top-6 bottom-6`) with the exact same border-radius/
+  shadow as the progress rail (confirmed via `getComputedStyle`, not
+  eyeballed); active row now `bg-white/15` soft fill instead of a border bar.
+  Verified live: arrows gone, sidebar's computed `border-radius` (16px) and
+  `box-shadow` match the progress rail's exactly, active/inactive row
+  classNames confirmed correct, and the stage/slide is full-width again (no
+  longer shrunk to make room). `tsc`/eslint clean. Scratch project deleted.
+- Nothing from today is committed yet — stacks on top of the earlier
+  uncommitted batch from this same date.
+
+---
+
 ## 2026-09-24 — Home filter/sort, close-button UX, a real CSS collision, spline/freehand tools, popup overlap+drag, seating close+reflow
 
 **Context:** a run of small, mostly screenshot-driven UX fixes across the

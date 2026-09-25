@@ -1,10 +1,45 @@
 import { create } from 'zustand';
+import type * as React from 'react';
 import { cloneSlide, createSlide, createStyledSlide, defaultFieldsForLayout, defaultFieldsForStyle } from './slideDefaults';
 import { optionalColumnsMissing, saveProject } from './data';
 import { makeId } from './id';
-import type { Brand, FontPairing, ImageTransform, Project, Slide, SlideBackground, SlideFields, SlideLayout, SlideStyleKind, TypographySettings } from '@/types/slide';
+import type { Brand, FontPairing, ImageTransform, Project, SectionIconKey, Slide, SlideBackground, SlideFields, SlideLayout, SlideStyleKind, TypographySettings } from '@/types/slide';
 
 type Mode = 'editor' | 'presenter';
+
+/** The Linked Views hotspot-drawing tools — shared between `SlideRenderer`
+ *  (which implements the actual drag-to-draw interaction) and the
+ *  Properties panel (which now renders the tool-selector buttons). */
+export type DrawTool = 'rect' | 'ellipse' | 'polygon' | 'spline' | 'freehand';
+
+/** A live snapshot of the active Linked Views slide's canvas toolbar
+ *  (Zoom/pan, North, Calibrate, drawing tools), registered by
+ *  `LinkedViewsExplorer` (SlideRenderer.tsx) every render and read by
+ *  `PropertiesPanel` to render the actual controls. The two components are
+ *  siblings under `edit/page.tsx` (ScaledStage/SlideRenderer vs.
+ *  PropertiesPanel), not parent/child, so this transient store slice is the
+ *  channel between them — the same reasoning already behind
+ *  `selectedSlideIds` living here rather than as local component state.
+ *  Every handler is the exact function `LinkedViewsExplorer` already used
+ *  for the canvas-rendered version of this toolbar — nothing about the
+ *  interaction itself changed, only where the buttons are drawn. */
+export interface LinkedViewToolbarSnapshot {
+  zoomPanEnabled: boolean;
+  onToggleZoomPan: (v: boolean) => void;
+  displayNorthDeg: number;
+  northLocked: boolean;
+  onNorthPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  onNorthPointerMove: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  onNorthPointerUp: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  onUnlockNorth: () => void;
+  hasCalibration: boolean;
+  calibrationLocked: boolean;
+  pickMode: 'calibrate' | 'measure' | null;
+  onCalibrate: () => void;
+  onUnlockCalibration: () => void;
+  tool: DrawTool | null;
+  onSetTool: (t: DrawTool | null) => void;
+}
 
 interface EditorState {
   project: Project | null;
@@ -26,6 +61,11 @@ interface EditorState {
    *  plain/toggle click, used as the fixed end of a shift-click range. */
   selectedSlideIds: string[];
   selectionAnchor: string | null;
+  /** See `LinkedViewToolbarSnapshot` above — `null` whenever no Linked Views
+   *  slide's canvas toolbar is currently showable (wrong layout, no image
+   *  loaded yet, or a walkthrough view). Transient, like the selection
+   *  state above: never persisted, never undo-tracked. */
+  linkedViewToolbar: LinkedViewToolbarSnapshot | null;
 
   loadProject: (project: Project) => void;
   setMode: (mode: Mode) => void;
@@ -36,6 +76,7 @@ interface EditorState {
   selectSlide: (id: string, modifier?: 'none' | 'toggle' | 'range') => void;
   clearSlideSelection: () => void;
   selectAllSlides: () => void;
+  setLinkedViewToolbar: (v: LinkedViewToolbarSnapshot | null) => void;
   goNext: () => void;
   goPrev: () => void;
   undo: () => void;
@@ -64,6 +105,7 @@ interface EditorState {
   changeStyle: (style: SlideStyleKind) => void;
   setBrandOverride: (brand: Brand | undefined) => void;
   setDesignOption: (label: string | undefined) => void;
+  setSectionIcon: (icon: SectionIconKey | undefined) => void;
   setClientLogo: (dataUrl: string | undefined) => void;
   setClientLogoTransform: (transform: ImageTransform | undefined) => void;
   setAccentColor: (hex: string | undefined) => void;
@@ -183,8 +225,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   redoStack: [],
   selectedSlideIds: [],
   selectionAnchor: null,
+  linkedViewToolbar: null,
 
   loadProject: (project) =>
+    // Deliberately doesn't touch `linkedViewToolbar` — that's the currently-
+    // mounted editable LinkedViewsExplorer's own registration, entirely
+    // independent of which project is loaded, and it manages its own
+    // mount/unmount lifecycle (see the registration effect in
+    // SlideRenderer.tsx). `edit/page.tsx`'s project-fetch effect calls this
+    // from an unguarded `.then()` with no cleanup, so in dev (StrictMode
+    // double-invokes effects) it can genuinely fire twice in quick
+    // succession; resetting a field here that a mounted component is
+    // actively managing raced the component's own effect and clobbered it
+    // after the fact — a real bug caught via live verification, not a
+    // hypothetical.
     set({
       project,
       currentSlideId: project.slides[0]?.id ?? null,
@@ -196,6 +250,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
 
   setMode: (mode) => set({ mode }),
+
+  setLinkedViewToolbar: (v) => set({ linkedViewToolbar: v }),
 
   selectSlide: (id, modifier = 'none') => {
     const { project, selectedSlideIds, selectionAnchor } = get();
@@ -473,6 +529,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { project, currentSlideId } = get();
     if (!project || !currentSlideId) return;
     const slides = project.slides.map((s) => (s.id === currentSlideId ? { ...s, designOption: label } : s));
+    commitProject({ ...project, slides });
+  },
+
+  setSectionIcon: (icon) => {
+    const { project, currentSlideId } = get();
+    if (!project || !currentSlideId) return;
+    const slides = project.slides.map((s) => (s.id === currentSlideId ? { ...s, sectionIcon: icon } : s));
     commitProject({ ...project, slides });
   },
 

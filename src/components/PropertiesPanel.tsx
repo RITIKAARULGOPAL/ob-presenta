@@ -1,12 +1,54 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useEditorStore } from '@/lib/editorStore';
 import { AccentPicker } from './AccentPicker';
 import { FONT_PAIRINGS, TYPE_SCALES, HEADLINE_WEIGHTS, BODY_FONTS, TRACKINGS } from '@/lib/fonts';
 import { fileToSlideImage } from '@/lib/imageFile';
-import { IconImage, IconLink, IconDroplet, IconType, IconLayers } from './icons';
-import type { Brand } from '@/types/slide';
+import { IconImage, IconLink, IconDroplet, IconType, IconLayers, IconCompass, IconChevronDown, IconChevronRight, SECTION_ICONS, IconSectionDefault } from './icons';
+import type { Brand, SectionIconKey } from '@/types/slide';
+import { LINKED_VIEW_DRAW_TOOLS } from './SlideRenderer';
+
+type SectionKey = 'designOption' | 'sectionIcon' | 'background' | 'logo' | 'linkedSlides' | 'accent' | 'typography';
+
+/** One collapsible section — a header row (icon + label + chevron) toggling
+ *  its own content. Local to this panel: every section here follows the
+ *  same shape, and nothing else in the app needs this pattern (yet). Kept
+ *  collapsed by default and opened only when the panel decides a section
+ *  already holds a real value, so an empty/untouched slide's panel reads as
+ *  a short, scannable list of headers instead of a wall of always-expanded
+ *  controls and permanent explanatory paragraphs. */
+function Disclosure({
+  icon,
+  label,
+  open,
+  onToggle,
+  children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mb-2 border-b border-ui-line-soft pb-2 last:border-b-0">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-1.5 py-2 text-xs font-bold uppercase tracking-wide text-ui-ink-3 transition hover:text-ui-ink-2"
+      >
+        {icon} {label}
+        <span className="ml-auto text-ui-ink-3">
+          {open ? <IconChevronDown className="h-3.5 w-3.5" /> : <IconChevronRight className="h-3.5 w-3.5" />}
+        </span>
+      </button>
+      {open && <div className="pb-4 pt-1">{children}</div>}
+    </div>
+  );
+}
+
+const SECTION_ICON_ORDER: SectionIconKey[] = ['file', 'list', 'bulb', 'grid', 'star', 'layers', 'users', 'wallet', 'compass', 'trending'];
 
 const BRAND_OPTIONS: { key: Brand | 'default'; label: string }[] = [
   { key: 'default', label: 'Project default' },
@@ -63,12 +105,19 @@ export function PropertiesPanel() {
   const project = useEditorStore((s) => s.project);
   const setBrandOverride = useEditorStore((s) => s.setBrandOverride);
   const setDesignOption = useEditorStore((s) => s.setDesignOption);
+  const setSectionIcon = useEditorStore((s) => s.setSectionIcon);
   const setAccentColor = useEditorStore((s) => s.setAccentColor);
   const setSlideTypographyOverride = useEditorStore((s) => s.setSlideTypographyOverride);
   const setLinkedSlideIds = useEditorStore((s) => s.setLinkedSlideIds);
   const setSlideBackground = useEditorStore((s) => s.setSlideBackground);
   const resetSlideBackground = useEditorStore((s) => s.resetSlideBackground);
+  const linkedViewToolbar = useEditorStore((s) => s.linkedViewToolbar);
   const bgFileRef = useRef<HTMLInputElement>(null);
+  // Defaults open (unlike the other sections below) — there's no "already
+  // has a value" concept for a live tool-selector the way there is for
+  // e.g. Background, so "present at all = relevant right now" is the more
+  // useful default. Not slide-keyed since it isn't part of `SectionKey`.
+  const [toolbarOpen, setToolbarOpen] = useState(true);
 
   const linkedIds = slide?.fields.linkedSlideIds ?? [];
   // Plans, renders and design slides are what a concept wants to point at —
@@ -77,12 +126,159 @@ export function PropertiesPanel() {
     (s) => s.id !== slide?.id && (s.layout === 'linked-views' || s.style === 'design'),
   );
 
+  // Which sections start open for *this* slide — collapsed by default,
+  // except a section that already holds a real value, so an active
+  // customization stays visible without hunting for it. Keyed by slide.id
+  // and recomputed via the "adjust state during render via a ref-compared
+  // key" pattern (not a useEffect) whenever the selected slide changes, so
+  // switching slides always reflects that slide's own values rather than
+  // whatever was left open on the last one.
+  const initialOpen = (): Record<SectionKey, boolean> => ({
+    designOption: !!slide?.designOption,
+    sectionIcon: !!slide?.sectionIcon,
+    background: !!(slide?.background?.color || slide?.background?.imageUrl),
+    logo: slide?.brandOverride !== undefined,
+    linkedSlides: linkedIds.length > 0,
+    accent: !!project?.accentColor,
+    typography: !!(
+      slide?.typographyOverride &&
+      (slide.typographyOverride.font !== undefined ||
+        slide.typographyOverride.scale !== undefined ||
+        slide.typographyOverride.weight !== undefined ||
+        slide.typographyOverride.bodyFont !== undefined ||
+        slide.typographyOverride.tracking !== undefined)
+    ),
+  });
+  const [open, setOpen] = useState<Record<SectionKey, boolean>>(initialOpen);
+  const [openForSlideId, setOpenForSlideId] = useState(slide?.id);
+  if (slide && slide.id !== openForSlideId) {
+    setOpenForSlideId(slide.id);
+    setOpen(initialOpen());
+  }
+  const toggle = (key: SectionKey) => setOpen((o) => ({ ...o, [key]: !o[key] }));
+
   if (!slide) return null;
 
   return (
     <aside className="flex w-72 flex-shrink-0 flex-col overflow-y-auto border-l border-ui-line bg-ui-surface px-5 py-6">
       <div className="mb-1 text-xs font-bold uppercase tracking-wider text-ui-accent">Slide</div>
-      <div className="mb-6 font-display text-base font-bold text-ui-ink">Properties</div>
+      <div className="mb-6 font-chrome-display text-base font-bold tracking-tight text-ui-ink">Properties</div>
+
+      {/* The active Linked Views slide's canvas toolbar (Zoom/pan, North,
+          Calibrate, drawing tools) — moved off the slide canvas per direct
+          feedback ("these tools can come in properties panel in a separate
+          tool bar"). `linkedViewToolbar` is registered live by
+          LinkedViewsExplorer (SlideRenderer.tsx) — see the registration
+          effect there — and is null whenever no Linked Views slide with an
+          image loaded is currently selected, so this section simply isn't
+          rendered otherwise. Placed above every other section: this is the
+          slide's primary editing-mode toolbar, not a per-slide setting. */}
+      {linkedViewToolbar && (
+        <Disclosure
+          icon={<IconCompass className="h-3.5 w-3.5" />}
+          label="Linked View Tools"
+          open={toolbarOpen}
+          onToggle={() => setToolbarOpen((o) => !o)}
+        >
+          <div className="flex flex-wrap items-center gap-1.5">
+            <label
+              className="flex items-center gap-1 text-[11px] font-medium text-ui-ink-3"
+              title="Lets viewers wheel-zoom and drag-pan this image (Presenter/view mode only)"
+            >
+              <input
+                type="checkbox"
+                checked={linkedViewToolbar.zoomPanEnabled}
+                onChange={(e) => linkedViewToolbar.onToggleZoomPan(e.target.checked)}
+                className="accent-ui-accent"
+              />
+              Zoom/pan
+            </label>
+            <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-ui-line" />
+            <button
+              onPointerDown={linkedViewToolbar.onNorthPointerDown}
+              onPointerMove={linkedViewToolbar.onNorthPointerMove}
+              onPointerUp={linkedViewToolbar.onNorthPointerUp}
+              title={
+                linkedViewToolbar.northLocked
+                  ? `North: ${Math.round(linkedViewToolbar.displayNorthDeg)}° — locked, unlock to drag`
+                  : `North: ${Math.round(linkedViewToolbar.displayNorthDeg)}° — drag to rotate`
+              }
+              style={{ transform: `rotate(${linkedViewToolbar.displayNorthDeg}deg)` }}
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-ui-ink-3 outline-none [touch-action:none] ${
+                linkedViewToolbar.northLocked
+                  ? 'cursor-not-allowed border-ui-line opacity-50'
+                  : 'cursor-grab border-ui-line hover:border-ui-accent hover:text-ui-accent active:cursor-grabbing'
+              }`}
+            >
+              <svg viewBox="0 0 40 40" className="h-full w-full">
+                <circle cx="20" cy="21" r="17" fill="none" stroke="currentColor" strokeOpacity="0.6" strokeWidth="1.5" />
+                <line x1="20" y1="31" x2="20" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path d="M20 12 L24 19 L20 16.5 L16 19 Z" fill="currentColor" />
+              </svg>
+            </button>
+            {linkedViewToolbar.northLocked && (
+              <button
+                onClick={linkedViewToolbar.onUnlockNorth}
+                title="Unlock to drag North again"
+                className="rounded-full border border-ui-line px-2 py-1 text-[11px] font-medium text-ui-ink-3 hover:border-ui-ink-3"
+              >
+                🔒 Unlock
+              </button>
+            )}
+            <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-ui-line" />
+            {linkedViewToolbar.hasCalibration ? (
+              <>
+                <button
+                  onClick={linkedViewToolbar.onCalibrate}
+                  disabled={linkedViewToolbar.calibrationLocked}
+                  className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${
+                    linkedViewToolbar.calibrationLocked
+                      ? 'cursor-not-allowed border-ui-line text-ui-ink-3 opacity-50'
+                      : 'border-ui-line text-ui-ink-3 hover:border-ui-ink-3'
+                  }`}
+                >
+                  Recalibrate
+                </button>
+                {linkedViewToolbar.calibrationLocked && (
+                  <button
+                    onClick={linkedViewToolbar.onUnlockCalibration}
+                    title="Unlock to recalibrate"
+                    className="rounded-full border border-ui-line px-2 py-1 text-[11px] font-medium text-ui-ink-3 hover:border-ui-ink-3"
+                  >
+                    🔒 Unlock
+                  </button>
+                )}
+              </>
+            ) : (
+              <button
+                onClick={linkedViewToolbar.onCalibrate}
+                className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+                  linkedViewToolbar.pickMode === 'calibrate'
+                    ? 'border-ui-accent bg-ui-accent-soft text-ui-accent'
+                    : 'border-ui-accent-line bg-ui-accent-soft text-ui-accent'
+                }`}
+              >
+                {linkedViewToolbar.pickMode === 'calibrate' ? 'Click two points a known distance apart' : 'Calibrate'}
+              </button>
+            )}
+            <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-ui-line" />
+            {LINKED_VIEW_DRAW_TOOLS.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => linkedViewToolbar.onSetTool(t.key)}
+                title={t.hint}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                  linkedViewToolbar.tool === t.key
+                    ? 'border-ui-accent bg-ui-accent-soft text-ui-accent'
+                    : 'border-dashed border-ui-line text-ui-ink-2 hover:border-ui-accent hover:text-ui-accent'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </Disclosure>
+      )}
 
       {/* One project can carry several design options (e.g. "Option 1",
           "Scheme West") as ordinary Concept/Layout/Render slides tagged with
@@ -90,15 +286,17 @@ export function PropertiesPanel() {
           the same convention ViewHotspot.zoneCategory already uses. Placed
           above Background/Layout/Style: it groups slides across the whole
           deck, so it reads as the most structural thing on this panel. */}
-      <div className="mb-2 border-b border-ui-line-soft pb-6">
-        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ui-ink-3">
-          <IconLayers className="h-3.5 w-3.5" /> Design Option
-        </h4>
+      <Disclosure
+        icon={<IconLayers className="h-3.5 w-3.5" />}
+        label="Design Option"
+        open={open.designOption}
+        onToggle={() => toggle('designOption')}
+      >
         <input
           value={slide.designOption ?? ''}
           onChange={(e) => setDesignOption(e.target.value.trim() || undefined)}
           placeholder="e.g. Option 1, Scheme West"
-          title="Groups this slide with others tagged the same — a Concept, Layout and Renders for one design option"
+          title="Groups this slide with others tagged the same — a Concept, Layout and Renders for one design option. Leave blank for a slide that doesn't belong to any option."
           list="design-options"
           className="w-full rounded-md border border-ui-line px-2.5 py-1.5 text-xs outline-none focus:border-ui-accent"
         />
@@ -109,19 +307,62 @@ export function PropertiesPanel() {
             <option key={o} value={o} />
           ))}
         </datalist>
-        <p className="mt-2 text-[11px] leading-relaxed text-ui-ink-3">
-          Leave blank for a slide that doesn&apos;t belong to any option.
-        </p>
-      </div>
+      </Disclosure>
+
+      {/* Only meaningful once this slide is a section-starter — that's what
+          makes it a divider Presenter's sidebar lists as its own section.
+          Sits right below Design Option since that's the same "groups
+          across the deck" register, and right above where Slide Style is
+          set (the toolbar menu, not this panel) so an author sees it the
+          moment the style they just picked makes it relevant. */}
+      {slide.style === 'section-starter' && (
+        <Disclosure
+          icon={<IconLayers className="h-3.5 w-3.5" />}
+          label="Section Icon"
+          open={open.sectionIcon}
+          onToggle={() => toggle('sectionIcon')}
+        >
+          <p className="mb-2.5 text-[11px] leading-relaxed text-ui-ink-3">Shown next to this section in Presenter&apos;s sidebar.</p>
+          <div className="flex flex-wrap gap-1.5">
+            {SECTION_ICON_ORDER.map((key) => {
+              const Icon = SECTION_ICONS[key];
+              const active = slide.sectionIcon === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSectionIcon(active ? undefined : key)}
+                  title={key}
+                  className={`flex h-8 w-8 items-center justify-center rounded-md border transition ${
+                    active ? 'border-ui-accent-line bg-ui-accent-soft text-ui-accent' : 'border-ui-line text-ui-ink-3 hover:border-ui-line-strong'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                </button>
+              );
+            })}
+          </div>
+          {!slide.sectionIcon && (
+            <p className="mt-2 flex items-center gap-1.5 text-[11px] leading-relaxed text-ui-ink-3">
+              <IconSectionDefault className="h-3.5 w-3.5 shrink-0" /> No icon picked yet — this default shows until you pick one.
+            </p>
+          )}
+        </Disclosure>
+      )}
 
       {/* Slide Style and Slide Layout used to live here as 18 always-visible
           pills. They are menu triggers in the editor toolbar now — one line
           that says what is set, instead of a grid that never changes. */}
-      <div className="mb-2">
-        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ui-ink-3">
-          <IconDroplet className="h-3.5 w-3.5" /> Background
-        </h4>
-        <div className="flex items-center gap-2">
+      <Disclosure
+        icon={<IconDroplet className="h-3.5 w-3.5" />}
+        label="Background"
+        open={open.background}
+        onToggle={() => toggle('background')}
+      >
+        <div
+          className="flex items-center gap-2"
+          title="Replaces this slide's default background. Text colour doesn't auto-adjust — pick a Section Starter/Design style for light text on a dark background."
+        >
           <label
             title="Background colour"
             className="relative h-7 w-7 flex-shrink-0 cursor-pointer overflow-hidden rounded-md border border-ui-line"
@@ -177,17 +418,14 @@ export function PropertiesPanel() {
             />
           </div>
         )}
-        <p className="mt-2 text-[11px] leading-relaxed text-ui-ink-3">
-          Replaces this slide&apos;s default background. Text colour doesn&apos;t
-          auto-adjust — pick a Section Starter/Design style above for light text
-          on a dark background.
-        </p>
-      </div>
+      </Disclosure>
 
-      <div className="mb-2 border-t border-ui-line-soft pt-6">
-        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ui-ink-3">
-          <IconImage className="h-3.5 w-3.5" /> Logo &amp; Copyright
-        </h4>
+      <Disclosure
+        icon={<IconImage className="h-3.5 w-3.5" />}
+        label="Logo & Copyright"
+        open={open.logo}
+        onToggle={() => toggle('logo')}
+      >
         <div className="flex flex-wrap gap-2">
           {BRAND_OPTIONS.map((o) => {
             const selected = o.key === 'default' ? slide.brandOverride === undefined : slide.brandOverride === o.key;
@@ -204,12 +442,14 @@ export function PropertiesPanel() {
             );
           })}
         </div>
-      </div>
+      </Disclosure>
 
-      <div className="mb-2 border-t border-ui-line-soft pt-6">
-        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ui-ink-3">
-          <IconLink className="h-3.5 w-3.5" /> Linked Slides
-        </h4>
+      <Disclosure
+        icon={<IconLink className="h-3.5 w-3.5" />}
+        label="Linked Slides"
+        open={open.linkedSlides}
+        onToggle={() => toggle('linkedSlides')}
+      >
         {linkTargets.length === 0 ? (
           <p className="text-[11px] leading-relaxed text-ui-ink-3">
             Add a Linked Views or Design slide to link one here.
@@ -241,19 +481,23 @@ export function PropertiesPanel() {
             })}
           </div>
         )}
-      </div>
+      </Disclosure>
 
-      <div className="mb-2 border-t border-ui-line-soft pt-6">
-        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ui-ink-3">
-          <IconDroplet className="h-3.5 w-3.5" /> Accent Colour
-        </h4>
+      <Disclosure
+        icon={<IconDroplet className="h-3.5 w-3.5" />}
+        label="Accent Colour"
+        open={open.accent}
+        onToggle={() => toggle('accent')}
+      >
         <AccentPicker logo={project?.clientLogo} value={project?.accentColor} onChange={setAccentColor} tone="panel" />
-      </div>
+      </Disclosure>
 
-      <div className="mb-2 border-t border-ui-line-soft pt-6">
-        <h4 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-ui-ink-3">
-          <IconType className="h-3.5 w-3.5" /> Typography
-        </h4>
+      <Disclosure
+        icon={<IconType className="h-3.5 w-3.5" />}
+        label="Typography"
+        open={open.typography}
+        onToggle={() => toggle('typography')}
+      >
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setSlideTypographyOverride({ font: undefined })}
@@ -313,7 +557,7 @@ export function PropertiesPanel() {
             onChange={(v) => setSlideTypographyOverride({ tracking: v })}
           />
         </div>
-      </div>
+      </Disclosure>
     </aside>
   );
 }

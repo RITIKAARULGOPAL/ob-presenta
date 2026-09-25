@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EditableText } from './EditableText';
-import { useEditorStore } from '@/lib/editorStore';
+import { useEditorStore, type DrawTool } from '@/lib/editorStore';
 import { shadeWithBlack, tintWithWhite } from '@/lib/color';
 import { resolveTypography, headlineStyle } from '@/lib/fonts';
 import { dataUrlBytes, fileToDataUrl, fileToSlideImage } from '@/lib/imageFile';
@@ -951,15 +951,16 @@ function BrandFooter({ slide, dark }: { slide: Slide; dark: boolean }) {
   );
 }
 
-type DrawTool = 'rect' | 'ellipse' | 'polygon' | 'spline' | 'freehand';
-
 /** How long a Layout-view stage transition's crossfade/shape-morph/overlay
  *  -fade runs, all three driven off one shared clock so they land in sync —
  *  the same reasoning the Sidvin reference gives for its own single rAF
  *  clock (avoiding drift between its image crossfade and its shape morph). */
 const MORPH_DURATION_MS = 1200;
 
-const TOOLS: { key: DrawTool; label: string; hint: string }[] = [
+/** The drawing-tool picker's own labels/hints — exported so the Properties
+ *  panel (which now renders these buttons; see `linkedViewToolbar` in
+ *  editorStore.ts) doesn't duplicate them. */
+export const LINKED_VIEW_DRAW_TOOLS: { key: DrawTool; label: string; hint: string }[] = [
   { key: 'rect', label: '▭ Rectangle', hint: 'Drag a box over the area. Shift for a square.' },
   { key: 'ellipse', label: '◯ Ellipse', hint: 'Drag to size it. Shift for a circle.' },
   { key: 'polygon', label: '⬡ Polygon', hint: 'Click each corner. Shift locks to 45°. Click the first point, or Enter, to close.' },
@@ -997,6 +998,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   const [activeId, setActiveId] = useState<string | undefined>(views[0]?.id);
   const project = useEditorStore((s) => s.project);
   const selectSlide = useEditorStore((s) => s.selectSlide);
+  const setLinkedViewToolbar = useEditorStore((s) => s.setLinkedViewToolbar);
   const [tool, setTool] = useState<DrawTool | null>(null);
   const [drawingPoints, setDrawingPoints] = useState<Point[] | null>(null);
   /** Where the cursor is, for the rubber-band edge and the close-snap hint. */
@@ -1398,13 +1400,6 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId, active.musicUrl]);
 
-  if (!active) return null;
-
-  const otherViews = views.filter((v) => v.id !== active.id);
-  const allHotspots = active.hotspots ?? [];
-  // Unset stageIds = active on every stage — matters both for hotspots drawn
-  // before stages existed and for a view that never defines any.
-  const hotspots = activeStage ? allHotspots.filter((h) => !h.stageIds || h.stageIds.includes(activeStage.id)) : allHotspots;
   const stageUrl = activeStage?.url ?? active.url;
   const stageTransform = activeStage?.url ? activeStage.transform : active.transform;
   // Scale belongs to whichever image is actually on screen — a stage that
@@ -1415,18 +1410,6 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
   const displayNorthDeg = dragNorthDeg ?? northDeg ?? 0;
   const northLocked = activeStage?.url ? activeStage.northLocked : active.northLocked;
   const calibrationLocked = activeStage?.url ? activeStage.calibrationLocked : active.calibrationLocked;
-
-  /** Where a pointer at these client coordinates should actually place a point.
-   *
-   *  The snap radius is a **screen** distance converted into frame units, so it
-   *  shrinks as the viewer zooms in — snapping must get finer with magnification,
-   *  not coarser, since zooming in is exactly when precision is being asked for. */
-  function resolvePick(rect: DOMRect, clientX: number, clientY: number): { point: Point; snap: SnapResult | null } {
-    const raw = clamp01({ x: (clientX - rect.left) / rect.width, y: (clientY - rect.top) / rect.height });
-    const radius = (SNAP_SCREEN_PX / rect.width) / Math.max(1, viewportZoom);
-    const snap = snapTo(snapIndex, raw, radius);
-    return { point: snap ? snap.point : raw, snap };
-  }
 
   /** Writes any of the image-scoped fields to whichever of the stage or the
    *  view actually owns the picture on screen.
@@ -1513,6 +1496,90 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
 
   function unlockCalibration() {
     setStage({ calibrationLocked: false });
+  }
+
+  // Registers the canvas toolbar's live values/handlers into the store so
+  // PropertiesPanel — a sibling subtree, not a descendant of this component
+  // — can render the actual buttons (Zoom/pan, North, Calibrate, drawing
+  // tools) and still call back into these exact same handlers. Every
+  // handler referenced here is unchanged from when this toolbar rendered
+  // inline on the canvas; only where the buttons are drawn moved. Cleared
+  // (not just re-set) whenever the toolbar shouldn't be showable at all —
+  // matching the `editable && stageUrl && active.kind !== 'walkthrough'`
+  // gate the removed on-canvas JSX used to check.
+  //
+  // Gated on `editable` FIRST, before anything else: the slide rail renders
+  // its own non-editable `LinkedViewsExplorer` instance for every Linked
+  // Views slide's thumbnail (the same rail/canvas DOM-duplication this
+  // component's other effects already have to account for — see the
+  // `isInRailPreview()`-style guards elsewhere in this file). Every one of
+  // those non-editable instances runs this same effect; without this early
+  // return each of them would call `setLinkedViewToolbar(null)` right after
+  // the real editable instance registers its own snapshot, since this is
+  // one shared store slot and effects across sibling instances aren't
+  // ordered against each other. Only the single editable instance — there
+  // is ever at most one — may write to this slot at all.
+  useEffect(() => {
+    if (!editable) return;
+    if (!stageUrl || active.kind === 'walkthrough') {
+      setLinkedViewToolbar(null);
+      return;
+    }
+    setLinkedViewToolbar({
+      zoomPanEnabled: !!active.zoomPanEnabled,
+      onToggleZoomPan: (v) => setView(active.id, { zoomPanEnabled: v }),
+      displayNorthDeg,
+      northLocked: !!northLocked,
+      onNorthPointerDown: startNorthDrag,
+      onNorthPointerMove: moveNorthDrag,
+      onNorthPointerUp: endNorthDrag,
+      onUnlockNorth: unlockNorth,
+      hasCalibration: !!calibration,
+      calibrationLocked: !!calibrationLocked,
+      pickMode,
+      onCalibrate: () => {
+        if (calibrationLocked) return;
+        setPickMode('calibrate');
+        setPickPoints([]);
+        setPendingCalDistance('');
+      },
+      onUnlockCalibration: unlockCalibration,
+      tool,
+      onSetTool: (t) => {
+        setDrawingPoints(null);
+        setPickingTarget(false);
+        setTool((prev) => (prev === t ? null : t));
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editable, stageUrl, active.kind, active.id, active.zoomPanEnabled, displayNorthDeg, northLocked, calibration, calibrationLocked, pickMode, tool]);
+
+  // Unmount only, and only for the editable instance (see above) — clears
+  // the registration so a different slide's Properties panel never shows a
+  // stale toolbar from a slide no longer being edited.
+  useEffect(() => {
+    if (!editable) return undefined;
+    return () => setLinkedViewToolbar(null);
+  }, [editable, setLinkedViewToolbar]);
+
+  if (!active) return null;
+
+  const otherViews = views.filter((v) => v.id !== active.id);
+  const allHotspots = active.hotspots ?? [];
+  // Unset stageIds = active on every stage — matters both for hotspots drawn
+  // before stages existed and for a view that never defines any.
+  const hotspots = activeStage ? allHotspots.filter((h) => !h.stageIds || h.stageIds.includes(activeStage.id)) : allHotspots;
+
+  /** Where a pointer at these client coordinates should actually place a point.
+   *
+   *  The snap radius is a **screen** distance converted into frame units, so it
+   *  shrinks as the viewer zooms in — snapping must get finer with magnification,
+   *  not coarser, since zooming in is exactly when precision is being asked for. */
+  function resolvePick(rect: DOMRect, clientX: number, clientY: number): { point: Point; snap: SnapResult | null } {
+    const raw = clamp01({ x: (clientX - rect.left) / rect.width, y: (clientY - rect.top) / rect.height });
+    const radius = (SNAP_SCREEN_PX / rect.width) / Math.max(1, viewportZoom);
+    const snap = snapTo(snapIndex, raw, radius);
+    return { point: snap ? snap.point : raw, snap };
   }
 
   function setCalibration(cal: PlanCalibration | undefined) {
@@ -2288,127 +2355,15 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
     // plan/seating row is the one thing that actually gives, sizing the
     // plan by whatever height is left rather than the reverse.
     <div className="flex h-full min-h-0 flex-col">
-      {/* The title rarely fills this width, so the per-view toolbar
-          (zoom/pan, north point, drawing tools) shares its row instead of
-          owning a row of its own further down. */}
-      <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-4">
+      <div className="mb-2 flex shrink-0 items-center">
         <Title slide={slide} editable={editable} dark={dark} />
-        {editable && stageUrl && active.kind !== 'walkthrough' && (
-          <div className="flex flex-wrap items-center justify-end gap-1.5">
-            <label className="flex items-center gap-1 text-[11px] font-medium text-[var(--ink-3)]" title="Lets viewers wheel-zoom and drag-pan this image (Presenter/view mode only)">
-              <input
-                type="checkbox"
-                checked={!!active.zoomPanEnabled}
-                onChange={(e) => setView(active.id, { zoomPanEnabled: e.target.checked })}
-                className="accent-[var(--accent)]"
-              />
-              Zoom/pan
-            </label>
-            <button
-              onPointerDown={startNorthDrag}
-              onPointerMove={moveNorthDrag}
-              onPointerUp={endNorthDrag}
-              title={northLocked ? `North: ${Math.round(displayNorthDeg)}° — locked, unlock to drag` : `North: ${Math.round(displayNorthDeg)}° — drag to rotate`}
-              style={{ transform: `rotate(${displayNorthDeg}deg)` }}
-              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[var(--ink-3)] outline-none [touch-action:none] ${
-                northLocked
-                  ? 'cursor-not-allowed border-[var(--line)] opacity-50'
-                  : 'cursor-grab border-[var(--line)] hover:border-[var(--accent)] hover:text-[var(--accent)] active:cursor-grabbing'
-              }`}
-            >
-              <svg viewBox="0 0 40 40" className="h-full w-full">
-                <circle cx="20" cy="21" r="17" fill="none" stroke="currentColor" strokeOpacity="0.6" strokeWidth="1.5" />
-                <line x1="20" y1="31" x2="20" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                <path d="M20 12 L24 19 L20 16.5 L16 19 Z" fill="currentColor" />
-              </svg>
-            </button>
-            {northLocked && (
-              <button
-                onClick={unlockNorth}
-                title="Unlock to drag North again"
-                className="rounded-full border border-[var(--line)] px-2 py-1 text-[11px] font-medium text-[var(--ink-3)] hover:border-[var(--ink-3)]"
-              >
-                🔒 Unlock
-              </button>
-            )}
-            {calibration ? (
-              <>
-                <button
-                  onClick={() => {
-                    if (calibrationLocked) return;
-                    setPickMode('calibrate');
-                    setPickPoints([]);
-                    setPendingCalDistance('');
-                  }}
-                  disabled={calibrationLocked}
-                  className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${
-                    calibrationLocked
-                      ? 'cursor-not-allowed border-[var(--line)] text-[var(--ink-3)] opacity-50'
-                      : 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--ink-3)]'
-                  }`}
-                >
-                  Recalibrate
-                </button>
-                {calibrationLocked && (
-                  <button
-                    onClick={unlockCalibration}
-                    title="Unlock to recalibrate"
-                    className="rounded-full border border-[var(--line)] px-2 py-1 text-[11px] font-medium text-[var(--ink-3)] hover:border-[var(--ink-3)]"
-                  >
-                    🔒 Unlock
-                  </button>
-                )}
-              </>
-            ) : (
-              <button
-                onClick={() => {
-                  setPickMode('calibrate');
-                  setPickPoints([]);
-                  setPendingCalDistance('');
-                }}
-                className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
-                  pickMode === 'calibrate'
-                    ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
-                    : 'border-[var(--accent-soft-line)] bg-[var(--accent-soft)] text-[var(--accent)]'
-                }`}
-              >
-                {pickMode === 'calibrate' ? 'Click two points a known distance apart' : 'Calibrate'}
-              </button>
-            )}
-            {/* Whether picks will snap at all, computed fresh from
-                isPdfPlan/planGeometry every render — both already correctly
-                re-resolved per stage/view — rather than reusing MediaBox's
-                own upload toast, which is component-local state with no key
-                tied to the active stage/view and would show stale text
-                after switching to a different plan. */}
-            <span className="text-[11px] text-[var(--ink-3)]">
-              {!isPdfPlan
-                ? 'Upload as a vector PDF for point/line snapping while calibrating.'
-                : !planGeometry?.vertices.length
-                  ? 'This PDF has no vector line-work — export it directly from the drawing tool, not flattened, scanned, or printed to PDF.'
-                  : `⌖ ${planGeometry.vertices.length / 2} snap points${planGeometry.truncated ? ' (trimmed to the busiest lines)' : ''}`}
-            </span>
-            {TOOLS.map((t) => (
-              <button
-                key={t.key}
-                onClick={() => {
-                  setDrawingPoints(null);
-                  setPickingTarget(false);
-                  setTool(tool === t.key ? null : t.key);
-                }}
-                title={t.hint}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                  tool === t.key
-                    ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
-                    : 'border-dashed border-[var(--line)] text-[var(--ink-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
+      {/* The Zoom/pan · North · Calibrate · drawing-tools toolbar that used
+          to render here now lives in the Properties panel (see the
+          registration effect below and PropertiesPanel.tsx's "Linked View
+          Tools" section) — moved off the canvas per direct feedback that it
+          didn't belong on the slide itself. This row now goes straight from
+          the title to the view tabs. */}
       <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2">
         {views.map((v) => (
           <button
@@ -3034,7 +2989,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
                 </button>
               </>
             ) : (
-              <span>{TOOLS.find((t) => t.key === tool)?.hint}</span>
+              <span>{LINKED_VIEW_DRAW_TOOLS.find((t) => t.key === tool)?.hint}</span>
             )}
             {/* Shift has no effect on a freehand trace — a continuous gesture,
                 not discrete points to constrain — so the hint would mislead. */}

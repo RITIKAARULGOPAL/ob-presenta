@@ -62,3 +62,19 @@ next-env.d.ts
 .vercel
 .env*
 __pycache__/
+
+# Skill-plugin vendor trees (installed via `npx skills add`/`npx impeccable
+# install`, reproducible from skills-lock.json) — kept out of git because
+# impeccable alone ships a ~15MB platform-specific .exe per install, and the
+# rest is third-party skill content, not something this repo authors or
+# reviews. `skills-lock.json` (committed) is what makes these reproducible;
+# `.impeccable/config.json` (committed) and `.codex/hooks.json` (committed)
+# are this repo's own small, human-authored config for those tools, so they
+# aren't covered by this ignore.
+/.agents/skills/
+/.claude/skills/
+/.claude/agents/
+
+# Per-developer impeccable state (install consent, machine-specific) —
+# mirrors how .claude/settings.local.json is already handled above.
+/.impeccable/config.local.json

@@ -106,6 +106,11 @@ interface EditorState {
   setBrandOverride: (brand: Brand | undefined) => void;
   setDesignOption: (label: string | undefined) => void;
   setSectionIcon: (icon: SectionIconKey | undefined) => void;
+  /** Takes the slide's id rather than using `currentSlideId`, unlike the
+   *  per-slide setters around it: the notes box commits on blur, and a blur
+   *  can land after the selection has already started moving. Whitespace-only
+   *  text clears the notes. */
+  setSlideNotes: (id: string, notes: string) => void;
   setClientLogo: (dataUrl: string | undefined) => void;
   setClientLogoTransform: (transform: ImageTransform | undefined) => void;
   setAccentColor: (hex: string | undefined) => void;
@@ -536,6 +541,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { project, currentSlideId } = get();
     if (!project || !currentSlideId) return;
     const slides = project.slides.map((s) => (s.id === currentSlideId ? { ...s, sectionIcon: icon } : s));
+    commitProject({ ...project, slides });
+  },
+
+  setSlideNotes: (id, notes) => {
+    const { project } = get();
+    if (!project) return;
+    const slide = project.slides.find((s) => s.id === id);
+    const next = notes.trim() ? notes : undefined;
+    // Same no-op guard as updateField: the notes box blurs unchanged all the
+    // time, and a no-op commit would cost the next Undo click.
+    if (!slide || slide.notes === next) return;
+    const slides = project.slides.map((s) => (s.id === id ? { ...s, notes: next } : s));
     commitProject({ ...project, slides });
   },
 

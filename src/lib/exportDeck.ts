@@ -3,7 +3,7 @@ import { createElement } from 'react';
 import * as htmlToImage from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { SlideRenderer } from '@/components/SlideRenderer';
-import type { Project } from '@/types/slide';
+import type { Project, Slide } from '@/types/slide';
 
 // Export renders each slide off-screen at a fixed 16:9 pixel size, rasterizes
 // it with html-to-image, then assembles the images into a PDF or PPTX. This
@@ -47,7 +47,12 @@ async function settleStage(stage: HTMLElement): Promise<void> {
   await new Promise((r) => requestAnimationFrame(r));
 }
 
-async function captureSlides(project: Project, onProgress?: ExportProgress): Promise<string[]> {
+interface CapturedSlide {
+  slide: Slide;
+  dataUrl: string;
+}
+
+async function captureSlides(project: Project, onProgress?: ExportProgress): Promise<CapturedSlide[]> {
   // Two elements, and the split matters. html-to-image copies the CAPTURED
   // node's own computed style onto its clone and renders that clone inside an
   // SVG foreignObject — so when the captured node is the one holding
@@ -74,7 +79,7 @@ async function captureSlides(project: Project, onProgress?: ExportProgress): Pro
   document.body.appendChild(wrapper);
 
   const root = createRoot(stage);
-  const images: string[] = [];
+  const captured: CapturedSlide[] = [];
 
   try {
     await document.fonts.ready;
@@ -84,7 +89,7 @@ async function captureSlides(project: Project, onProgress?: ExportProgress): Pro
 
     for (let i = 0; i < exportable.length; i++) {
       const slide = exportable[i];
-      root.render(createElement(SlideRenderer, { slide, editable: false }));
+      root.render(createElement(SlideRenderer, { slide, editable: false, silent: true }));
       await settleStage(stage);
 
       const dataUrl = await htmlToImage.toPng(stage, {
@@ -93,7 +98,7 @@ async function captureSlides(project: Project, onProgress?: ExportProgress): Pro
         pixelRatio: 2,
         cacheBust: true,
       });
-      images.push(dataUrl);
+      captured.push({ slide, dataUrl });
       onProgress?.(i + 1, exportable.length);
     }
   } finally {
@@ -101,11 +106,11 @@ async function captureSlides(project: Project, onProgress?: ExportProgress): Pro
     wrapper.remove();
   }
 
-  return images;
+  return captured;
 }
 
 export async function exportToPdf(project: Project, onProgress?: ExportProgress): Promise<void> {
-  const images = await captureSlides(project, onProgress);
+  const captured = await captureSlides(project, onProgress);
   // jsPDF defaults `orientation` to 'p' whenever it's omitted — not "infer
   // from the format array" — and then swaps a landscape [1280, 720] array to
   // portrait to match. Omitting orientation (the previous code here) produced
@@ -115,7 +120,7 @@ export async function exportToPdf(project: Project, onProgress?: ExportProgress)
   // addPage() call — each one re-runs the same default-to-portrait check.
   const pdf = new jsPDF({ orientation: 'l', unit: 'px', format: [SLIDE_W, SLIDE_H] });
 
-  images.forEach((dataUrl, i) => {
+  captured.forEach(({ dataUrl }, i) => {
     if (i > 0) pdf.addPage([SLIDE_W, SLIDE_H], 'l');
     pdf.addImage(dataUrl, 'PNG', 0, 0, SLIDE_W, SLIDE_H);
   });
@@ -124,16 +129,19 @@ export async function exportToPdf(project: Project, onProgress?: ExportProgress)
 }
 
 export async function exportToPptx(project: Project, onProgress?: ExportProgress): Promise<void> {
-  const images = await captureSlides(project, onProgress);
+  const captured = await captureSlides(project, onProgress);
   const PptxGenJS = (await import('pptxgenjs')).default;
   const pres = new PptxGenJS();
 
   pres.defineLayout({ name: 'PRESENTA_16X9', width: 13.333, height: 7.5 });
   pres.layout = 'PRESENTA_16X9';
 
-  for (const dataUrl of images) {
-    const slide = pres.addSlide();
-    slide.addImage({ data: dataUrl, x: 0, y: 0, w: 13.333, h: 7.5 });
+  for (const { slide, dataUrl } of captured) {
+    const out = pres.addSlide();
+    out.addImage({ data: dataUrl, x: 0, y: 0, w: 13.333, h: 7.5 });
+    // Speaker notes survive the export even though the slide itself is a
+    // flat picture, so the deck can still be presented from PowerPoint.
+    if (slide.notes) out.addNotes(slide.notes);
   }
 
   await pres.writeFile({ fileName: `${sanitizeFilename(project.name)}.pptx` });

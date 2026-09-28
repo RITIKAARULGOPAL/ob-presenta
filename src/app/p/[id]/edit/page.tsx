@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useRef, useState } from 'react';
+import { use, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getProject, optionalColumnsMissing } from '@/lib/data';
@@ -9,15 +9,18 @@ import { SlideRail } from '@/components/SlideRail';
 import { SlideRenderer } from '@/components/SlideRenderer';
 import { ScaledStage } from '@/components/ScaledStage';
 import { PropertiesPanel } from '@/components/PropertiesPanel';
+import { SpeakerNotes } from '@/components/SpeakerNotes';
 import { ConceptLibraryDropdown } from '@/components/ConceptLibraryDropdown';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { exportToPdf, exportToPptx } from '@/lib/exportDeck';
+import { enterFullscreen } from '@/lib/fullscreen';
+import { openPresenterView, presentUrl } from '@/lib/presenting';
 import { DESIGN_PILLARS } from '@/lib/conceptLibrary';
 import { conceptSlide } from '@/lib/conceptSlides';
 import {
   IconBulb, IconTextBlock, IconStar, IconBars, IconLink, IconFile, IconScreen, IconImage,
   IconUndo, IconRedo, IconPlay, IconDownload, IconPlus, IconMinus, IconChevronDown,
-  IconCopy, IconEyeOff, IconEye, IconTrash, IconGrid, IconLayers,
+  IconCopy, IconEyeOff, IconEye, IconTrash, IconGrid, IconLayers, IconRestart, IconSpeakerNotes,
 } from '@/components/icons';
 import { Button, IconButton, ToolbarDivider } from '@/components/ui/Button';
 import { Menu, MenuItem, MenuLabel, MenuSeparator, Kbd } from '@/components/ui/Menu';
@@ -37,6 +40,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const [notFound, setNotFound] = useState(false);
   const [showConceptPicker, setShowConceptPicker] = useState(false);
   const [exportStatus, setExportStatus] = useState('');
+  const [presentNotice, setPresentNotice] = useState('');
   const [zoomFactor, setZoomFactor] = useState(ZOOM_DEFAULT);
   const stageAreaRef = useRef<HTMLDivElement>(null);
 
@@ -100,6 +104,37 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
 
+  // From this slide by default, as in Google Slides and Keynote: the slide
+  // you're looking at is the one you meant to show. Full screen and the
+  // presenter-view pop-up both have to be requested right here, inside the
+  // click or key press, since a browser only grants either one as a direct
+  // response to the user.
+  const present = useCallback(
+    (from: 'current' | 'beginning', withPresenterView = false) => {
+      if (!project) return;
+      if (withPresenterView) {
+        // No full screen this time. This window is about to be dragged onto
+        // the projector, and full screen would pin it to the laptop's own
+        // display, on top of the presenter view. Presenter's F key takes it
+        // full screen once it's where it belongs.
+        if (!openPresenterView(project.id)) {
+          setPresentNotice('Allow pop-ups for this site to open the presenter view.');
+          return;
+        }
+      } else {
+        enterFullscreen();
+      }
+      router.push(presentUrl(project.id, from === 'current' ? currentSlide?.id : undefined));
+    },
+    [project, currentSlide, router],
+  );
+
+  useEffect(() => {
+    if (!presentNotice) return;
+    const t = setTimeout(() => setPresentNotice(''), 6000);
+    return () => clearTimeout(t);
+  }, [presentNotice]);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       // Escape clears a multi-selection even mid-edit (harmless either way),
@@ -151,6 +186,11 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         selectAllSlides();
         return;
       }
+      if (mod && e.key === 'Enter') {
+        e.preventDefault();
+        present(e.shiftKey ? 'beginning' : 'current');
+        return;
+      }
       if (mod && (key === '=' || key === '+')) {
         e.preventDefault();
         setZoomFactor((z) => clamp(z + ZOOM_STEP, ZOOM_MIN, ZOOM_MAX));
@@ -187,6 +227,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     goNext,
     goPrev,
     currentSlide,
+    present,
   ]);
 
   async function handleExport(kind: 'pdf' | 'pptx') {
@@ -330,9 +371,55 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           )}
         </Menu>
 
-        <Button variant="primary" icon={<IconPlay className="h-3 w-3" />} onClick={() => router.push(`/p/${project.id}/present`)}>
-          Present
-        </Button>
+        {presentNotice && (
+          <span role="status" className="shrink-0 text-micro font-medium text-ui-warn-ink">
+            {presentNotice}
+          </span>
+        )}
+        {/* A split button: the main half presents from this slide, the
+            chevron offers the other starts. One control, so still the one
+            primary button on screen. */}
+        <div className="flex shrink-0 items-center">
+          <Button
+            variant="primary"
+            icon={<IconPlay className="h-3 w-3" />}
+            onClick={() => present('current')}
+            title="Present from this slide (Ctrl/⌘+Enter)"
+            className="rounded-r-none"
+          >
+            Present
+          </Button>
+          <Menu
+            width="w-72"
+            trigger={({ onClick, ...a11y }) => (
+              <Button
+                variant="primary"
+                onClick={onClick}
+                aria-label="More ways to present"
+                title="More ways to present"
+                className="rounded-l-none border-l-ui-accent-on/30 px-1.5"
+                {...a11y}
+              >
+                <IconChevronDown className="h-3 w-3" />
+              </Button>
+            )}
+          >
+            <MenuItem icon={<IconPlay className="h-3 w-3" />} hint="Ctrl/⌘+↵" onClick={() => present('current')}>
+              From this slide
+            </MenuItem>
+            <MenuItem icon={<IconRestart className="h-[15px] w-[15px]" />} hint="Ctrl/⌘+⇧+↵" onClick={() => present('beginning')}>
+              From the beginning
+            </MenuItem>
+            <MenuSeparator />
+            <MenuItem icon={<IconSpeakerNotes className="h-[15px] w-[15px]" />} onClick={() => present('current', true)}>
+              With presenter view
+            </MenuItem>
+            <p className="px-2.5 pb-1.5 pt-0.5 text-micro leading-snug text-ui-ink-3">
+              Your notes, a timer and the next slide open in a window of their own for the laptop screen. Drag this
+              window to the projector, then press F for full screen.
+            </p>
+          </Menu>
+        </div>
       </header>
 
       {/* Row 2 — the current slide. Layout and Style used to be 18 pills in
@@ -412,44 +499,47 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             below that 1280px min-content width and the whole editor overflows
             sideways, pushing the properties panel off-screen. The stage has its
             own overflow-auto, so it scrolls internally instead. */}
-        <main ref={stageAreaRef} className="relative min-h-0 min-w-0 flex-1 bg-ui-canvas p-8">
-          <ScaledStage
-            pannable
-            zoomFactor={zoomFactor}
-            // The slide keeps its own white ground in both themes — it is the page that
-            // gets exported, not part of the chrome. Only the frame follows the theme.
-            stageClassName="overflow-hidden rounded-lg bg-white shadow-float ring-1 ring-ui-line"
-          >
-            {currentSlide && <SlideRenderer slide={currentSlide} editable animate />}
-          </ScaledStage>
-
-          {/* Zoom belongs to the canvas, so it floats on it rather than living
-              in a full-width footer bar the rest of the app had to pay for. */}
-          <div className="absolute bottom-4 right-5 flex items-center gap-0.5 rounded-ui-md border border-ui-line bg-ui-surface p-1 shadow-float">
-            <IconButton
-              size="sm"
-              label="Zoom out"
-              title="Zoom out (Ctrl/⌘+-)"
-              icon={<IconMinus className="h-3.5 w-3.5" />}
-              onClick={() => setZoomFactor((z) => clamp(z - ZOOM_STEP, ZOOM_MIN, ZOOM_MAX))}
-            />
-            <button
-              type="button"
-              onClick={() => setZoomFactor(ZOOM_DEFAULT)}
-              title="Reset zoom (Ctrl/⌘+0)"
-              className="h-7 w-12 rounded-ui-sm text-label font-semibold text-ui-ink-2 transition-colors duration-150 ease-ui hover:bg-ui-raised hover:text-ui-ink"
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <main ref={stageAreaRef} className="relative min-h-0 min-w-0 flex-1 bg-ui-canvas p-8">
+            <ScaledStage
+              pannable
+              zoomFactor={zoomFactor}
+              // The slide keeps its own white ground in both themes — it is the page that
+              // gets exported, not part of the chrome. Only the frame follows the theme.
+              stageClassName="overflow-hidden rounded-lg bg-white shadow-float ring-1 ring-ui-line"
             >
-              {Math.round(zoomFactor * 100)}%
-            </button>
-            <IconButton
-              size="sm"
-              label="Zoom in"
-              title="Zoom in (Ctrl/⌘+=)"
-              icon={<IconPlus className="h-3.5 w-3.5" />}
-              onClick={() => setZoomFactor((z) => clamp(z + ZOOM_STEP, ZOOM_MIN, ZOOM_MAX))}
-            />
-          </div>
-        </main>
+              {currentSlide && <SlideRenderer slide={currentSlide} editable animate />}
+            </ScaledStage>
+
+            {/* Zoom belongs to the canvas, so it floats on it rather than living
+                in a full-width footer bar the rest of the app had to pay for. */}
+            <div className="absolute bottom-4 right-5 flex items-center gap-0.5 rounded-ui-md border border-ui-line bg-ui-surface p-1 shadow-float">
+              <IconButton
+                size="sm"
+                label="Zoom out"
+                title="Zoom out (Ctrl/⌘+-)"
+                icon={<IconMinus className="h-3.5 w-3.5" />}
+                onClick={() => setZoomFactor((z) => clamp(z - ZOOM_STEP, ZOOM_MIN, ZOOM_MAX))}
+              />
+              <button
+                type="button"
+                onClick={() => setZoomFactor(ZOOM_DEFAULT)}
+                title="Reset zoom (Ctrl/⌘+0)"
+                className="h-7 w-12 rounded-ui-sm text-label font-semibold text-ui-ink-2 transition-colors duration-150 ease-ui hover:bg-ui-raised hover:text-ui-ink"
+              >
+                {Math.round(zoomFactor * 100)}%
+              </button>
+              <IconButton
+                size="sm"
+                label="Zoom in"
+                title="Zoom in (Ctrl/⌘+=)"
+                icon={<IconPlus className="h-3.5 w-3.5" />}
+                onClick={() => setZoomFactor((z) => clamp(z + ZOOM_STEP, ZOOM_MIN, ZOOM_MAX))}
+              />
+            </div>
+          </main>
+          {currentSlide && <SpeakerNotes slide={currentSlide} />}
+        </div>
         <PropertiesPanel />
       </div>
 
@@ -463,6 +553,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         <span className="flex items-center gap-1"><Kbd>↑</Kbd><Kbd>↓</Kbd> change slide</span>
         <span className="flex items-center gap-1"><Kbd>⌘</Kbd><Kbd>D</Kbd> duplicate</span>
         <span className="flex items-center gap-1"><Kbd>⌘</Kbd><Kbd>Z</Kbd> undo</span>
+        <span className="flex items-center gap-1"><Kbd>⌘</Kbd><Kbd>↵</Kbd> present</span>
       </div>
     </div>
   );

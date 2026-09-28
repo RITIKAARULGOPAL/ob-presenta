@@ -262,6 +262,75 @@ export function IconChevronRight(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Previous slide — the mirror of IconChevronRight. */
+export function IconChevronLeft(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="m15 6-6 6 6 6" />
+    </Base>
+  );
+}
+
+// ---- Presenting -------------------------------------------------------------
+
+/** Enter full screen — four corners pushing outward. */
+export function IconFullscreen(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />
+    </Base>
+  );
+}
+
+/** Leave full screen — the same corners pulled back in. */
+export function IconFullscreenExit(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5" />
+    </Base>
+  );
+}
+
+/** Presenter view / speaker notes — a sheet with lines of text. */
+export function IconSpeakerNotes(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <rect x="4" y="3.5" width="16" height="17" rx="2" />
+      <path d="M8 8.5h8M8 12h8M8 15.5h5" />
+    </Base>
+  );
+}
+
+/** Black screen — a filled-in screen. */
+export function IconBlackScreen(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <rect x="3" y="4.5" width="18" height="12" rx="1.6" fill="currentColor" />
+      <path d="M8.5 20.5h7M12 16.5v4" />
+    </Base>
+  );
+}
+
+/** Pause the presentation timer. */
+export function IconPause(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="M9 5v14M15 5v14" />
+    </Base>
+  );
+}
+
+/** Start over — an arrow coming back round to the top. Presenting from the
+ *  beginning, and resetting the presenter view's timer. */
+export function IconRestart(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" />
+      <path d="M4.5 4v4h4" />
+    </Base>
+  );
+}
+
 /** Search. */
 export function IconSearch(props: SVGProps<SVGSVGElement>) {
   return (

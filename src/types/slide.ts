@@ -606,6 +606,13 @@ export interface Slide {
    *  meaningful when `style === 'section-starter'`; ignored otherwise.
    *  Unset renders a default fallback icon, not a blank space. */
   sectionIcon?: SectionIconKey;
+  /** Speaker notes — plain text, shown only in the presenter view (and
+   *  carried into a PPTX export's own notes), never on the slide itself.
+   *  Lives on the slide rather than in `fields` because changing a slide's
+   *  layout or style resets `fields` to that layout's defaults, and what the
+   *  presenter meant to say about a slide shouldn't vanish with its layout.
+   *  Unset (never empty string) when there are no notes. */
+  notes?: string;
 }
 
 export interface Project {

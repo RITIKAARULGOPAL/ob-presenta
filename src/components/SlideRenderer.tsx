@@ -53,6 +53,12 @@ interface SlideRendererProps {
    *  canvas and for Presenter — editable is the wrong signal, since Presenter
    *  is not editable but is exactly where the motion matters. */
   animate?: boolean;
+  /** Never start a Linked Views view's background music. For copies of a
+   *  slide that sit beside the live one: Presenter's hover previews and the
+   *  presenter view's current/next panes, which would otherwise play the
+   *  track a second time over the audience screen, or play the next slide's
+   *  track early. Also export, which renders every slide off-screen. */
+  silent?: boolean;
 }
 
 const ARROW = '→';
@@ -992,7 +998,7 @@ function isClickTool(tool: DrawTool | null): boolean {
  * vertices, Finish once there are 3+, then pick the target view (+ optional video
  * timestamp); click a finished region to delete it. Non-editable (Presenter): click
  * a region to jump to its target, seeking the target video if a timestamp was set. */
-function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
+function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
   const updateField = useEditorStore((s) => s.updateField);
   const views = slide.fields.views ?? [];
   const [activeId, setActiveId] = useState<string | undefined>(views[0]?.id);
@@ -2936,7 +2942,7 @@ function LinkedViewsExplorer({ slide, editable }: SlideRendererProps) {
             </button>
           )}
 
-          {active.musicUrl && (
+          {active.musicUrl && !silent && (
             <>
               {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
               <audio ref={musicAudioRef} src={active.musicUrl} className="hidden" />
@@ -3952,7 +3958,7 @@ function TwoContent({ slide, editable }: SlideRendererProps) {
   );
 }
 
-export function SlideRenderer({ slide, editable, animate = false }: SlideRendererProps) {
+export function SlideRenderer({ slide, editable, animate = false, silent = false }: SlideRendererProps) {
   const updateField = useEditorStore((s) => s.updateField);
   const accentColor = useEditorStore((s) => s.project?.accentColor) ?? DEFAULT_ACCENT;
   const projectFontFamily = useEditorStore((s) => s.project?.fontFamily);
@@ -4127,7 +4133,7 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
           {slide.layout === 'two-content' && <TwoContent slide={slide} editable={editable} />}
           {slide.layout === 'merge-diagram' && <MergeDiagram slide={slide} editable={editable} />}
           {slide.layout === 'stat-hero' && <StatHero slide={slide} editable={editable} />}
-          {slide.layout === 'linked-views' && <LinkedViewsExplorer slide={slide} editable={editable} />}
+          {slide.layout === 'linked-views' && <LinkedViewsExplorer slide={slide} editable={editable} silent={silent} />}
           {slide.layout === 'orbit' && <OrbitDiagram slide={slide} editable={editable} />}
           {slide.layout === 'site-locus' && <SiteLocusDiagram slide={slide} editable={editable} />}
           {slide.layout === 'material-compare' && <MaterialCompare slide={slide} editable={editable} />}

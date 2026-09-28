@@ -7,13 +7,22 @@ import { useEditorStore } from '@/lib/editorStore';
 import { SlideRenderer } from '@/components/SlideRenderer';
 import { ScaledStage } from '@/components/ScaledStage';
 import { PresenterSidebar, type PresenterSection } from '@/components/PresenterSidebar';
+import { PresenterShortcuts } from '@/components/PresenterShortcuts';
+import { IconFullscreen, IconFullscreenExit, IconSpeakerNotes } from '@/components/icons';
+import { useDeckKeys, useSwipe } from '@/lib/deckInput';
+import { exitFullscreen, isFullscreen, toggleFullscreen, useFullscreenSupported, useIsFullscreen } from '@/lib/fullscreen';
+import { openPresenterView, resolveStartSlide, shownSlides } from '@/lib/presenting';
+import { usePresenterSync } from '@/lib/presenterSync';
 import type { Slide } from '@/types/slide';
+
+const KBD = 'rounded border border-white/25 bg-white/5 px-1.5 py-0.5 font-sans text-[10px] leading-none';
 
 /** Floating live preview shown above a hovered nav dot — the same
  *  SlideRenderer the main stage uses, just scaled way down inside a fixed
  *  1280×720 box (the same reference canvas ScaledStage/export assume), so a
  *  freeform/linked-views slide previews exactly as it'll actually look
- *  rather than a stale static thumbnail. */
+ *  rather than a stale static thumbnail. Silent, so hovering a Linked Views
+ *  slide doesn't start its background music. */
 function DotPreview({ slide }: { slide: Slide }) {
   const w = 176;
   const h = 99; // 16:9
@@ -24,7 +33,7 @@ function DotPreview({ slide }: { slide: Slide }) {
       style={{ width: w, height: h }}
     >
       <div style={{ width: 1280, height: 720, transform: `scale(${w / 1280})`, transformOrigin: 'top left' }}>
-        <SlideRenderer slide={slide} editable={false} />
+        <SlideRenderer slide={slide} editable={false} silent />
       </div>
       {label && (
         <div className="absolute inset-x-0 bottom-0 truncate bg-[#241d16]/75 px-1.5 py-0.5 text-[9px] font-medium text-white/90">
@@ -35,11 +44,36 @@ function DotPreview({ slide }: { slide: Slide }) {
   );
 }
 
+/** A round icon button in the bottom-right controls pill. Hands focus back to
+ *  the page after a mouse click: left on the button, the next Enter would
+ *  press it again instead of reaching the deck. A keyboard press (detail 0)
+ *  keeps focus where the keyboard user put it. */
+function PillButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={(e) => {
+        onClick();
+        if (e.detail > 0) e.currentTarget.blur();
+      }}
+      className="flex h-7 w-7 items-center justify-center rounded-full text-white/80 transition hover:bg-white/10 hover:text-white"
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function PresenterPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const [ready, setReady] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [black, setBlackState] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  // `seq` makes a repeat of the same message restart its timer.
+  const [notice, setNotice] = useState<{ text: string; seq: number } | null>(null);
 
   const project = useEditorStore((s) => s.project);
   const loadProject = useEditorStore((s) => s.loadProject);
@@ -48,54 +82,137 @@ export default function PresenterPage({ params }: { params: Promise<{ id: string
   const goPrev = useEditorStore((s) => s.goPrev);
   const setMode = useEditorStore((s) => s.setMode);
   const selectSlide = useEditorStore((s) => s.selectSlide);
+  const fullscreen = useIsFullscreen();
+  const canFullscreen = useFullscreenSupported();
 
   useEffect(() => {
+    // Read once, here, rather than through the page's searchParams: the URL
+    // is rewritten on every slide change below, and none of that should
+    // re-run this.
+    const requested = new URLSearchParams(window.location.search).get('slide');
     getProject(id).then((p) => {
       if (p) {
         loadProject(p);
         // The store steps over skipped slides only in presenter mode, and the
         // deck may well open on one.
         setMode('presenter');
-        const first = p.slides.find((s) => !s.skipped);
-        if (first) selectSlide(first.id);
+        const start = resolveStartSlide(p.slides, requested);
+        if (start) selectSlide(start.id);
         setReady(true);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // Keep ?slide= on whatever's showing, so a reload (or a clicker's F5)
+  // comes back here rather than to the first slide. replaceState, not push:
+  // stepping through a deck shouldn't fill the back button with every slide.
+  const currentSlideId = currentSlide?.id;
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
-        e.preventDefault();
-        goNext();
-      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-        e.preventDefault();
-        goPrev();
-      } else if (e.key === 'Escape') {
-        router.push(`/p/${id}/edit`);
-      }
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [goNext, goPrev, router, id]);
+    if (!ready || !currentSlideId) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('slide') === currentSlideId) return;
+    url.searchParams.set('slide', currentSlideId);
+    window.history.replaceState(null, '', url);
+  }, [ready, currentSlideId]);
 
-  if (!ready || !project) {
-    return <div className="flex h-screen items-center justify-center bg-[#171310] text-white/40">Loading…</div>;
+  // Leaving Presenter by any route (Esc, the back button) leaves full screen
+  // too. Deferred, and only once Presenter is really gone from the page: in
+  // development React runs this cleanup once straight after mounting, and
+  // exiting then would undo the full screen the editor's Present button just
+  // asked for.
+  useEffect(
+    () => () => {
+      setTimeout(() => {
+        if (!document.querySelector('[data-presenter]')) exitFullscreen();
+      }, 0);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 7000);
+    return () => clearTimeout(t);
+  }, [notice]);
+
+  const flash = (text: string) => setNotice((n) => ({ text, seq: (n?.seq ?? 0) + 1 }));
+
+  const { setBlack } = usePresenterSync({
+    projectId: id,
+    role: 'audience',
+    active: ready,
+    black,
+    onBlack: setBlackState,
+    onPeerJoined: () => {
+      if (!isFullscreen()) flash('Presenter view connected. Move this window to the audience screen, then press F for full screen.');
+    },
+  });
+
+  const shown = project ? shownSlides(project.slides) : [];
+  const shownIndex = shown.findIndex((s) => s.id === currentSlide?.id);
+
+  // Moving to any slide ends a black screen: the presenter is plainly ready
+  // to carry on, and a still-black screen would hide that the deck moved.
+  function goTo(slideId: string | undefined) {
+    if (black) setBlack(false);
+    if (slideId) selectSlide(slideId);
+  }
+  function next() {
+    if (black) setBlack(false);
+    goNext();
+  }
+  function prev() {
+    if (black) setBlack(false);
+    goPrev();
+  }
+  function leave() {
+    exitFullscreen();
+    router.push(`/p/${id}/edit`);
+  }
+  function openView() {
+    if (!openPresenterView(id)) flash('Pop-ups are blocked for this site. Allow them to open the presenter view.');
   }
 
-  const shown = project.slides.filter((s) => !s.skipped);
+  const { pendingNumber } = useDeckKeys({
+    next,
+    prev,
+    first: () => goTo(shown[0]?.id),
+    last: () => goTo(shown[shown.length - 1]?.id),
+    // A number past the end goes to the last slide rather than nowhere.
+    jumpTo: (n) => goTo(shown[Math.min(n, shown.length) - 1]?.id),
+    toggleBlack: () => setBlack(!black),
+    escape: () => {
+      if (showShortcuts) setShowShortcuts(false);
+      else if (black) setBlack(false);
+      else leave();
+    },
+    extra: {
+      f: toggleFullscreen,
+      s: openView,
+      '?': () => setShowShortcuts((v) => !v),
+    },
+  });
+  const swipe = useSwipe({ left: next, right: prev });
+
+  if (!ready || !project) {
+    return (
+      <div data-presenter className="flex h-screen items-center justify-center bg-[#171310] text-white/40">
+        Loading…
+      </div>
+    );
+  }
+
   if (shown.length === 0) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-3 bg-[#171310] text-white/50">
+      <div data-presenter className="flex h-screen flex-col items-center justify-center gap-3 bg-[#171310] text-white/50">
         <p>Every slide in this deck is skipped.</p>
-        <button onClick={() => router.push(`/p/${id}/edit`)} className="text-sm underline">
+        <button onClick={leave} className="text-sm underline">
           Back to the editor
         </button>
       </div>
     );
   }
-  const shownIndex = shown.findIndex((s) => s.id === currentSlide?.id);
 
   // One group per section — a run of slides starting at a section-starter
   // divider, or wherever a design-option tag changes (e.g. into or out of
@@ -127,7 +244,7 @@ export default function PresenterPage({ params }: { params: Promise<{ id: string
   });
 
   return (
-    <div className="relative h-screen w-screen bg-[#171310]">
+    <div data-presenter className="relative h-screen w-screen bg-[#171310]" {...swipe}>
       {currentSlide && (
         <div className="absolute inset-0">
           {/* Same fixed 1280x720 canvas the editor and export use — without
@@ -148,18 +265,33 @@ export default function PresenterPage({ params }: { params: Promise<{ id: string
       {/* Floats over the slide, left edge, the same rounded/translucent
           treatment as every other piece of chrome below — not a layout
           sibling that reserves its own width. */}
-      <PresenterSidebar sections={sections} currentIndex={shownIndex} onSelect={selectSlide} />
+      <PresenterSidebar sections={sections} currentIndex={shownIndex} onSelect={goTo} />
 
-      {/* Keyboard legend — kbd-styled keys rather than plain prose, so it
-          reads at a glance for someone who's never presented from this app
-          before. */}
-      <div className="absolute bottom-6 right-6 flex items-center gap-1.5 rounded-full bg-[#241d16]/40 px-3 py-1.5 text-xs text-white shadow-lg backdrop-blur-sm">
-        <kbd className="rounded border border-white/25 bg-white/5 px-1.5 py-0.5 font-sans text-[10px] leading-none">←</kbd>
-        <kbd className="rounded border border-white/25 bg-white/5 px-1.5 py-0.5 font-sans text-[10px] leading-none">→</kbd>
-        <span className="text-white/60">navigate</span>
-        <span className="mx-0.5 text-white/25">·</span>
-        <kbd className="rounded border border-white/25 bg-white/5 px-1.5 py-0.5 font-sans text-[10px] leading-none">Esc</kbd>
-        <span className="text-white/60">exit</span>
+      {/* Presenting controls, then the keyboard legend — kbd-styled keys
+          rather than plain prose, so it reads at a glance for someone who's
+          never presented from this app before. Only the arrows and Esc fit
+          here; ? lists the rest. */}
+      <div className="absolute bottom-6 right-6 flex items-center gap-1 rounded-full bg-[#241d16]/40 p-1 text-xs text-white shadow-lg backdrop-blur-sm">
+        <PillButton label="Presenter view (S)" onClick={openView}>
+          <IconSpeakerNotes className="h-4 w-4" />
+        </PillButton>
+        {canFullscreen && (
+          <PillButton label={fullscreen ? 'Exit full screen (F)' : 'Full screen (F)'} onClick={toggleFullscreen}>
+            {fullscreen ? <IconFullscreenExit className="h-4 w-4" /> : <IconFullscreen className="h-4 w-4" />}
+          </PillButton>
+        )}
+        {/* Key hints mean nothing on a touch screen, where swiping does the job. */}
+        <div className="ml-1 flex items-center gap-1.5 border-l border-white/15 pl-2.5 pr-2 pointer-coarse:hidden">
+          <kbd className={KBD}>←</kbd>
+          <kbd className={KBD}>→</kbd>
+          <span className="text-white/60">navigate</span>
+          <span className="mx-0.5 text-white/25">·</span>
+          <kbd className={KBD}>?</kbd>
+          <span className="text-white/60">shortcuts</span>
+          <span className="mx-0.5 text-white/25">·</span>
+          <kbd className={KBD}>Esc</kbd>
+          <span className="text-white/60">exit</span>
+        </div>
       </div>
 
       {/* Progress rail: step count + a one-line hint, a slim fill bar, and a
@@ -194,7 +326,7 @@ export default function PresenterPage({ params }: { params: Promise<{ id: string
               {group.map(({ slide: s, index: i }) => (
                 <button
                   key={s.id}
-                  onClick={() => selectSlide(s.id)}
+                  onClick={() => goTo(s.id)}
                   onMouseEnter={() => setHoveredIndex(i)}
                   onMouseLeave={() => setHoveredIndex((h) => (h === i ? null : h))}
                   aria-label={`Go to slide ${i + 1}${s.fields.title ? `: ${s.fields.title}` : ''}`}
@@ -210,6 +342,37 @@ export default function PresenterPage({ params }: { params: Promise<{ id: string
           ))}
         </div>
       </div>
+
+      {notice && !black && !pendingNumber && (
+        <div
+          role="status"
+          className="pointer-events-none fixed left-1/2 top-6 z-30 w-max max-w-[min(90vw,34rem)] -translate-x-1/2 rounded-2xl bg-[#241d16]/85 px-4 py-2.5 text-center text-xs leading-snug text-white shadow-lg backdrop-blur-sm"
+        >
+          {notice.text}
+        </div>
+      )}
+
+      {showShortcuts && <PresenterShortcuts canFullscreen={canFullscreen} onClose={() => setShowShortcuts(false)} />}
+
+      {/* Nothing on screen but black, chrome included: the point is to take
+          the room's eyes off the screen. A click brings the slide back, so a
+          mouse user is never stuck behind it. */}
+      {black && <div aria-hidden className="fixed inset-0 z-50 cursor-none bg-black" onClick={() => setBlack(false)} />}
+
+      {/* Above the black screen on purpose: typing a number is how the
+          presenter means to come back from it, and they need to see what
+          they've typed. */}
+      {pendingNumber && (
+        <div
+          role="status"
+          className="pointer-events-none fixed left-1/2 top-6 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-full bg-[#241d16]/85 px-4 py-2 text-sm text-white shadow-lg backdrop-blur-sm"
+        >
+          <span className="text-white/60">Go to slide</span>
+          <span className="font-semibold tabular-nums">{pendingNumber}</span>
+          <span className="text-white/40">of {shown.length}</span>
+          <kbd className={KBD}>Enter</kbd>
+        </div>
+      )}
     </div>
   );
 }

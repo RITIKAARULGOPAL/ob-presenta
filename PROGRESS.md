@@ -32,6 +32,106 @@ or re-explain anything.
 
 ---
 
+## 2026-09-28 — F1: speaker notes, presenter view, full screen, present from here, new keys, swipe
+
+**Context:** FEATURES.md F1, done ahead of its W5 slot, on top of the still-
+uncommitted 2026-09-24/25 batch. Only SlideRenderer's `silent` lines touch a
+file that batch also changed.
+
+**Done:**
+- **Speaker notes.** `Slide.notes` ([slide.ts](src/types/slide.ts)) lives on
+  the slide, not in `fields`, so a layout/style change (which resets
+  `fields`) can't wipe it. `setSlideNotes(id, text)` in
+  [editorStore.ts](src/lib/editorStore.ts). New
+  [SpeakerNotes.tsx](src/components/SpeakerNotes.tsx) strip under the editor
+  canvas: saves on blur like EditableText, collapsible (remembered per
+  browser). PPTX export writes them into each slide's notes
+  ([exportDeck.ts](src/lib/exportDeck.ts)); PDF has nowhere to put them.
+- **Present menu** ([edit/page.tsx](src/app/p/[id]/edit/page.tsx)): split
+  button. The main half presents from this slide (the Google Slides/Keynote
+  default); the menu adds from the beginning and with presenter view.
+  Ctrl/⌘+Enter and Ctrl/⌘+Shift+Enter. Both plain starts ask for full screen
+  inside the click, the only moment a browser allows it; with presenter view
+  doesn't, since that window is about to be dragged to the projector.
+- **Presenter** ([present/page.tsx](src/app/p/[id]/present/page.tsx)): opens on
+  `?slide=` (a skipped slide resolves to the next shown one,
+  [presenting.ts](src/lib/presenting.ts)) and keeps it current with
+  replaceState, so a reload or a clicker's F5 comes back to the same slide.
+  Keys live in [deckInput.ts](src/lib/deckInput.ts), shared with the
+  presenter view: ↑/↓ as well, Home/End, digits then Enter (shows "Go to
+  slide N of M"; Backspace edits, Esc cancels, 3s timeout, past the end means
+  the last slide), B or . for black (covers the chrome too; any move or a
+  click ends it), F full screen, S presenter view, ? for a shortcuts overlay
+  ([PresenterShortcuts.tsx](src/components/PresenterShortcuts.tsx)). Esc peels
+  one layer at a time: typed number, shortcuts, black, then leave.
+  Ctrl/⌘/Alt combos go to the browser. Swipe: one finger, 60px+, mostly
+  sideways, under 800ms, and not when it starts on a control or on anything
+  with a drag cursor (Material Compare's handle, a zoomed plan). The
+  bottom-right pill gains Presenter view and Full screen buttons; its key
+  hints hide on touch screens. Leaving Presenter leaves full screen, via a
+  deferred check so dev Strict Mode's mount-time cleanup doesn't undo it.
+- **Presenter view**, a new route
+  ([presenter-view/page.tsx](src/app/p/[id]/presenter-view/page.tsx), window
+  title from [layout.tsx](src/app/p/[id]/presenter-view/layout.tsx)): current
+  and next slide (inert, silent), notes with A−/A+ (remembered), timer with
+  pause/restart, clock, prev/next, black toggle, connection status, and "Open
+  one" to reopen a closed audience screen. Always dark through a
+  `data-theme="dark"` wrapper on the app's own tokens, not Presenter's warm
+  literals (the U6 direction).
+- **Sync** ([presenterSync.ts](src/lib/presenterSync.ts)): a BroadcastChannel
+  per deck. The view asks the audience screen for its deck instead of
+  fetching its own, so the two can't disagree; with no answer in 1.5s it
+  loads the deck itself (rehearsing). Either side drives, applied changes
+  aren't echoed back, and if both move at once the later one wins on both.
+  It subscribes to the store, so hotspot jumps and nav dots sync too.
+- **`silent` on SlideRenderer**: a copy of a slide never starts its Linked
+  Views music (presenter-view panes, Presenter's dot previews, export).
+
+**Verified live** on a scratch deck in the in-app browser, driven by
+dispatched events: notes save, undo/redo, reload, collapse; the split button,
+its menu and both shortcuts (Ctrl+Enter inside the notes box does nothing);
+Presenter starting on the editor's slide, and on the next one when that slide
+is skipped; every key above; reload keeps the slide; five slide changes cause
+zero RSC refetches; swipe both ways, with tap, vertical, two-finger, slow and
+start-on-button all ignored; the pop-up-blocked notice; the view connecting,
+two-way slide and black sync, jumping from either side, disconnecting on Esc,
+reconnecting when presenting again, and loading on its own; timer and notes
+size. On a slide whose first view has music (added via REST for the test),
+the audience has its `<audio>` and the view's panes and the dot preview have
+none. PowerPoint (COM, local file) reads a two-paragraph note back as three
+lines. `tsc` clean; eslint shows no new issues against a pre-edit baseline
+(SlideRenderer's 11/3 are old).
+
+**Not verified:** real full screen (the pane was hidden, and a synthetic click
+can't grant it; the refused request fails quietly, as designed); a real
+pop-up window (blocked without a gesture, so the view was tested in a second
+tab, which BroadcastChannel treats the same); an actual export run (it
+downloads a file); the ⌘ shortcuts on a Mac.
+
+**Watch out for:**
+- The presenter view mirrors which slide is showing, not what's happening
+  inside it (a Linked Views tab, stage, zoom or open popup). That still
+  happens on the audience screen.
+- BroadcastChannel only reaches windows of the same browser profile, so a
+  phone can't be the presenter view for a laptop.
+- B4 is unchanged: Presenter still re-fetches the deck, and `mode` stays
+  `presenter` after Esc.
+- **Only one dev server can run in this folder.** Next 16 locks
+  `.next/dev/lock` per folder, whatever the port, so two chats sharing this
+  checkout can't both preview. Another chat's forgotten server (idle since
+  09-25) had to be stopped today. `.claude/launch.json` now says
+  `autoPort: false`, keeping 3001 pinned so 3000 stays free; a parallel chat
+  needs its own worktree.
+
+**Left off / next up:**
+- The scratch project "F1 scratch - delete me" (`proj_7lomy93ymukv84bp`,
+  which also has a "Music check" Linked Views slide added over REST) is
+  still in Supabase. Delete it from Home.
+- Committed 2026-09-28 on `claude/f1-presenting`, right after the 09-25
+  font fix. Not pushed.
+
+---
+
 ## 2026-09-25 (cont'd) — Slide fonts: the `.font-display`→Arial anomaly, root-caused and fixed
 
 **Context:** the anomaly flagged three times in the 2026-09-24 entries (slide

@@ -263,15 +263,18 @@
      instant on purpose — see the note above the token blocks. */
   --ease-ui: cubic-bezier(0.2, 0.6, 0.3, 1);
 
-  --font-sans: var(--font-geist-sans);
+  /* --slide-*-font are set only on SlideRenderer's root (the deck's chosen
+     faces); everywhere else these fall back to the plain next/font families,
+     exactly as before. */
+  --font-sans: var(--slide-body-font, var(--font-geist-sans));
   --font-mono: var(--font-geist-mono);
-  --font-display: var(--font-archivo);
+  --font-display: var(--slide-display-font, var(--font-archivo));
 
   /* Chrome's own display face — deliberately a SEPARATE token from
      --font-display above. That one is reserved for slide headline text:
-     SlideRenderer redeclares --font-archivo at each slide's own scope so a
+     SlideRenderer sets --slide-display-font at each slide's own scope so a
      deck's typography choice reaches every font-display element inside it
-     (see the comment beside '--font-archivo': typography.fontVar there).
+     (see the comment beside '--slide-display-font' there).
      Reusing --font-display for chrome would mean a slide left on "Default"
      typography — which resolves straight through to this same root value —
      would silently pick up whatever chrome's display face happens to be,

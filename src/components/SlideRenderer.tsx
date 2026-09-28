@@ -3975,7 +3975,7 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
 
   const base = (
     <div
-      className={`relative flex ${
+      className={`relative flex font-sans ${
         slide.layout === 'linked-views' ? 'h-full overflow-hidden' : 'min-h-full'
       } w-full flex-col justify-center px-16 pb-14 pt-10 ${animClass} ${
         hasCustomBg ? '' : dark ? 'bg-[var(--ink)] [background-image:radial-gradient(120%_90%_at_15%_-10%,var(--dark-veil-1),var(--dark-veil-2)_60%)]' : 'bg-white'
@@ -3999,20 +3999,19 @@ export function SlideRenderer({ slide, editable, animate = false }: SlideRendere
           // every deck's dark slides feel designed for that deck specifically.
           '--dark-veil-1': shadeWithBlack(accentColor, 0.55),
           '--dark-veil-2': '#141a2b',
-          // Tailwind's font-display utility resolves --font-display, which
-          // globals.css points at --font-archivo — redeclaring it here, at the
-          // slide's own scope, is what lets a project's font choice reach every
-          // font-display element below without touching each component, same
-          // trick as the accent vars above. It's a live CSS var reference, not a
-          // static substitution, so this keeps resolving correctly however many
-          // var() layers of indirection sit in between.
-          '--font-archivo': typography.fontVar,
-          // Body text never sets an explicit font-family (it just inherits the
-          // theme's --font-sans default), so overriding --font-geist-sans here
-          // reaches every kicker, description and caption below the same way
-          // --font-archivo reaches every font-display headline — no changes
-          // needed in Kicker/Body/TwoContent/etc. themselves.
-          '--font-geist-sans': typography.bodyFontVar,
+          // The font-display and font-sans utilities read these two slide-only
+          // variables first (see --font-display/--font-sans in globals.css), so
+          // setting them here reaches every headline and body element below
+          // without touching each component, same trick as the accent vars
+          // above. They must be NEW names, not a redeclaration of the next/font
+          // variables they point at: the Default pairing's value is
+          // var(--font-archivo), so writing it into --font-archivo made that
+          // property refer to itself — invalid, and every Default-deck headline
+          // silently fell back to the body's Arial.
+          '--slide-display-font': typography.fontVar,
+          // Read via the font-sans class on this wrapper; without it, body text
+          // inherited <body>'s Arial whichever body font was chosen.
+          '--slide-body-font': typography.bodyFontVar,
           // headlineStyle() (fonts.ts) reads these three on each of the six
           // headline/hero-number elements, so one slide-level resolve here
           // reaches all of them.

@@ -32,6 +32,61 @@ or re-explain anything.
 
 ---
 
+## 2026-09-25 (cont'd) — Slide fonts: the `.font-display`→Arial anomaly, root-caused and fixed
+
+**Context:** the anomaly flagged three times in the 2026-09-24 entries (slide
+headlines computing to Arial instead of Archivo). Also brought
+`SESSION-HANDOFF-2026-09-24.md` up to date: it had claimed nothing was
+committed, and now maps each section to its commit and has a section 6 for
+the toolbar move.
+
+**Done:**
+- **Root cause: a custom property that referred to itself.** `@theme inline`
+  compiles `.font-display` to `font-family: var(--font-archivo)`.
+  `SlideRenderer` then redeclared `--font-archivo: typography.fontVar` on
+  each slide, and the Default ("Studio") pairing's value *is*
+  `var(--font-archivo)` ([fonts.ts](src/lib/fonts.ts)). So the property
+  referred to itself, which is invalid at computed-value time, and the
+  headline inherited `<body>`'s Arial. Editorial/Structural/Classic were
+  unaffected because they point at other variables. The body font had the
+  same self-reference for Geist, and nothing on a slide ever applied
+  `--font-sans`, so **slide body text was Arial on every deck** whichever
+  body font was chosen. The old comment claiming it "inherits the theme's
+  --font-sans default" was wrong.
+- **Fix:** [globals.css](src/app/globals.css) now has
+  `--font-display: var(--slide-display-font, var(--font-archivo))` and
+  `--font-sans: var(--slide-body-font, var(--font-geist-sans))`.
+  [SlideRenderer.tsx](src/components/SlideRenderer.tsx)'s root sets those two
+  new slide-only variables instead of redeclaring the next/font ones, and
+  gains a `font-sans` class. Outside a slide both fall back to exactly what
+  they resolved to before, so chrome (the `<kbd>` elements in Presenter and
+  `Menu` using `font-sans`) is unchanged.
+- **Verified live** on the real Ecom Express project, which uses Default: the
+  headline computes to `Archivo` and body text to `Geist`. With the same
+  values set directly on the slide root (nothing saved), Fraunces, Big
+  Shoulders, Playfair, IBM Plex Sans and Source Serif 4 all resolve. Rail
+  thumbnails show Archivo. Home and Properties chrome are still Inter Tight.
+  `tsc` is clean, and SlideRenderer's eslint count equals the stash baseline
+  (11/3, all pre-existing).
+
+**Watch out for:**
+- **This is a visible change to every existing deck:** headlines go from
+  Arial to Archivo and body text from Arial to Geist, in the editor,
+  Presenter and exports (`exportDeck.ts` renders the same tree). This is the
+  design intent, but tell the user before a client sees a deck they
+  last looked at in Arial.
+- Never write a `var(--X)` value back into `--X` itself. Always add a new
+  variable to hold a slide-scoped choice.
+
+**Left off / next up:**
+- PDF/PPTX export wasn't re-run (it would download a file). It renders the
+  same component, so it should pick the fix up, but one real export is worth
+  checking.
+- Committed 2026-09-28 on `claude/f1-presenting` as its own commit (the
+  handoff file went in with that day's planning-docs commit).
+
+---
+
 ## 2026-09-25 — Linked Views: canvas toolbar moved into the Properties panel
 
 **Context:** feedback from a screenshot + selected-element inspection of the

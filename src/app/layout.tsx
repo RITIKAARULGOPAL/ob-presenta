@@ -23,7 +23,7 @@ const archivo = Archivo({
 // (see src/lib/fonts.ts) — loaded here, once, at build time like Archivo above,
 // since next/font/google needs a static import per family rather than a
 // runtime family name. Each gets its own CSS variable; switching between them
-// is just which variable a slide's --font-archivo resolves to (SlideRenderer).
+// is just which variable a slide's --slide-display-font resolves to (SlideRenderer).
 const fraunces = Fraunces({
   variable: "--font-fraunces",
   subsets: ["latin"],

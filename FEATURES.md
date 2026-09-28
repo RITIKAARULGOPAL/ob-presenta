@@ -56,9 +56,9 @@ shorten this. Adjust the weeks for holidays and review time.
 |---|---|---|---|---|
 | W1 | Sep 28–Oct 2 | Stop losing work + quick fixes | B1–B7, B9–B20, B22, V1, V2, U6, U17, U19, L1, L2, sectionIcon | ~26h |
 | W1 (you) | Sep 28–Oct 2 | Only you can do these | Run migrations 0003–0005, send the image for B8, clean the Ecom stray seating link, decide U1/B12/B22, Presenter reload check in a real browser | ~1h |
-| W2 | Oct 5–9 | Presenter ready for meetings + safe saves | B21, U1–U5, F4, X6, two Linked Views checks, export-time check, CHANGELOG catch-up | ~30h |
+| W2 | Oct 5–9 | Presenter ready for meetings + safe saves | B21, U1–U5, F4, X6, ~~two Linked Views checks~~ (done 09-28), export-time check, CHANGELOG catch-up | ~29h |
 | W3 | Oct 12–16 | Editor UX pass | U8–U10, U12–U16, U18, U20, U21 | ~29h |
-| W4–5 | Oct 19–30 | Crisp PDF + PPTX exports, optional stages | X3, X4, S1, F8 | 6–9d |
+| W4–5 | Oct 19–30 | Crisp PDF + PPTX exports, optional stages | X3, X4, ~~S1~~, ~~F8~~ (done 09-28) | 4–7d |
 | W6–7 | Nov 2–13 | Site analysis stage | S2 | 1.5–2.5w |
 | W8–9 | Nov 16–27 | Images to Supabase Storage | F6 (needs dashboard access) | 1–2w |
 | W10–11 | Nov 30–Dec 11 | Full-resolution photos, sharp floor plans, lighter editor previews | X1, X2, X7 | 4–7d |
@@ -165,13 +165,15 @@ shorten this. Adjust the weeks for holidays and review time.
 - [x] ~~Zone-to-rooms split/merge "burst" transition style (vs. fade)~~ (2026-09-23)
 - [x] ~~Spline + Freehand drawing tools~~ (2026-09-24)
 - [x] ~~Hotspot popup anchors beside the shape, draggable, no overflow~~ (2026-09-24)
-- [ ] Two zone hotspots sharing the same `zoneCategory`/label with their own
-      separate children (A) — believed correct by construction (id-based
-      join sidesteps the name collision), never independently proven live
-      · **30m · W2**
-- [ ] A hotspot on only one side of a transition, ghost fade-in/out path (A) —
-      a direct symmetric extension of the proven shared-identity morph,
-      never watched frame-by-frame itself · **30m · W2**
+- [x] ~~Two zone hotspots sharing the same `zoneCategory`/label with their own
+      separate children~~ (2026-09-28): proven live in both directions of a
+      Burst transition. Each pair of rooms starts as an exact copy of its own
+      parent zone and merges back into it, never the other "Meeting" zone.
+      See PROGRESS.md 2026-09-28 (cont'd).
+- [x] ~~A hotspot on only one side of a transition, ghost fade-in/out path~~
+      (2026-09-28): watched frame by frame in Burst and Fade. A region only
+      on the old stage fades out in place and one only on the new stage fades
+      in; in Fade no room's outline changes in any frame.
 
 ## Linked Views — stages, overlays, calibration
 
@@ -188,17 +190,15 @@ shorten this. Adjust the weeks for holidays and review time.
 - [ ] Very divergent hotspot shapes can self-intersect into a momentary
       "bowtie" mid-morph frame (B) — known, accepted limitation of
       per-vertex lerp, not fixed · **1–2d · Later**
-- [ ] **S1** Every stage is optional (requested 2026-09-28). Today the first
-      "+ Stage" on a plan adds all four stages at once (Zoning, Walls,
-      Circulation, Furniture) (`SlideRenderer.tsx:2409`). Instead, "+ Stage"
-      offers six suggested stages to tick, in this order: Site analysis (the
-      site due-diligence plan), Zoning, Walls, Circulation, Furniture, and
-      Design consideration. You can also add a stage with a custom name. Any
-      stage can be renamed, reordered or removed later (F8), and a plan with
-      no stages works as it does today. What the Site analysis and Design
-      consideration stages show on the plan is still to be decided; until
-      then each has its own plan image and regions, like Walls (C)
-      · **1d · W4–5**
+- [x] ~~**S1** Every stage is optional~~ (2026-09-28). "+ Stage" opens a
+      picker with the six suggested stages to tick (Site analysis, Zoning,
+      Walls, Circulation, Furniture, Design consideration) and a custom name,
+      in one Add. Suggested stages slot into that order; custom ones go last.
+      Render and Axo views get the name field only. The picker is on the
+      slide and in the Properties panel's Stages list, by the user's choice.
+      Site analysis and Design consideration are ordinary stages for now,
+      with their own image and regions, until S2 decides more. See
+      PROGRESS.md 2026-09-28 (cont'd).
 - [ ] **S2** Site analysis stage (requested 2026-09-28): the site
       due-diligence plan, with about 90 checklist items in 6 categories
       (Access & Circulation; MEP; Fire & Life Safety; Natural &
@@ -465,9 +465,11 @@ given in chat. Severity runs from P0 (blocking) to P3 (polish).
       A walkthrough video can't be paused, and the arrows act behind the
       space-detail popup (`present/page.tsx:67-81`, `SpaceDetailOverlay.tsx:30-42`) (B)
       · **1h · W1**
-- [ ] **B16 P3** A North drag or Unlock can revert a stage rename made just
-      before, because the toolbar handlers registered in the store hold an old
-      stages list (`eslint-disable` at `SlideRenderer.tsx:1554`) (C) · **1h · W1**
+- [x] ~~**B16 P3** A North drag or Unlock can revert a stage rename made just
+      before~~ (2026-09-28, with S1/F8): stage writes now go through the
+      store's `updateLinkedView`, which patches the view as it is in the deck,
+      and the panel's snapshot re-registers when the stages change. Verified:
+      rename, then North drag and Unlock from the panel, and the name stays.
 - [ ] **B17 P3** Undo and redo leave stale multi-selection ids, showing a
       phantom "N selected" toolbar (`editorStore.ts:307-335`) (C) · **30m · W1**
 - [ ] **B18 P3** Excel import matches headers by substring, so "Zone Name"
@@ -518,9 +520,10 @@ given in chat. Severity runs from P0 (blocking) to P3 (polish).
       SVG paths with no tab stop or role (C) · **1d · W15**
 
 ### Editor UX
-- [ ] **U8** The Linked Views tools are split between the canvas (stages,
-      split style, Dimensions, remove image) and the panel (drawing, Calibrate,
-      North) (C) · **1d · W3**
+- [ ] **U8** The Linked Views tools are split between the canvas (split
+      style, Dimensions, remove image) and the panel (drawing, Calibrate,
+      North). Stage editing now lives in both on purpose (S1/F8, the user's
+      choice on 2026-09-28) (C) · **1d · W3**
 - [ ] **U9** Controls drawn inside the slide render at about 8px at 1440×900
       (about 6.5px at 1280) (C) · **1d · W3**
 - [ ] **U10** The hotspot popup packs about 18 fields into a 240px card inside
@@ -600,9 +603,13 @@ given in chat. Severity runs from P0 (blocking) to P3 (polish).
       for sharp PowerPoint text, and X4 is the interim one. PowerPoint needs
       the deck's fonts installed on the viewing PC, or it swaps in others
       (B) · **2–3w · Later**
-- [ ] **F8** Delete and reorder stages (`PlanTimeline` can only add and
-      rename). Needed for S1, since optional stages must be removable (C)
-      · **1d · W4–5**
+- [x] ~~**F8** Delete and reorder stages~~ (2026-09-28). Rename, move earlier
+      or later, and delete, from the selected stage on the slide or from any
+      row of the panel's Stages list. Deleting asks what happens to regions
+      only on that stage: carry them to other stages (the neighbour is
+      ticked) or delete them. With no stages left they can stay on the plan,
+      and a last stage's own image becomes the plan's. See PROGRESS.md
+      2026-09-28 (cont'd).
 - [ ] **F9** A deck-import UI. `importSlidesFromPdf` has no caller (ties to
       B22) (B) · **1–2d · W17**
 - [ ] **F10** Search within a deck; templates and "save as template" (B)

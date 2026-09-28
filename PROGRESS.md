@@ -32,6 +32,76 @@ or re-explain anything.
 
 ---
 
+## 2026-09-28 (cont'd) — Linked Views: optional stages (S1), delete and reorder stages (F8), B16, two transition checks
+
+**Context:** asked to start on FEATURES.md's three Linked Views sections.
+Taken in its 09-28 priority order: the two (A) checks, then S1 with F8.
+Asked first, and answered: commit F1 before starting (done, see the entry
+below); when a stage is deleted, its own regions "can be carried to other
+stages upon approval from user"; stage editing goes both on the slide and in
+the Properties panel.
+
+**Done:**
+- **The two (A) checks, proven live.** Two test slides seeded over REST
+  (two zones both named "Meeting", each with two rooms; one region only on
+  each stage), then each transition stepped frame by frame. Burst: each
+  room starts as an exact copy of its own zone and merges back into it.
+  Fade: no outline changes in any frame. One-sided regions fade in or out
+  in place, in both modes.
+- **S1 + F8.** Pure stage functions in
+  [linkedViewStages.ts](src/lib/linkedViewStages.ts) (add with suggested
+  order, rename, move, delete with a carry-or-delete choice, and region
+  clean-up that `removeHotspot` now shares). A store action,
+  `updateLinkedView` ([editorStore.ts](src/lib/editorStore.ts)), applies them
+  to the view as it is in the deck. UI:
+  [StageEditing.tsx](src/components/StageEditing.tsx) (the picker, the
+  per-stage move/delete buttons, the panel's Stages list),
+  [StageDeleteDialog.tsx](src/components/StageDeleteDialog.tsx) (portalled
+  out of the scaled slide), and [PlanTimeline.tsx](src/components/PlanTimeline.tsx),
+  which now also draws the Render/Axo pills, so both share one set of
+  editing controls. The panel's Linked View Tools now appear without an
+  image too, for the Stages list; the image tools wait for `hasImage`.
+- **B16 fixed** as part of it: `setStage` writes through `updateLinkedView`.
+
+**Verified live** on the scratch deck:
+- **Adding:** suggestions ticked out of order land in plan order, already-added ones are disabled, custom names go last, and Circulation slots between Walls and Furniture.
+- **Rename and reorder:** both work from the slide and from the panel, and the two stay in step.
+- **Delete, three ways, each checked in the saved row:**
+  - carry to the ticked neighbour;
+  - "Delete them too", which also clears the rooms' parent links;
+  - the last stage, where regions stay on the plan and a stage-only image, scale and north move onto the plan.
+- **Safety and undo:** one Undo restores a delete, and Delete/Backspace on the dialog's focused button can't reach the editor's delete-slide shortcut.
+- **Render pills:** they offer a custom name only.
+- **Presenter:** it shows stages with no editing controls.
+- **B16:** rename, then a North drag and Unlock from the panel, and the name survives.
+- **Checks:** `tsc` clean; eslint shows no new issues against a stash baseline.
+
+**Watch out for:**
+- The Browser pane was hidden all session, which breaks two things that are
+  fine for real users: no `requestAnimationFrame` (stage morphs stall, so
+  they were stepped with a fake-clock stand-in) and no window focus (a
+  scripted `blur()` never fires React's `onBlur`; dispatch `focusout`).
+- A key event dispatched on `window` itself runs window listeners in
+  registration order, so a capture listener there doesn't go first. Real key
+  presses target an element. My first dialog check used window and deleted a
+  slide of the scratch deck; Undo restored it.
+- Seeding over REST: reload the editor before touching it, or its next
+  whole-row save overwrites the seeded data.
+
+**Left off / next up:**
+- **S2 (Site analysis)** is next: 1.5–2.5 weeks, and
+  `docs/site-analysis-checklist.md` still lacks its category 1. It needs a
+  build plan signed off before building.
+- Not started, by the timeline: the kind-change crossfade and bowtie morph
+  (Later), and the BOQ table (W27+).
+- Committed 2026-09-28 on `claude/f1-presenting` as its own commit, after
+  the planning-docs one. Not pushed.
+- A `PROGRESS.md.pending` written at 18:22 listed only this entry's files
+  (three SessionEnd hooks fired at once and interleaved their lines), so it
+  was folded in here and removed.
+
+---
+
 ## 2026-09-28 — F1: speaker notes, presenter view, full screen, present from here, new keys, swipe
 
 **Context:** FEATURES.md F1, done ahead of its W5 slot, on top of the still-

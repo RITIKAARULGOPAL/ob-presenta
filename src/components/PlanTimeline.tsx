@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { StageActions, StagePicker } from './StageEditing';
 
 export interface PlanTimelineStage {
   id: string;
@@ -8,42 +9,159 @@ export interface PlanTimelineStage {
 }
 
 interface PlanTimelineProps {
+  /** 'timeline' is the plan-evolution stepper, for Layout views. 'pills' is
+   *  a plain row of stage pills, for Render and Axo views, which use stages
+   *  for things like day and night where a progress bar would misrepresent
+   *  what switching means. */
+  variant: 'timeline' | 'pills';
   stages: PlanTimelineStage[];
   activeStageId: string | undefined;
   editable: boolean;
   onSelect: (stageId: string) => void;
-  onAddStage: () => void;
+  onAddStages: (labels: string[]) => void;
   onRenameStage: (stageId: string, label: string) => void;
+  onMoveStage: (stageId: string, delta: -1 | 1) => void;
+  onRequestDeleteStage: (stageId: string) => void;
+  /** Called as the add-stages picker opens, so a half-drawn shape can't
+   *  swallow the keys typed into it. */
+  onOpenPicker?: () => void;
 }
 
-/** Sidvin-style plan-evolution stepper — a thin progress track + fill bar
- *  plus a row of dot+label markers — replacing the plain stage-pill row for
- *  Layout views specifically (see LinkedViewsExplorer, which keeps the
- *  plain row for every other view kind: Render/Axo also use stages for
- *  non-progression purposes like a day/night toggle, where a linear
- *  progress bar would misrepresent what switching stages means). Reaching a
- *  stage *is* switching to it — there's no separate "confirm" step. */
-export default function PlanTimeline({ stages, activeStageId, editable, onSelect, onAddStage, onRenameStage }: PlanTimelineProps) {
+/** A Linked View's stage switcher, drawn on the slide. The timeline variant
+ *  is the Sidvin-style stepper: a thin track with a fill bar and a row of
+ *  dot-and-label markers, where reaching a stage *is* switching to it.
+ *
+ *  While editing, the selected stage gets move-earlier, move-later and
+ *  delete controls under its marker (or beside its pill), a double-click
+ *  renames any stage, and "+ Stage" opens the picker. The Properties
+ *  panel's Stages list offers the same actions; both call the same
+ *  handlers. */
+export default function PlanTimeline({
+  variant,
+  stages,
+  activeStageId,
+  editable,
+  onSelect,
+  onAddStages,
+  onRenameStage,
+  onMoveStage,
+  onRequestDeleteStage,
+  onOpenPicker,
+}: PlanTimelineProps) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  const [pickerOpen, setPickerOpen] = useState(false);
 
-  const activeIndex = Math.max(0, stages.findIndex((s) => s.id === activeStageId));
+  const found = stages.findIndex((s) => s.id === activeStageId);
+  const activeIndex = Math.max(0, found);
   const fillPct = stages.length > 1 ? (activeIndex / (stages.length - 1)) * 100 : 0;
 
   function commitRename() {
     if (renamingId && draft.trim()) onRenameStage(renamingId, draft.trim());
     setRenamingId(null);
   }
+  function startRename(s: PlanTimelineStage) {
+    if (!editable) return;
+    setRenamingId(s.id);
+    setDraft(s.label);
+  }
+  function togglePicker() {
+    if (!pickerOpen) onOpenPicker?.();
+    setPickerOpen((o) => !o);
+  }
+
+  const renameInput = (
+    <input
+      autoFocus
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commitRename}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') commitRename();
+        if (e.key === 'Escape') setRenamingId(null);
+      }}
+      onClick={(e) => e.stopPropagation()}
+      aria-label="Stage name"
+      className="w-24 rounded border border-[var(--accent)] px-1 text-center text-[11px] text-[var(--ink)] outline-none"
+    />
+  );
+
+  const addButton = editable && (
+    <button
+      type="button"
+      onClick={togglePicker}
+      aria-expanded={pickerOpen}
+      className="rounded-full border border-dashed border-[var(--line)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+    >
+      {stages.length ? '+ Stage' : '+ Add stages'}
+    </button>
+  );
+
+  const picker = pickerOpen && (
+    <StagePicker
+      surface="slide"
+      suggest={variant === 'timeline'}
+      existingLabels={stages.map((s) => s.label)}
+      onAdd={(labels) => {
+        onAddStages(labels);
+        setPickerOpen(false);
+      }}
+      onCancel={() => setPickerOpen(false)}
+    />
+  );
+
+  const actionsFor = (s: PlanTimelineStage, i: number) =>
+    editable &&
+    i === activeIndex && (
+      <StageActions
+        label={s.label}
+        canEarlier={i > 0}
+        canLater={i < stages.length - 1}
+        onMove={(delta) => onMoveStage(s.id, delta)}
+        onDelete={() => onRequestDeleteStage(s.id)}
+      />
+    );
 
   if (!stages.length) {
     return editable ? (
-      <button
-        onClick={onAddStage}
-        className="rounded-full border border-dashed border-[var(--line)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-      >
-        + Add plan-evolution stages
-      </button>
+      <div>
+        {addButton}
+        {picker}
+      </div>
     ) : null;
+  }
+
+  if (variant === 'pills') {
+    return (
+      <div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {stages.map((s, i) => (
+            <div key={s.id} className="flex items-center gap-0.5">
+              {renamingId === s.id ? (
+                renameInput
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onSelect(s.id)}
+                  onDoubleClick={() => startRename(s)}
+                  title={editable ? 'Double-click to rename' : undefined}
+                  className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+                    i === activeIndex
+                      ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                      : 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--ink-3)]'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              )}
+              {actionsFor(s, i)}
+            </div>
+          ))}
+          {addButton}
+        </div>
+        {picker}
+      </div>
+    );
   }
 
   return (
@@ -55,57 +173,42 @@ export default function PlanTimeline({ stages, activeStageId, editable, onSelect
         {stages.map((s, i) => {
           const state = i < activeIndex ? 'done' : i === activeIndex ? 'active' : 'upcoming';
           return (
-            <button
-              key={s.id}
-              onClick={() => onSelect(s.id)}
-              onDoubleClick={(e) => {
-                if (!editable) return;
-                e.stopPropagation();
-                setRenamingId(s.id);
-                setDraft(s.label);
-              }}
-              className="flex flex-col items-center gap-1.5 bg-transparent px-1"
-              title={editable ? 'Double-click to rename' : undefined}
-            >
-              <span
-                className={`h-3.5 w-3.5 rounded-full border-2 transition-colors ${
-                  state === 'active'
-                    ? 'border-[var(--accent)] bg-[var(--accent)]'
-                    : state === 'done'
-                      ? 'border-[var(--accent)] bg-[var(--accent-soft)]'
-                      : 'border-[var(--line)] bg-transparent'
-                }`}
-              />
-              {renamingId === s.id ? (
-                <input
-                  autoFocus
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onBlur={commitRename}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') commitRename();
-                    if (e.key === 'Escape') setRenamingId(null);
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-20 rounded border border-[var(--accent)] px-1 text-center text-[11px] outline-none"
+            <div key={s.id} className="flex flex-col items-center gap-1">
+              <button
+                type="button"
+                onClick={() => onSelect(s.id)}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  startRename(s);
+                }}
+                className="flex flex-col items-center gap-1.5 bg-transparent px-1"
+                title={editable ? 'Double-click to rename' : undefined}
+              >
+                <span
+                  className={`h-3.5 w-3.5 rounded-full border-2 transition-colors ${
+                    state === 'active'
+                      ? 'border-[var(--accent)] bg-[var(--accent)]'
+                      : state === 'done'
+                        ? 'border-[var(--accent)] bg-[var(--accent-soft)]'
+                        : 'border-[var(--line)] bg-transparent'
+                  }`}
                 />
-              ) : (
-                <span className={`whitespace-nowrap text-[11px] font-semibold ${state === 'upcoming' ? 'text-[var(--ink-3)]' : 'text-[var(--ink)]'}`}>
-                  {s.label}
-                </span>
-              )}
-            </button>
+                {renamingId !== s.id && (
+                  <span className={`whitespace-nowrap text-[11px] font-semibold ${state === 'upcoming' ? 'text-[var(--ink-3)]' : 'text-[var(--ink)]'}`}>
+                    {s.label}
+                  </span>
+                )}
+              </button>
+              {/* Outside the marker button: an input inside a button is
+                  invalid, and its clicks would select the stage too. */}
+              {renamingId === s.id && renameInput}
+              {actionsFor(s, i)}
+            </div>
           );
         })}
       </div>
-      {editable && (
-        <button
-          onClick={onAddStage}
-          className="mt-1.5 rounded-full border border-dashed border-[var(--line)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-        >
-          + Stage
-        </button>
-      )}
+      {editable && <div className="mt-1.5">{addButton}</div>}
+      {picker}
     </div>
   );
 }

@@ -36,7 +36,9 @@ import { MaterialCompare } from './MaterialCompare';
 import { ImageAdjustOverlay } from './ImageAdjustOverlay';
 import { LogoAdjustOverlay } from './LogoAdjustOverlay';
 import PlanTimeline from './PlanTimeline';
+import { StageDeleteDialog } from './StageDeleteDialog';
 import { SplitStylePreviewIcon } from './SplitStylePreviewIcon';
+import { addStages, deleteStage, moveStage, regionsOnlyOn, removeRegions, renameStage, type StageRegionFate } from '@/lib/linkedViewStages';
 import { morphShapes } from '@/lib/shapeMorph';
 import { clamp, imageStyle, maxPan, MAX_ZOOM, MIN_ZOOM } from '@/lib/imageTransform';
 import { makeId } from '@/lib/id';
@@ -1005,6 +1007,7 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
   const project = useEditorStore((s) => s.project);
   const selectSlide = useEditorStore((s) => s.selectSlide);
   const setLinkedViewToolbar = useEditorStore((s) => s.setLinkedViewToolbar);
+  const updateLinkedView = useEditorStore((s) => s.updateLinkedView);
   const [tool, setTool] = useState<DrawTool | null>(null);
   const [drawingPoints, setDrawingPoints] = useState<Point[] | null>(null);
   /** Where the cursor is, for the rubber-band edge and the close-snap hint. */
@@ -1062,6 +1065,8 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
   /** Which named stage is active — undefined means "no stages defined" or
    *  "first one," both of which fall back to the view's own url/transform. */
   const [activeStageId, setActiveStageId] = useState<string | undefined>(undefined);
+  /** The stage whose delete dialog is open (see StageDeleteDialog). */
+  const [stagePendingDelete, setStagePendingDelete] = useState<string | null>(null);
   /** A snapshot of the stage just switched *away* from, kept only for the
    *  duration of a Layout-view stage transition — `activeStageId` above has
    *  already moved on to the destination stage the instant a transition
@@ -1427,10 +1432,64 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
   function setStage(patch: Partial<Pick<LinkedView, 'url' | 'transform' | 'calibration' | 'geometry' | 'isPdfPlan' | 'northDeg' | 'northLocked' | 'calibrationLocked'>>) {
     const targetsStage = !!activeStage && (!!activeStage.url || patch.url !== undefined);
     if (targetsStage) {
-      setView(active.id, { stages: active.stages!.map((s) => (s.id === activeStage!.id ? { ...s, ...patch } : s)) });
+      // Patches the stage inside the view as it is in the deck now, not the
+      // stage list this render closed over: the North handlers reach here
+      // from the panel's snapshot, and writing back that older list is how a
+      // North drag or Unlock undid a rename made just before (B16).
+      const stageId = activeStage!.id;
+      updateLinkedView(slide.id, active.id, (v) => ({ ...v, stages: v.stages?.map((s) => (s.id === stageId ? { ...s, ...patch } : s)) }));
     } else {
       setView(active.id, patch);
     }
+  }
+
+  function cancelDrawing() {
+    setDrawingPoints(null);
+    setPickingTarget(false);
+    setTool(null);
+    setCursor(null);
+    setDragging(false);
+    setOrtho(false);
+    setEditingHotspotId(null);
+    setRedrawShapeFor(null);
+  }
+
+  // Stage edits (S1, F8), shared by the timeline on the slide and the
+  // Properties panel's Stages list. Each goes through updateLinkedView, which
+  // works on the view fresh from the deck rather than `active` from whichever
+  // render last registered the panel's snapshot.
+  function addStagesToView(labels: string[]) {
+    let added: string[] = [];
+    updateLinkedView(slide.id, active.id, (v) => {
+      const result = addStages(v, labels);
+      added = result.added;
+      return result.view;
+    });
+    if (!added.length) return;
+    // Land on what was just added, as a single "+ Stage" always has.
+    cancelDrawing();
+    setActiveStageId(added[0]);
+  }
+  function renameStageOfView(stageId: string, label: string) {
+    updateLinkedView(slide.id, active.id, (v) => renameStage(v, stageId, label));
+  }
+  function moveStageOfView(stageId: string, delta: -1 | 1) {
+    updateLinkedView(slide.id, active.id, (v) => moveStage(v, stageId, delta));
+  }
+  function requestDeleteStage(stageId: string) {
+    cancelDrawing();
+    setStagePendingDelete(stageId);
+  }
+  /** Switching stage from the Properties panel: instant, like the Render and
+   *  Axo pills, and it cuts short a stage morph already playing rather than
+   *  letting it blend towards a stage that's no longer the destination. */
+  function showStage(stageId: string | undefined) {
+    cancelDrawing();
+    if (transitionRafRef.current != null) cancelAnimationFrame(transitionRafRef.current);
+    transitionRafRef.current = null;
+    setTransitionFrom(null);
+    setTransitionProgress(1);
+    setActiveStageId(stageId);
   }
 
   /** North-point rotate handle. Mirrors the drag-tools' own pointer-capture
@@ -1510,9 +1569,9 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
   // tools) and still call back into these exact same handlers. Every
   // handler referenced here is unchanged from when this toolbar rendered
   // inline on the canvas; only where the buttons are drawn moved. Cleared
-  // (not just re-set) whenever the toolbar shouldn't be showable at all —
-  // matching the `editable && stageUrl && active.kind !== 'walkthrough'`
-  // gate the removed on-canvas JSX used to check.
+  // (not just re-set) for a walkthrough view, which has nothing to offer
+  // here. Without an image the snapshot still goes out, for its Stages
+  // list, with `hasImage` false.
   //
   // Gated on `editable` FIRST, before anything else: the slide rail renders
   // its own non-editable `LinkedViewsExplorer` instance for every Linked
@@ -1527,11 +1586,25 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
   // is ever at most one — may write to this slot at all.
   useEffect(() => {
     if (!editable) return;
-    if (!stageUrl || active.kind === 'walkthrough') {
+    // Registered with or without an image: stages can be set up first and
+    // each given its own image afterwards. The panel shows the image tools
+    // only once `hasImage` is true.
+    if (active.kind === 'walkthrough') {
       setLinkedViewToolbar(null);
       return;
     }
     setLinkedViewToolbar({
+      hasImage: !!stageUrl,
+      stages: {
+        suggest: active.kind === 'layout',
+        list: (active.stages ?? []).map((s) => ({ id: s.id, label: s.label })),
+        activeStageId: activeStage?.id,
+        onSelect: showStage,
+        onAdd: addStagesToView,
+        onRename: renameStageOfView,
+        onMove: moveStageOfView,
+        onRequestDelete: requestDeleteStage,
+      },
       zoomPanEnabled: !!active.zoomPanEnabled,
       onToggleZoomPan: (v) => setView(active.id, { zoomPanEnabled: v }),
       displayNorthDeg,
@@ -1558,7 +1631,7 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
       },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editable, stageUrl, active.kind, active.id, active.zoomPanEnabled, displayNorthDeg, northLocked, calibration, calibrationLocked, pickMode, tool]);
+  }, [editable, stageUrl, active.kind, active.id, active.stages, activeStage?.id, active.zoomPanEnabled, displayNorthDeg, northLocked, calibration, calibrationLocked, pickMode, tool]);
 
   // Unmount only, and only for the editable instance (see above) — clears
   // the registration so a different slide's Properties panel never shows a
@@ -1572,6 +1645,13 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
 
   const otherViews = views.filter((v) => v.id !== active.id);
   const allHotspots = active.hotspots ?? [];
+  const pendingDeleteStage = stagePendingDelete ? active.stages?.find((s) => s.id === stagePendingDelete) : undefined;
+  // Pre-ticked in the delete dialog as where the stage's own regions go.
+  const deleteNeighbour = (() => {
+    const list = active.stages ?? [];
+    const at = pendingDeleteStage ? list.indexOf(pendingDeleteStage) : -1;
+    return at === -1 ? undefined : (list[at - 1] ?? list[at + 1]);
+  })();
   // Unset stageIds = active on every stage — matters both for hotspots drawn
   // before stages existed and for a view that never defines any.
   const hotspots = activeStage ? allHotspots.filter((h) => !h.stageIds || h.stageIds.includes(activeStage.id)) : allHotspots;
@@ -1846,17 +1926,6 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
     setDrawingPoints((prev) => (prev && prev.length > 1 ? prev.slice(0, -1) : null));
   }
 
-  function cancelDrawing() {
-    setDrawingPoints(null);
-    setPickingTarget(false);
-    setTool(null);
-    setCursor(null);
-    setDragging(false);
-    setOrtho(false);
-    setEditingHotspotId(null);
-    setRedrawShapeFor(null);
-  }
-
   function selectView(id: string) {
     setActiveId(id);
     cancelDrawing();
@@ -2043,31 +2112,23 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
   }
 
   function removeHotspot(id: string) {
-    setView(active.id, {
-      // Also drop the deleted space from anyone's adjacency list, so a
-      // rebuilt plan doesn't accumulate links pointing at nothing.
-      hotspots: allHotspots
-        .filter((h) => h.id !== id)
-        .map((h) => {
-          const adjacentHotspotIds = h.adjacentHotspotIds?.includes(id)
-            ? h.adjacentHotspotIds.filter((x) => x !== id) : h.adjacentHotspotIds;
-          // Same reasoning: a child left pointing at a deleted parent would
-          // just silently never burst/merge again rather than erroring, so
-          // clear it the same way adjacency is cleared above.
-          const parentHotspotId = h.parentHotspotId === id ? undefined : h.parentHotspotId;
-          if (adjacentHotspotIds === h.adjacentHotspotIds && parentHotspotId === h.parentHotspotId) return h;
-          return { ...h, adjacentHotspotIds: adjacentHotspotIds?.length ? adjacentHotspotIds : undefined, parentHotspotId };
-        }),
-      // Same reasoning as the adjacency cleanup above, for the seating
-      // table's own hotspot links — otherwise a deleted space leaves a
-      // dangling id in a row's hotspotIds that will just never highlight
-      // anything again, silently.
-      seatingZones: active.seatingZones?.map((z) => ({
-        ...z,
-        rows: z.rows.map((r) => (r.hotspotIds?.includes(id) ? { ...r, hotspotIds: r.hotspotIds.filter((x) => x !== id) } : r)),
-      })),
-    });
+    // removeRegions also clears every reference to it (adjacency, parent
+    // zone, seating rows), the same clean-up a deleted stage's regions get.
+    updateLinkedView(slide.id, active.id, (v) => removeRegions(v, new Set([id])));
     setEditingHotspotId((cur) => (cur === id ? null : cur));
+  }
+
+  /** Deletes the stage the dialog was opened for. If it was the stage on
+   *  show, lands on the one before it (or after, for the first). */
+  function confirmDeleteStage(fate: StageRegionFate) {
+    const id = stagePendingDelete;
+    setStagePendingDelete(null);
+    if (!id) return;
+    const list = active.stages ?? [];
+    const at = list.findIndex((s) => s.id === id);
+    const neighbour = list[at - 1] ?? list[at + 1];
+    updateLinkedView(slide.id, active.id, (v) => deleteStage(v, id, fate));
+    if (activeStage?.id === id) showStage(neighbour?.id);
   }
 
   /** Arms drawing a fresh shape for one existing hotspot, scoped to the
@@ -2386,39 +2447,26 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
         ))}
       </div>
       {(active.stages?.length || editable) && active.kind !== 'walkthrough' && (
-        active.kind === 'layout' ? (
-          // The Sidvin-style plan-evolution stepper — scoped to Layout
-          // views specifically. Render/Axo also use stages for
-          // non-progression purposes (a day/night toggle, a camera angle),
-          // where a linear progress bar would misrepresent what switching
-          // stages means, so those kinds keep the plain pill row below.
-          <div className="mb-3 shrink-0">
-            <PlanTimeline
-              stages={active.stages ?? []}
-              activeStageId={activeStage?.id}
-              editable={editable}
-              onSelect={selectStage}
-              onAddStage={() => {
-                cancelDrawing();
-                if (!active.stages?.length) {
-                  // A fresh Layout view's first "+ Stage" click offers the
-                  // whole suggested progression at once, not one generically
-                  // -named stage at a time — still free-text labels
-                  // underneath (renamable, same as any other stage), just a
-                  // starting point matching the ask's own phrasing.
-                  const fresh = ['Zoning', 'Walls', 'Circulation', 'Furniture'].map((label) => ({ id: makeId('stage'), label }));
-                  setView(active.id, { stages: fresh });
-                  setActiveStageId(fresh[0].id);
-                } else {
-                  const stage = { id: makeId('stage'), label: `Stage ${active.stages.length + 1}` };
-                  setView(active.id, { stages: [...active.stages, stage] });
-                  setActiveStageId(stage.id);
-                }
-              }}
-              onRenameStage={(id, label) => setView(active.id, { stages: (active.stages ?? []).map((s) => (s.id === id ? { ...s, label } : s)) })}
-            />
-          </div>
-        ) : null
+        // Layout views get the Sidvin-style plan-evolution stepper. Render
+        // and Axo use stages for things like a day/night toggle or a camera
+        // angle, where a progress bar would misrepresent what switching
+        // means, so they get plain pills. Every stage is optional (S1):
+        // "+ Stage" offers the suggested plan stages to tick instead of
+        // adding a fixed set.
+        <div className="mb-3 shrink-0">
+          <PlanTimeline
+            variant={active.kind === 'layout' ? 'timeline' : 'pills'}
+            stages={active.stages ?? []}
+            activeStageId={activeStage?.id}
+            editable={editable}
+            onSelect={selectStage}
+            onAddStages={addStagesToView}
+            onRenameStage={renameStageOfView}
+            onMoveStage={moveStageOfView}
+            onRequestDeleteStage={requestDeleteStage}
+            onOpenPicker={cancelDrawing}
+          />
+        </div>
       )}
       {editable && active.kind === 'layout' && (
         <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2">
@@ -2442,43 +2490,6 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
             </button>
           ))}
         </div>
-      )}
-      {(active.stages?.length || editable) && active.kind !== 'walkthrough' && active.kind !== 'layout' && (
-          <div className="mb-3 flex shrink-0 flex-wrap items-center gap-1.5">
-            {active.stages?.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => {
-                  // Same reasoning as selectView: a hotspot mid-edit, or a
-                  // half-drawn shape, belongs to the stage it was started on —
-                  // switching away should cancel it, not leave it dangling
-                  // against a filtered hotspot list that may no longer include it.
-                  cancelDrawing();
-                  setActiveStageId(s.id);
-                }}
-                className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
-                  s.id === activeStage?.id
-                    ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
-                    : 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--ink-3)]'
-                }`}
-              >
-                {s.label}
-              </button>
-            ))}
-            {editable && (
-              <button
-                onClick={() => {
-                  const stage = { id: makeId('stage'), label: `Stage ${(active.stages?.length ?? 0) + 1}` };
-                  setView(active.id, { stages: [...(active.stages ?? []), stage] });
-                  cancelDrawing();
-                  setActiveStageId(stage.id);
-                }}
-                className="rounded-full border border-dashed border-[var(--line)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-              >
-                + Stage
-              </button>
-            )}
-          </div>
       )}
       {activeOverlay === 'zoning' && !overlayHidden && zoneCategories.length > 0 && (
         <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2">
@@ -3600,6 +3611,19 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
       )}
       </div>
       </div>
+      {editable && pendingDeleteStage && (
+        <StageDeleteDialog
+          key={pendingDeleteStage.id}
+          stageLabel={pendingDeleteStage.label}
+          ownImage={!!pendingDeleteStage.url}
+          imageKept={!!pendingDeleteStage.url && !active.url && (active.stages?.length ?? 0) === 1}
+          onlyRegions={regionsOnlyOn(active, pendingDeleteStage.id).length}
+          otherStages={(active.stages ?? []).filter((s) => s.id !== pendingDeleteStage.id).map((s) => ({ id: s.id, label: s.label }))}
+          defaultCarryTo={deleteNeighbour ? [deleteNeighbour.id] : []}
+          onCancel={() => setStagePendingDelete(null)}
+          onConfirm={confirmDeleteStage}
+        />
+      )}
     </div>
   );
 }

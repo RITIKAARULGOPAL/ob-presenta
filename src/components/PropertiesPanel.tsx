@@ -8,6 +8,7 @@ import { fileToSlideImage } from '@/lib/imageFile';
 import { IconImage, IconLink, IconDroplet, IconType, IconLayers, IconCompass, IconChevronDown, IconChevronRight, SECTION_ICONS, IconSectionDefault } from './icons';
 import type { Brand, SectionIconKey } from '@/types/slide';
 import { LINKED_VIEW_DRAW_TOOLS } from './SlideRenderer';
+import { StageList } from './StageEditing';
 
 type SectionKey = 'designOption' | 'sectionIcon' | 'background' | 'logo' | 'linkedSlides' | 'accent' | 'typography';
 
@@ -169,8 +170,8 @@ export function PropertiesPanel() {
           feedback ("these tools can come in properties panel in a separate
           tool bar"). `linkedViewToolbar` is registered live by
           LinkedViewsExplorer (SlideRenderer.tsx) — see the registration
-          effect there — and is null whenever no Linked Views slide with an
-          image loaded is currently selected, so this section simply isn't
+          effect there — and is null unless a Linked Views slide (other than
+          a walkthrough view) is selected, so this section simply isn't
           rendered otherwise. Placed above every other section: this is the
           slide's primary editing-mode toolbar, not a per-slide setting. */}
       {linkedViewToolbar && (
@@ -180,6 +181,15 @@ export function PropertiesPanel() {
           open={toolbarOpen}
           onToggle={() => setToolbarOpen((o) => !o)}
         >
+          {/* The same stage actions as the timeline on the slide (S1, F8),
+              at a size that's comfortable to use. */}
+          <StageList stages={linkedViewToolbar.stages} />
+          <div className="mt-4 border-t border-ui-line-soft pt-3" />
+          {!linkedViewToolbar.hasImage ? (
+            <p className="text-[11px] leading-snug text-ui-ink-3">
+              Add an image to the plan{linkedViewToolbar.stages.list.length ? ' or to this stage' : ''} to draw regions, set north and calibrate.
+            </p>
+          ) : (
           <div className="flex flex-wrap items-center gap-1.5">
             <label
               className="flex items-center gap-1 text-[11px] font-medium text-ui-ink-3"
@@ -277,6 +287,7 @@ export function PropertiesPanel() {
               </button>
             ))}
           </div>
+          )}
         </Disclosure>
       )}
 

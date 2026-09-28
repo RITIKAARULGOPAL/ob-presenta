@@ -253,6 +253,15 @@ export function IconChevronDown(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** Move up a list — the mirror of IconChevronDown. */
+export function IconChevronUp(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Base {...props}>
+      <path d="m6 15 6-6 6 6" />
+    </Base>
+  );
+}
+
 /** Disclosure affordance, collapsed. */
 export function IconChevronRight(props: SVGProps<SVGSVGElement>) {
   return (

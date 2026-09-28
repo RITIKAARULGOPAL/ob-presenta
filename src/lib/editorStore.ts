@@ -3,7 +3,7 @@ import type * as React from 'react';
 import { cloneSlide, createSlide, createStyledSlide, defaultFieldsForLayout, defaultFieldsForStyle } from './slideDefaults';
 import { optionalColumnsMissing, saveProject } from './data';
 import { makeId } from './id';
-import type { Brand, FontPairing, ImageTransform, Project, SectionIconKey, Slide, SlideBackground, SlideFields, SlideLayout, SlideStyleKind, TypographySettings } from '@/types/slide';
+import type { Brand, FontPairing, ImageTransform, LinkedView, Project, SectionIconKey, Slide, SlideBackground, SlideFields, SlideLayout, SlideStyleKind, TypographySettings } from '@/types/slide';
 
 type Mode = 'editor' | 'presenter';
 
@@ -24,6 +24,11 @@ export type DrawTool = 'rect' | 'ellipse' | 'polygon' | 'spline' | 'freehand';
  *  for the canvas-rendered version of this toolbar — nothing about the
  *  interaction itself changed, only where the buttons are drawn. */
 export interface LinkedViewToolbarSnapshot {
+  /** Whether the view (or its active stage) has an image yet. The image
+   *  tools below need one; the stage list doesn't, since each stage can
+   *  bring its own image later. */
+  hasImage: boolean;
+  stages: LinkedViewStagesSnapshot;
   zoomPanEnabled: boolean;
   onToggleZoomPan: (v: boolean) => void;
   displayNorthDeg: number;
@@ -39,6 +44,24 @@ export interface LinkedViewToolbarSnapshot {
   onUnlockCalibration: () => void;
   tool: DrawTool | null;
   onSetTool: (t: DrawTool | null) => void;
+}
+
+/** The active Linked View's stages as the Properties panel lists them, with
+ *  the same handlers the stage timeline on the slide calls. */
+export interface LinkedViewStagesSnapshot {
+  /** Layout views are offered the six suggested plan stages to tick. Other
+   *  kinds use stages for things like day and night, so they only get a
+   *  custom name. */
+  suggest: boolean;
+  list: { id: string; label: string }[];
+  activeStageId: string | undefined;
+  onSelect: (stageId: string) => void;
+  onAdd: (labels: string[]) => void;
+  onRename: (stageId: string, label: string) => void;
+  onMove: (stageId: string, delta: -1 | 1) => void;
+  /** Opens the delete dialog rather than deleting: a stage with regions of
+   *  its own needs a decision about where they go. */
+  onRequestDelete: (stageId: string) => void;
 }
 
 interface EditorState {
@@ -62,9 +85,8 @@ interface EditorState {
   selectedSlideIds: string[];
   selectionAnchor: string | null;
   /** See `LinkedViewToolbarSnapshot` above — `null` whenever no Linked Views
-   *  slide's canvas toolbar is currently showable (wrong layout, no image
-   *  loaded yet, or a walkthrough view). Transient, like the selection
-   *  state above: never persisted, never undo-tracked. */
+   *  slide's tools apply (wrong layout, or a walkthrough view). Transient,
+   *  like the selection state above: never persisted, never undo-tracked. */
   linkedViewToolbar: LinkedViewToolbarSnapshot | null;
 
   loadProject: (project: Project) => void;
@@ -111,6 +133,14 @@ interface EditorState {
    *  can land after the selection has already started moving. Whitespace-only
    *  text clears the notes. */
   setSlideNotes: (id: string, notes: string) => void;
+  /** Rewrites one Linked View through `update`, which receives the view
+   *  fresh from the deck rather than whatever copy the caller rendered with.
+   *  Stage edits arrive from the Properties panel through a snapshot
+   *  registered some renders ago, and writing back a view captured that
+   *  early is how a North drag used to undo a stage rename (B16). An update
+   *  that returns the view unchanged commits nothing, so it costs no Undo
+   *  step. */
+  updateLinkedView: (slideId: string, viewId: string, update: (view: LinkedView) => LinkedView) => void;
   setClientLogo: (dataUrl: string | undefined) => void;
   setClientLogoTransform: (transform: ImageTransform | undefined) => void;
   setAccentColor: (hex: string | undefined) => void;
@@ -554,6 +584,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!slide || slide.notes === next) return;
     const slides = project.slides.map((s) => (s.id === id ? { ...s, notes: next } : s));
     commitProject({ ...project, slides });
+  },
+
+  updateLinkedView: (slideId, viewId, update) => {
+    const { project } = get();
+    if (!project) return;
+    let changed = false;
+    const slides = project.slides.map((s) => {
+      if (s.id !== slideId || !s.fields.views) return s;
+      const views = s.fields.views.map((v) => {
+        if (v.id !== viewId) return v;
+        const next = update(v);
+        if (next !== v) changed = true;
+        return next;
+      });
+      return changed ? { ...s, fields: { ...s.fields, views } } : s;
+    });
+    if (changed) commitProject({ ...project, slides });
   },
 
   setClientLogo: (dataUrl) => {

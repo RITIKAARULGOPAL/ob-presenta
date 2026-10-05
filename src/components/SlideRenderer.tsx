@@ -57,6 +57,7 @@ import { PLAN_LAYERS, siteCategory } from '@/lib/siteChecklist';
 import { morphShapes } from '@/lib/shapeMorph';
 import { clamp, imageStyle, maxPan, MAX_ZOOM, MIN_ZOOM } from '@/lib/imageTransform';
 import { makeId } from '@/lib/id';
+import { isVideoFile, uploadVideo, videoUploadMessage } from '@/lib/videoUpload';
 import type { Brand, FreeformElement, HotspotGalleryImage, ImageTransform, LinkedView, PlanAnnotation, PlanCalibration, PlanGeometry, Slide, ViewHotspot } from '@/types/slide';
 import type { Point } from '@/lib/hotspotShape';
 
@@ -152,8 +153,8 @@ function MediaBox({
   const [pdfPick, setPdfPick] = useState<{ doc: PdfDocument; numPages: number; page: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
-  const canUpload = editable && kind === 'image';
-  const canAdjust = canUpload && allowAdjust && !!onChangeTransform;
+  const canUpload = editable;
+  const canAdjust = canUpload && kind === 'image' && allowAdjust && !!onChangeTransform;
 
   useEffect(() => {
     if (!url) setAdjusting(false);
@@ -203,6 +204,23 @@ function MediaBox({
 
   async function accept(file: File | undefined) {
     if (!file) return;
+    if (kind === 'video') {
+      if (!isVideoFile(file)) {
+        setNote('That file is not a video.');
+        return;
+      }
+      setBusy(true);
+      setNote('Uploading…');
+      try {
+        onChangeUrl(await uploadVideo(file));
+        setNote(`Added — ${(file.size / 1024 / 1024).toFixed(1)} MB.`);
+      } catch (err) {
+        setNote(videoUploadMessage(err));
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
     if (!isPdf && !file.type.startsWith('image/')) {
       setNote('That file is not an image or a PDF.');
@@ -289,8 +307,10 @@ function MediaBox({
                   {dragging
                     ? 'Drop to add'
                     : busy
-                      ? 'Reading…'
-                      : onPdfPlan
+                      ? kind === 'video' ? 'Uploading…' : 'Reading…'
+                      : kind === 'video'
+                        ? 'Drag a video here'
+                        : onPdfPlan
                         ? 'Drag a plan here — a vector PDF snaps to points and lines while calibrating'
                         : 'Drag an image here'}
                 </span>
@@ -311,7 +331,7 @@ function MediaBox({
           <input
             ref={fileRef}
             type="file"
-            accept="image/*,application/pdf"
+            accept={kind === 'video' ? 'video/*' : 'image/*,application/pdf'}
             className="absolute h-px w-px overflow-hidden opacity-0"
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -363,21 +383,6 @@ function MediaBox({
           <div className="absolute inset-x-2 bottom-2 flex flex-col gap-1">
             {note && <span className="rounded bg-black/70 px-2 py-0.5 text-[10px] text-white/80">{note}</span>}
             <div className="flex gap-1">
-              {/* Image has real upload paths now (drag-drop, Choose a file,
-                  PDF plans) — a paste-URL fallback next to all of that is just
-                  clutter, so it's video-only: video has no adjust overlay and
-                  no upload path at all (a base64 video would be tens of
-                  megabytes in the project row, see imageFile.ts), so a pasted
-                  URL is its *only* way to get a source. */}
-              {kind === 'video' && (
-                <input
-                  value={url}
-                  onChange={(e) => onChangeUrl(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  placeholder="Paste video URL…"
-                  className="min-w-0 flex-1 rounded-md border border-white/20 bg-black/60 px-2 py-1 text-xs text-white outline-none placeholder:text-white/40"
-                />
-              )}
               {/* Replace lives in the on-image toolbar once selected (click the
                   image) — a photo doesn't also need a standalone Upload button
                   here. */}
@@ -551,19 +556,73 @@ function ClientLogo({ editable, dark }: { editable: boolean; dark: boolean }) {
   );
 }
 
-/** The title slide's optional full-bleed looping background video. URL-only
- *  (like a linked-views walkthrough) — a base64 video would be tens of
- *  megabytes in the project row. Renders nothing at all in Presenter/export
- *  when unset, rather than an empty placeholder box, since a title slide
- *  with no video should look exactly like it always has. */
-function HeroVideo({ url, editable, onChangeUrl }: { url?: string; editable: boolean; onChangeUrl: (url: string) => void }) {
-  const [editingUrl, setEditingUrl] = useState(false);
-  const [draft, setDraft] = useState(url ?? '');
+/** The title slide's content wrapper plus its optional looping background
+ *  video. A picked or dropped file uploads to Supabase Storage (videoUpload.ts)
+ *  and the slide keeps the URL. Unset, Presenter/export show no trace of it. */
+function HeroVideo({
+  url,
+  editable,
+  onChangeUrl,
+  children,
+}: {
+  url?: string;
+  editable: boolean;
+  onChangeUrl: (url: string) => void;
+  children: React.ReactNode;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [note, setNote] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  if (!url && !editable) return null;
+  async function accept(file: File | undefined) {
+    if (!file) return;
+    if (!isVideoFile(file)) {
+      setNote('That file is not a video.');
+      return;
+    }
+    setBusy(true);
+    setNote('Uploading…');
+    try {
+      onChangeUrl(await uploadVideo(file));
+      setNote('');
+    } catch (err) {
+      setNote(videoUploadMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const carriesFiles = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
 
   return (
-    <>
+    // Deliberately not `relative`: the video's inset-0 then resolves to the
+    // slide root, so it's full-bleed, and this box fills the slide as the
+    // drop zone. `isolate` keeps the video's -z-10 above the slide background.
+    <div
+      className={`isolate flex flex-1 flex-col justify-center text-center ${dragging ? 'rounded-xl ring-2 ring-[var(--accent)]' : ''}`}
+      onDragOver={
+        editable
+          ? (e) => {
+              if (!carriesFiles(e)) return;
+              e.preventDefault();
+              setDragging(true);
+            }
+          : undefined
+      }
+      onDragLeave={editable ? (e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false); } : undefined}
+      onDrop={
+        editable
+          ? (e) => {
+              if (!carriesFiles(e)) return;
+              // Without preventDefault the browser navigates away to the file.
+              e.preventDefault();
+              setDragging(false);
+              void accept(e.dataTransfer.files?.[0]);
+            }
+          : undefined
+      }
+    >
       {url && (
         <>
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
@@ -578,59 +637,46 @@ function HeroVideo({ url, editable, onChangeUrl }: { url?: string; editable: boo
           <div className="pointer-events-none absolute inset-0 -z-10 bg-black/45" />
         </>
       )}
-      {editable && (
-        <div className="absolute inset-x-0 -top-8 flex justify-center">
-          {editingUrl ? (
-            <div className="flex items-center gap-1.5 rounded-md border border-[var(--line)] bg-white px-2 py-1 shadow-lg">
-              <input
-                autoFocus
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    onChangeUrl(draft.trim());
-                    setEditingUrl(false);
-                  } else if (e.key === 'Escape') {
-                    setEditingUrl(false);
-                  }
-                }}
-                placeholder="Paste video URL…"
-                className="w-56 text-xs text-[var(--ink)] outline-none"
-              />
-              <button
-                onClick={() => {
-                  onChangeUrl(draft.trim());
-                  setEditingUrl(false);
-                }}
-                className="shrink-0 rounded bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold text-white"
-              >
-                Set
-              </button>
-            </div>
-          ) : (
+      <div className="relative">
+        {editable && (
+          <div className="absolute inset-x-0 -top-8 flex items-center justify-center gap-1.5">
             <button
-              onClick={() => {
-                setDraft(url ?? '');
-                setEditingUrl(true);
-              }}
-              className={`rounded-md border border-dashed px-2.5 py-1 text-[10px] font-semibold transition ${
+              onClick={() => fileRef.current?.click()}
+              disabled={busy}
+              title="Pick a video file, or drag one onto the slide"
+              className={`rounded-md border border-dashed px-2.5 py-1 text-[10px] font-semibold transition disabled:opacity-60 ${
                 url ? 'border-white/30 text-white/70 hover:border-white/60' : 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
               }`}
             >
-              {url ? 'Replace hero video' : '+ Add hero video'}
+              {busy ? 'Uploading…' : dragging ? 'Drop video to add' : url ? 'Replace hero video' : '+ Add hero video'}
             </button>
-          )}
-          {url && !editingUrl && (
-            <button
-              onClick={() => onChangeUrl('')}
-              className="ml-1.5 rounded-md border border-dashed border-white/30 px-2 py-1 text-[10px] font-semibold text-white/70 hover:border-red-400 hover:text-red-300"
-            >
-              Remove
-            </button>
-          )}
-        </div>
-      )}
-    </>
+            {url && !busy && (
+              <button
+                onClick={() => { onChangeUrl(''); setNote(''); }}
+                className="rounded-md border border-dashed border-white/30 px-2 py-1 text-[10px] font-semibold text-white/70 hover:border-red-400 hover:text-red-300"
+              >
+                Remove
+              </button>
+            )}
+            {note && !busy && (
+              <span className={`text-[10px] ${url ? 'text-white/80' : 'text-[var(--ink-3)]'}`}>{note}</span>
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="video/*"
+              className="absolute h-px w-px overflow-hidden opacity-0"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                void accept(file);
+              }}
+            />
+          </div>
+        )}
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -4540,8 +4586,7 @@ export function SlideRenderer({ slide, editable, animate = false, silent = false
           />
         </div>
       ) : slide.layout === 'title-slide' ? (
-        <div className="relative isolate text-center">
-          <HeroVideo url={slide.fields.heroVideoUrl} editable={editable} onChangeUrl={(url) => updateField('heroVideoUrl', url)} />
+        <HeroVideo url={slide.fields.heroVideoUrl} editable={editable} onChangeUrl={(url) => updateField('heroVideoUrl', url)}>
           <div className="relative">
             <Kicker slide={slide} editable={editable} />
             <EditableText
@@ -4563,7 +4608,7 @@ export function SlideRenderer({ slide, editable, animate = false, silent = false
             />
             <ClientLogo editable={editable} dark={dark || !!slide.fields.heroVideoUrl} />
           </div>
-        </div>
+        </HeroVideo>
       ) : slide.layout === 'freeform' ? (
         <FreeformSlide slide={slide} editable={editable} />
       ) : slide.layout === 'blank' ? (

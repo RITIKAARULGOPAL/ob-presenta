@@ -32,6 +32,42 @@ or re-explain anything.
 
 ---
 
+## 2026-10-05 — W1 bug sweep
+
+**Done:**
+- **15 bugs fixed** in one commit (`d7da69d`) on `claude/f1-presenting`:
+  - B1  SlideRail: `shrink-0` so thumbnails don't squash on long decks
+  - B3  `changeLayout`/`changeStyle`: skip commit when value unchanged (prevents content loss on re-select)
+  - B5  `ImageAdjustOverlay`, `LogoAdjustOverlay`: mirror `onChange` into a ref so `onPointerMove` identity is stable and window listeners survive mid-drag
+  - B6  `HeroVideo`: `isolate` on title-slide wrapper contains `-z-10` video inside the slide's own stacking context
+  - B7  `ScaledStage` pannable mode: `transformOrigin: 'top left'` (not `'center'`) so zoomed canvas scrolls from the right corner
+  - B9  `EditableText`: `innerText` instead of `textContent` to preserve HTML line breaks on blur
+  - B11 `editorStore.dropLinksTo`: set `targetSlideId: undefined` instead of filtering out hotspots
+  - B14 Properties panel Design Option: trim only on blur, not on every keystroke
+  - B17 `editorStore` undo/redo: reset `selectedSlideIds` and `selectionAnchor`
+  - B18 `importExcel.findColumn`: exact → whole-word → substring priority + per-column exclusion (fixes "Zone Name" matching `LABEL_HEADERS`)
+  - B19 Home page `handleDelete`: await delete before removing row; rollback on error
+  - U17 Layout checkmark: show for current layout regardless of style (not only `standard`)
+  - U19 SlideRenderer BOQ placeholder: removed stale "placeholder — real table coming later" copy
+  - V1  `globals.css --app-ink-3`: `#8a93a3` → `#697386` (~4.65:1 WCAG AA on white)
+  - V2  `globals.css body`: `font-family: var(--font-chrome-body)` instead of hardcoded Arial
+
+**Not fixed (require user input or more investigation):**
+- B4  Presenter re-fetches deck on mount; `mode` stays `presenter` after Esc
+- B10 `key={slide.id}` missing on Linked Views components in list
+- B15 Space/arrows blocked by space-detail popup in presenter
+- B20 Presenter controls overlap progress rail at phone width
+- L1  Rules-of-hooks violations in SlideRenderer.tsx (line numbers in FEATURES.md may be stale)
+- L2  Remaining 16 lint errors
+- U6  Presenter warm `#171310` vs cool app dark `#0d1017` mismatch
+
+**Left off / next up:**
+- Delete scratch deck "S2 scratch - delete me" (`proj_8i77grpxmumdc4qk`) from Home
+- Do NOT push the branch until the user asks
+- Committed 2026-10-05 on `claude/f1-presenting`. Not pushed.
+
+---
+
 ## 2026-10-05 — S2: Site analysis stage
 
 **Context:** sign-off on all 7 decisions given 2026-09-29; built on top of

@@ -90,9 +90,13 @@ or re-explain anything.
   duplicated slides can still point at it); no cleanup exists yet.
 
 **Left off / next up:**
-- User runs migrations 0003–0006 in the Supabase SQL Editor. Then test a
-  real video upload + playback, check accent survives a Presenter reload,
-  and commit.
+- ~~Run migrations 0003–0006~~ — done by the user 2026-10-05. Verified on
+  the scratch deck: migration banner gone; accent survives a fresh
+  Presenter load; a recorded 96 KB webm dropped on the title slide
+  uploaded to the `media` bucket, fills the slide and loads in Presenter.
+- Deployed: `main` fast-forwarded to `f269806` by the user, live at
+  https://ob-presenta.vercel.app. Preview builds of branches still fail on
+  Vercel (every Preview on record has) — likely Preview env vars.
 - Get the Vercel build error and fix it.
 - Delete scratch deck `proj_8i77grpxmumdc4qk`.
 

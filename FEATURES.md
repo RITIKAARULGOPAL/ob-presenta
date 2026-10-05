@@ -86,9 +86,11 @@ shorten this. Adjust the weeks for holidays and review time.
 - [x] ~~Close (×) icon instead of "← Back to Presenta" text link~~ (2026-09-24)
 - [x] ~~Light/System/Dark theme toggle~~ (2026-09-21)
 - [x] ~~Cool/crisp palette + Inter Tight/Helvetica chrome type retint~~ (2026-09-24/25)
-- [ ] Real hero → search/filter → card-grid layout hierarchy (B) — mockup
-      approved, only colors/fonts landed via the token retint; the actual
-      restructure isn't built · **1d · W14**
+- [x] ~~Real hero → search/filter → card-grid layout hierarchy~~ (2026-09-28,
+      `worktree-presenta-parallel`) — the original approved mockup artifact
+      was no longer reachable, so rebuilt to the same direction (condensed
+      hero band, toolbar row, responsive card grid) using the existing
+      token system rather than re-approving pixel-for-pixel; worth a look
 - [ ] ⌘K command palette over `editorStore`'s ~50 named actions (B) —
       Phase 4 of the 2026-09-21 UI rework, unbuilt · **1–2d · W16**
 - [ ] Searchable layout/concept-picker dialog with real slide previews (B) —

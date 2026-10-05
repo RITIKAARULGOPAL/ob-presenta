@@ -645,4 +645,17 @@ export interface ProjectSummary {
   date: string;
   updatedAt: number;
   brand: Brand;
+  createdAt: number;
+  /** These four ride along so Home's card thumbnails can render an accurate
+   *  screenshot of the first slide (see captureThumbnail.ts) without a
+   *  second per-project fetch. clientLogoTransform is deliberately not
+   *  included — it isn't persisted to Supabase anywhere in this codebase,
+   *  so it's already always undefined on reload, same as here. */
+  accentColor?: string;
+  fontFamily?: FontPairing;
+  typography?: TypographySettings;
+  clientLogo?: string;
+  /** The deck's own slides[0], fetched via a Postgres JSON-path select
+   *  (see listProjects in data.ts) rather than the full `slides` array. */
+  firstSlide: Slide | null;
 }

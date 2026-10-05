@@ -44,23 +44,54 @@ function fromRow(row: ProjectRow): Project {
   };
 }
 
+// Typed `string`, not inferred as a literal: supabase-js's `.select()` tries
+// to statically parse a literal select-string argument at the type level, and
+// its grammar doesn't recognise the `->` JSON-path syntax below (even though
+// PostgREST itself accepts it fine at runtime — verified live). Widening to
+// `string` here makes the template literal built from these plain `string`
+// too, which sidesteps that parser instead of fighting it.
+const LIST_BASE_COLUMNS: string = 'id, name, client, date, updated_at, brand, created_at';
+// slides->0 returns the whole first-slide JSON object (not the rest of the
+// array) — Home's card thumbnails screenshot it via captureThumbnail.ts.
+const LIST_FIRST_SLIDE_COLUMN: string = 'first_slide:slides->0';
+
+function fromListRow(r: Record<string, unknown>): ProjectSummary {
+  return {
+    id: r.id as string,
+    name: r.name as string,
+    client: r.client as string,
+    date: r.date as string,
+    updatedAt: r.updated_at as number,
+    brand: r.brand as Brand,
+    createdAt: r.created_at as number,
+    accentColor: (r.accent_color as string | null) ?? undefined,
+    fontFamily: (r.font_family as FontPairing | null) ?? undefined,
+    typography: (r.typography as TypographySettings | null) ?? undefined,
+    clientLogo: (r.client_logo as string | null) ?? undefined,
+    firstSlide: (r.first_slide as ProjectSummary['firstSlide']) ?? null,
+  };
+}
+
 export async function listProjects(): Promise<ProjectSummary[]> {
-  const { data, error } = await supabase
-    .from('projects')
-    .select('id, name, client, date, updated_at, brand')
-    .order('updated_at', { ascending: false });
+  // Both built as explicitly `string`-typed locals, not passed as inline
+  // template literals: TS infers an inline template literal built from
+  // `string`-typed parts as a `${string}, ${string}...` template literal
+  // TYPE (not the general `string` type), which supabase-js's `.select()`
+  // then tries to statically parse the same way it would a literal — and
+  // fails on the `->` JSON-path syntax. An explicit `: string` annotation on
+  // the variable itself forces real widening to `string`.
+  const fullSelect: string = `${LIST_BASE_COLUMNS}, ${OPTIONAL_COLUMNS.join(', ')}, ${LIST_FIRST_SLIDE_COLUMN}`;
+  const fallbackSelect: string = `${LIST_BASE_COLUMNS}, ${LIST_FIRST_SLIDE_COLUMN}`;
+  let { data, error } = await supabase.from('projects').select(fullSelect).order('updated_at', { ascending: false });
+  if (isUnknownColumn(error)) {
+    warnOnce();
+    ({ data, error } = await supabase.from('projects').select(fallbackSelect).order('updated_at', { ascending: false }));
+  }
   if (error) {
     console.error('listProjects failed:', error.message);
     return [];
   }
-  return (data ?? []).map((r) => ({
-    id: r.id,
-    name: r.name,
-    client: r.client,
-    date: r.date,
-    updatedAt: r.updated_at,
-    brand: r.brand,
-  }));
+  return (data ?? []).map((r) => fromListRow(r as unknown as Record<string, unknown>));
 }
 
 /** Columns added by migrations 0003 through 0005. When a migration hasn't

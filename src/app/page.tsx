@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createProject, deleteProject, listProjects } from '@/lib/data';
 import { fileToDataUrl } from '@/lib/imageFile';
 import { useEditorStore } from '@/lib/editorStore';
+import { captureProjectThumbnail } from '@/lib/captureThumbnail';
 import { AccentPicker } from '@/components/AccentPicker';
 import { IconClose, IconSearch, IconTrash } from '@/components/icons';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -39,6 +40,28 @@ function parseProjectDate(value: string): number {
   return Number.isNaN(t) ? 0 : t;
 }
 
+/** Shared by the render body and the thumbnail-capture effect, so the two
+ *  can never disagree about which projects are currently "visible". */
+function filterAndSortProjects(
+  projects: ProjectSummary[],
+  brandFilter: Brand | 'all',
+  searchQuery: string,
+  sortBy: SortKey,
+): ProjectSummary[] {
+  return projects
+    .filter((p) => brandFilter === 'all' || p.brand === brandFilter)
+    .filter((p) => {
+      const q = searchQuery.trim().toLowerCase();
+      if (!q) return true;
+      return p.name.toLowerCase().includes(q) || p.client.toLowerCase().includes(q);
+    })
+    .sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      if (sortBy === 'date') return parseProjectDate(b.date) - parseProjectDate(a.date);
+      return b.updatedAt - a.updatedAt;
+    });
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -60,23 +83,69 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [brandFilter, setBrandFilter] = useState<Brand | 'all'>('all');
   const [sortBy, setSortBy] = useState<SortKey>('updated');
+  const [thumbnails, setThumbnails] = useState<Record<string, string | 'error'>>({});
+  const capturedIds = useRef(new Set<string>());
 
   useEffect(() => {
     listProjects().then(setProjects);
   }, []);
 
-  const visibleProjects = projects
-    .filter((p) => brandFilter === 'all' || p.brand === brandFilter)
-    .filter((p) => {
-      const q = searchQuery.trim().toLowerCase();
-      if (!q) return true;
-      return p.name.toLowerCase().includes(q) || p.client.toLowerCase().includes(q);
-    })
-    .sort((a, b) => {
-      if (sortBy === 'name') return a.name.localeCompare(b.name);
-      if (sortBy === 'date') return parseProjectDate(b.date) - parseProjectDate(a.date);
-      return b.updatedAt - a.updatedAt;
-    });
+  const visibleProjects = filterAndSortProjects(projects, brandFilter, searchQuery, sortBy);
+
+  // Real screenshots of each card's first slide, generated in the browser
+  // and filled in progressively — see captureThumbnail.ts for why this can't
+  // just be a static image render. Concurrency is pinned at exactly 1: the
+  // editor store has one `project` slot, so two captures can never correctly
+  // run at once regardless of how much idle CPU there is.
+  useEffect(() => {
+    const idsToCapture = filterAndSortProjects(projects, brandFilter, searchQuery, sortBy)
+      .map((p) => p.id)
+      .filter((id) => !capturedIds.current.has(id));
+    if (idsToCapture.length === 0) return;
+
+    let cancelled = false;
+    // captureThumbnail's settleStage waits on requestAnimationFrame, which
+    // browsers suspend entirely for a hidden/backgrounded tab — confirmed
+    // live, not theoretical: with the tab hidden, rAF simply never fires, so
+    // every capture would otherwise sit at its full timeout one after
+    // another for no reason. Pausing here means Home opened in a background
+    // tab fills in the moment it's actually looked at, instead of grinding
+    // through the whole list as timed-out failures first.
+    let stopWaiting: (() => void) | null = null;
+    function waitUntilVisible(): Promise<void> {
+      if (!document.hidden) return Promise.resolve();
+      return new Promise((resolve) => {
+        const onChange = () => {
+          if (!document.hidden) {
+            document.removeEventListener('visibilitychange', onChange);
+            stopWaiting = null;
+            resolve();
+          }
+        };
+        stopWaiting = () => document.removeEventListener('visibilitychange', onChange);
+        document.addEventListener('visibilitychange', onChange);
+      });
+    }
+
+    (async () => {
+      for (const id of idsToCapture) {
+        if (cancelled) break;
+        await waitUntilVisible();
+        if (cancelled) break;
+        capturedIds.current.add(id);
+        const source = projects.find((p) => p.id === id);
+        if (!source) continue;
+        const dataUrl = await captureProjectThumbnail(source);
+        if (cancelled) return;
+        setThumbnails((prev) => ({ ...prev, [id]: dataUrl ?? 'error' }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      stopWaiting?.();
+    };
+  }, [projects, brandFilter, searchQuery, sortBy]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -121,105 +190,123 @@ export default function HomePage() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-hero-bg px-6 py-16 text-hero-ink">
+    <main className="relative flex min-h-screen flex-col items-center overflow-x-hidden bg-hero-bg px-6 py-12 text-hero-ink sm:px-10">
       {/* The backdrop wash changes with the theme too — same composition,
           different light — so it is a variable rather than a literal here. */}
       <div className="pointer-events-none absolute inset-0" style={{ background: 'var(--app-hero-glow)' }} />
 
       <ThemeToggle tone="hero" className="absolute right-6 top-6 z-10" />
-      <div className="relative w-full max-w-3xl">
+      <div className="relative w-full max-w-6xl">
         {!showForm ? (
           <>
-            <div className="mb-2 font-chrome-display text-4xl font-light tracking-[0.3em]">
-              Presenta<span className="tracking-normal">.</span>
-            </div>
-            <p className="mb-1 font-chrome-body text-lg font-medium text-hero-ink">An Interactive Presentation Platform</p>
-            <p className="mb-3 max-w-md font-chrome-body text-sm leading-relaxed text-hero-ink-2">
-              Bringing clarity to every decision. Creating spaces that work, inspire and endure.
-            </p>
-            <p className="mb-14 font-chrome-body text-sm text-hero-ink-3">Powered by Officebanao</p>
-
-            <button
-              onClick={() => setShowForm(true)}
-              className="mb-10 flex w-full items-center gap-5 rounded-2xl border border-dashed border-hero-line-strong bg-hero-card p-7 text-left transition hover:bg-hero-card-hover"
-            >
-              <span className="flex h-13 w-13 flex-shrink-0 items-center justify-center rounded-xl border border-hero-line bg-hero-card-hover p-3">
-                <svg viewBox="0 0 24 24" className="h-5 w-5 stroke-hero-ink" fill="none" strokeWidth={2} strokeLinecap="round">
+            {/* Hero band */}
+            <div className="mb-10 flex flex-wrap items-end justify-between gap-6 border-b border-hero-line pb-8">
+              <div>
+                <div className="mb-2 font-chrome-display text-3xl font-light tracking-[0.3em]">
+                  Presenta<span className="tracking-normal">.</span>
+                </div>
+                <p className="font-chrome-body text-base font-medium text-hero-ink">An Interactive Presentation Platform</p>
+                <p className="mt-1 max-w-md font-chrome-body text-sm leading-relaxed text-hero-ink-3">
+                  Bringing clarity to every decision. Creating spaces that work, inspire and endure.
+                </p>
+                <p className="mt-2 font-chrome-body text-xs text-hero-ink-3">Powered by Officebanao</p>
+              </div>
+              <button
+                onClick={() => setShowForm(true)}
+                className="flex flex-shrink-0 items-center gap-3 rounded-xl bg-ui-accent px-5 py-3.5 text-left text-ui-accent-on transition hover:bg-ui-accent-hover"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4 stroke-ui-accent-on" fill="none" strokeWidth={2.5} strokeLinecap="round">
                   <path d="M12 5v14M5 12h14" />
                 </svg>
-              </span>
-              <span>
-                <span className="block font-chrome-display text-lg font-bold">New presentation</span>
-                <span className="block font-chrome-body text-sm text-hero-ink-3">Start from a blank project — set the name and date</span>
-              </span>
-            </button>
+                <span>
+                  <span className="block font-chrome-display text-sm font-bold">New presentation</span>
+                  <span className="block font-chrome-body text-[11px] opacity-80">Start from a blank project</span>
+                </span>
+              </button>
+            </div>
 
-            <div className="mb-4 text-xs font-bold uppercase tracking-widest text-hero-ink-2">Recent</div>
-            {projects.length > 0 && (
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="relative min-w-[180px] flex-1">
-                  <IconSearch className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-hero-ink-3" />
-                  <input
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by name or client…"
-                    className="w-full rounded-full border border-hero-line bg-hero-card py-1.5 pl-9 pr-4 text-sm text-hero-ink outline-none placeholder:text-hero-ink-3 focus:border-hero-line-strong"
-                  />
+            {/* Toolbar: title + search/filter/sort */}
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs font-bold uppercase tracking-widest text-hero-ink-2">Recent</div>
+              {projects.length > 0 && (
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="relative min-w-[180px] flex-1">
+                    <IconSearch className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-hero-ink-3" />
+                    <input
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search by name or client…"
+                      className="w-full rounded-full border border-hero-line bg-hero-card py-1.5 pl-9 pr-4 text-sm text-hero-ink outline-none placeholder:text-hero-ink-3 focus:border-hero-line-strong"
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <SegmentedControl options={BRAND_FILTER_OPTIONS} value={brandFilter} onChange={setBrandFilter} ariaLabel="Filter by brand" tone="hero" />
+                    <SegmentedControl options={SORT_OPTIONS} value={sortBy} onChange={setSortBy} ariaLabel="Sort by" tone="hero" />
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <SegmentedControl options={BRAND_FILTER_OPTIONS} value={brandFilter} onChange={setBrandFilter} ariaLabel="Filter by brand" tone="hero" />
-                  <SegmentedControl options={SORT_OPTIONS} value={sortBy} onChange={setSortBy} ariaLabel="Sort by" tone="hero" />
-                </div>
-              </div>
-            )}
-            <div className="flex flex-col gap-3">
-              {projects.length === 0 && <div className="text-sm text-hero-ink-3">No saved presentations yet — start a new one above.</div>}
-              {projects.length > 0 && visibleProjects.length === 0 && (
-                <div className="text-sm text-hero-ink-3">No presentations match your filters.</div>
               )}
-              {visibleProjects.map((p) => (
-                <div
-                  key={p.id}
-                  data-project-id={p.id}
-                  data-project-name={p.name}
-                  className="flex items-center gap-4 rounded-xl border border-hero-line bg-hero-card px-6 py-5 transition hover:bg-hero-card-hover"
-                >
-                  <button onClick={() => router.push(`/p/${p.id}/edit`)} className="flex min-w-0 flex-1 items-center gap-4 text-left">
-                    <span className="h-2 w-2 flex-shrink-0 rounded-full bg-ui-accent" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-chrome-display text-sm font-semibold text-hero-ink">{p.name}</span>
-                      <span className="block font-chrome-body text-xs text-hero-ink-2">
+            </div>
+
+            {/* Card grid */}
+            {projects.length === 0 && <div className="text-sm text-hero-ink-3">No saved presentations yet — start a new one above.</div>}
+            {projects.length > 0 && visibleProjects.length === 0 && (
+              <div className="text-sm text-hero-ink-3">No presentations match your filters.</div>
+            )}
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {visibleProjects.map((p) => {
+                const brandInfo = BRAND_CHOICES.find((c) => c.key === p.brand);
+                return (
+                  <div
+                    key={p.id}
+                    data-project-id={p.id}
+                    data-project-name={p.name}
+                    className="group relative flex flex-col overflow-hidden rounded-2xl border border-hero-line bg-hero-card transition hover:border-hero-line-strong hover:bg-hero-card-hover"
+                  >
+                    <div className="relative aspect-video w-full overflow-hidden bg-ui-accent">
+                      {thumbnails[p.id] && thumbnails[p.id] !== 'error' && (
+                        // eslint-disable-next-line @next/next/no-img-element -- fixed-size card thumbnail, not a content image
+                        <img src={thumbnails[p.id] as string} alt="" className="h-full w-full object-cover" />
+                      )}
+                    </div>
+                    <button onClick={() => router.push(`/p/${p.id}/edit`)} className="flex flex-1 flex-col items-start gap-3 p-5 text-left">
+                      {brandInfo && (
+                        <span className="rounded-full bg-ui-accent-soft px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ui-accent">
+                          {brandInfo.label}
+                        </span>
+                      )}
+                      <span className="block w-full truncate font-chrome-display text-base font-semibold text-hero-ink">{p.name}</span>
+                      <span className="block font-chrome-body text-xs text-hero-ink-3">
                         {p.client ? `${p.client} · ` : ''}
                         {p.date}
                       </span>
-                    </span>
-                  </button>
-                  {confirmDeleteId === p.id ? (
-                    <span className="flex flex-shrink-0 items-center gap-3 text-xs font-semibold">
-                      <button onClick={() => handleDelete(p.id)} className="flex items-center gap-1.5 text-ui-danger hover:text-ui-danger-ink">
-                        <IconTrash className="h-3.5 w-3.5" /> Delete
-                      </button>
-                      <button onClick={() => setConfirmDeleteId(null)} className="text-hero-ink-3 hover:text-hero-ink">
-                        Cancel
-                      </button>
-                    </span>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => setConfirmDeleteId(p.id)}
-                        className="flex-shrink-0 text-hero-ink-3 hover:text-ui-danger"
-                        aria-label={`Delete ${p.name}`}
-                        title={`Delete ${p.name}`}
-                      >
-                        <IconTrash className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => router.push(`/p/${p.id}/edit`)} className="flex-shrink-0 text-xs font-semibold text-hero-ink-2 hover:text-hero-ink">
+                    </button>
+                    <div className="flex items-center justify-between px-5 pb-4">
+                      {confirmDeleteId === p.id ? (
+                        <span className="flex items-center gap-3 text-xs font-semibold">
+                          <button onClick={() => handleDelete(p.id)} className="flex items-center gap-1.5 text-ui-danger hover:text-ui-danger-ink">
+                            <IconTrash className="h-3.5 w-3.5" /> Delete
+                          </button>
+                          <button onClick={() => setConfirmDeleteId(null)} className="text-hero-ink-3 hover:text-hero-ink">
+                            Cancel
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteId(p.id)}
+                          className="text-hero-ink-3 opacity-0 transition hover:text-ui-danger group-hover:opacity-100"
+                          aria-label={`Delete ${p.name}`}
+                          title={`Delete ${p.name}`}
+                        >
+                          <IconTrash className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button onClick={() => router.push(`/p/${p.id}/edit`)} className="ml-auto text-xs font-semibold text-hero-ink-2 hover:text-hero-ink">
                         Open →
                       </button>
-                    </>
-                  )}
-                </div>
-              ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </>
         ) : (

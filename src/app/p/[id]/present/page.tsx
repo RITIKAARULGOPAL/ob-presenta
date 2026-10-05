@@ -90,15 +90,26 @@ export default function PresenterPage({ params }: { params: Promise<{ id: string
     // is rewritten on every slide change below, and none of that should
     // re-run this.
     const requested = new URLSearchParams(window.location.search).get('slide');
+    function start(slides: Slide[]) {
+      // The store steps over skipped slides only in presenter mode, and the
+      // deck may well open on one.
+      setMode('presenter');
+      const first = resolveStartSlide(slides, requested);
+      if (first) selectSlide(first.id);
+      setReady(true);
+    }
+    // Coming from the editor, present exactly what's on screen. A re-fetch
+    // would drop anything the database can't hold yet (logo, accent, fonts
+    // while migrations 0003–0005 are missing).
+    const inMemory = useEditorStore.getState().project;
+    if (inMemory?.id === id) {
+      start(inMemory.slides);
+      return;
+    }
     getProject(id).then((p) => {
       if (p) {
         loadProject(p);
-        // The store steps over skipped slides only in presenter mode, and the
-        // deck may well open on one.
-        setMode('presenter');
-        const start = resolveStartSlide(p.slides, requested);
-        if (start) selectSlide(start.id);
-        setReady(true);
+        start(p.slides);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -32,6 +32,33 @@ or re-explain anything.
 
 ---
 
+## 2026-10-05 (cont'd) — Stage controls into the panel; 3002 worktree merged
+
+**Done:**
+- `77da3b2`: "+ Stage" removed from `PlanTimeline` (the panel's `StageList`
+  already had "+ Add stages"); Split style (Fade/Burst) moved from the slide
+  into Properties → Linked View Tools via two new `LinkedViewToolbarSnapshot`
+  fields (`splitAnimation`, `onSetSplitAnimation`; null on non-layout views).
+- Merged `worktree-presenta-parallel` (the 3002 worktree, branched at
+  `67aea39`, work was all uncommitted) as `ec016af` (export no longer hangs
+  on an empty `<img>` slot) + `fe4d5be` (Home hero/toolbar/card grid with
+  first-slide thumbnails via `captureThumbnail.ts`), merge `0e8604b`. No
+  conflicts; B19's `handleDelete` fix survived in `page.tsx`.
+- Verified on 3001: tsc/eslint clean, Home renders with thumbnails, opening
+  a deck from Home loads the right project (thumbnail code borrows the store),
+  Split style toggles from the panel and is gone from the slide.
+
+**Watch out for:**
+- "Ecom Express" has a `file:///` image in its first slide, so its thumbnail
+  capture fails and the card shows a plain fill. Data, not code.
+- The 3002 worktree still exists, with only its port-3002 `launch.json`
+  change and a pending file left. Remove it when no longer needed.
+
+**Left off / next up:**
+- Delete scratch deck `proj_8i77grpxmumdc4qk`. Not pushed — don't push until asked.
+
+---
+
 ## 2026-10-05 — W1 bug sweep
 
 **Done:**

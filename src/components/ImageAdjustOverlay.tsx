@@ -37,6 +37,12 @@ export function ImageAdjustOverlay({
   // snapshot from the render that was current when the drag began.
   const liveRef = useRef(t);
   liveRef.current = t;
+  // Mirror onChange into a ref so onPointerMove/onPointerUp don't change
+  // identity when the parent re-renders with a new inline onChange — a
+  // changed identity triggers the cleanup useEffect, removing the window
+  // listeners mid-drag and stopping the drag after the first pointermove.
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   const dragRef = useRef<{ kind: DragKind; startX: number; startY: number; startT: typeof t; center: Point } | null>(null);
 
@@ -49,7 +55,7 @@ export function ImageAdjustOverlay({
 
       if (drag.kind === 'pan') {
         const limit = maxPan(drag.startT.zoom);
-        onChange({
+        onChangeRef.current({
           ...drag.startT,
           panX: clamp(drag.startT.panX + (e.clientX - drag.startX) / rect.width, -limit, limit),
           panY: clamp(drag.startT.panY + (e.clientY - drag.startY) / rect.height, -limit, limit),
@@ -59,7 +65,7 @@ export function ImageAdjustOverlay({
         const now = distance(drag.center, { x: e.clientX, y: e.clientY });
         const zoom = clamp(drag.startT.zoom * (start > 0 ? now / start : 1), MIN_ZOOM, MAX_ZOOM);
         const limit = maxPan(zoom);
-        onChange({
+        onChangeRef.current({
           ...drag.startT,
           zoom,
           panX: clamp(drag.startT.panX, -limit, limit),
@@ -74,10 +80,10 @@ export function ImageAdjustOverlay({
         const startAngle = Math.atan2(drag.startY - drag.center.y, drag.startX - drag.center.x);
         const nowAngle = Math.atan2(e.clientY - drag.center.y, e.clientX - drag.center.x);
         const deltaDeg = ((nowAngle - startAngle) * 180) / Math.PI;
-        onChange({ ...drag.startT, rotation: drag.startT.rotation + deltaDeg });
+        onChangeRef.current({ ...drag.startT, rotation: drag.startT.rotation + deltaDeg });
       }
     },
-    [frameRef, onChange],
+    [frameRef],
   );
 
   const onPointerUp = useCallback(() => {

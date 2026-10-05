@@ -140,7 +140,7 @@ export function SlideRail() {
                   selectSlide(slide.id);
                 }
               }}
-              className={`group relative aspect-video cursor-pointer overflow-hidden rounded-md border-2 text-left transition ${
+              className={`group relative aspect-video shrink-0 cursor-pointer overflow-hidden rounded-md border-2 text-left transition ${
                 slide.id === currentSlideId ? 'border-ui-accent-line' : 'border-transparent hover:border-ui-line-strong'
               } ${isSelected ? 'ring-2 ring-ui-accent ring-offset-1' : ''} ${isDragging ? 'opacity-40' : ''}`}
             >

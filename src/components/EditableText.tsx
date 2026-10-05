@@ -63,6 +63,6 @@ export function EditableText({
     style,
     // Editor-only, so a hint can never reach a rendered deck.
     'data-placeholder': editable ? placeholder : undefined,
-    onBlur: (e: React.FocusEvent<HTMLElement>) => onChange(e.currentTarget.textContent ?? ''),
+    onBlur: (e: React.FocusEvent<HTMLElement>) => onChange(e.currentTarget.innerText ?? ''),
   });
 }

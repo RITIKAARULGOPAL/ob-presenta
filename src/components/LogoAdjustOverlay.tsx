@@ -40,6 +40,8 @@ export function LogoAdjustOverlay({
   const liveRef = useRef(t);
   liveRef.current = t;
   const wrapRef = useRef<HTMLDivElement>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
   const dragRef = useRef<{ kind: DragKind; startX: number; startY: number; startT: typeof t; center: Point } | null>(null);
 
   const onPointerMove = useCallback((e: PointerEvent) => {
@@ -49,7 +51,7 @@ export function LogoAdjustOverlay({
       const start = distance(drag.center, { x: drag.startX, y: drag.startY });
       const now = distance(drag.center, { x: e.clientX, y: e.clientY });
       const zoom = clamp(drag.startT.zoom * (start > 0 ? now / start : 1), MIN_ZOOM, MAX_ZOOM);
-      onChange({ ...drag.startT, zoom });
+      onChangeRef.current({ ...drag.startT, zoom });
     } else {
       // Rotate by how far the pointer has swung around the center since the
       // drag started, not by its absolute angle — see ImageAdjustOverlay for
@@ -58,9 +60,9 @@ export function LogoAdjustOverlay({
       const startAngle = Math.atan2(drag.startY - drag.center.y, drag.startX - drag.center.x);
       const nowAngle = Math.atan2(e.clientY - drag.center.y, e.clientX - drag.center.x);
       const deltaDeg = ((nowAngle - startAngle) * 180) / Math.PI;
-      onChange({ ...drag.startT, rotation: drag.startT.rotation + deltaDeg });
+      onChangeRef.current({ ...drag.startT, rotation: drag.startT.rotation + deltaDeg });
     }
-  }, [onChange]);
+  }, []);
 
   const onPointerUp = useCallback(() => {
     dragRef.current = null;

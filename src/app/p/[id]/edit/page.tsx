@@ -446,7 +446,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               {layouts.map((k) => (
                 <MenuItem
                   key={k}
-                  selected={currentSlide.layout === k && currentSlide.style === 'standard'}
+                  selected={currentSlide.layout === k}
                   onClick={() => changeLayout(k)}
                 >
                   {LAYOUT_LABELS[k]}

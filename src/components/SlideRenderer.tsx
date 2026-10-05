@@ -3955,7 +3955,7 @@ function LinkedViewsExplorer({ slide, editable, silent, interactive = editable, 
                   <input
                     value={pendingBoqNote}
                     onChange={(e) => setPendingBoqNote(e.target.value)}
-                    placeholder="BOQ note (placeholder — real table coming later)"
+                    placeholder="BOQ note"
                     className="w-full rounded-md border border-[var(--line)] px-2 py-1 text-xs outline-none"
                   />
                   <textarea
@@ -4563,7 +4563,7 @@ export function SlideRenderer({ slide, editable, animate = false, silent = false
           />
         </div>
       ) : slide.layout === 'title-slide' ? (
-        <div className="relative text-center">
+        <div className="relative isolate text-center">
           <HeroVideo url={slide.fields.heroVideoUrl} editable={editable} onChangeUrl={(url) => updateField('heroVideoUrl', url)} />
           <div className="relative">
             <Kicker slide={slide} editable={editable} />

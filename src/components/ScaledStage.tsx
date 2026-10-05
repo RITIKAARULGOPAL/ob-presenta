@@ -104,7 +104,7 @@ export function ScaledStage({
             width: STAGE_W,
             height: STAGE_H,
             transform: `scale(${scale})`,
-            transformOrigin: 'center',
+            transformOrigin: 'top left',
             visibility: scale ? 'visible' : 'hidden',
           }}
         >

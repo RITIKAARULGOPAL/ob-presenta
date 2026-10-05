@@ -316,7 +316,8 @@ export function PropertiesPanel() {
       >
         <input
           value={slide.designOption ?? ''}
-          onChange={(e) => setDesignOption(e.target.value.trim() || undefined)}
+          onChange={(e) => setDesignOption(e.target.value || undefined)}
+          onBlur={(e) => setDesignOption(e.target.value.trim() || undefined)}
           placeholder="e.g. Option 1, Scheme West"
           title="Groups this slide with others tagged the same — a Concept, Layout and Renders for one design option. Leave blank for a slide that doesn't belong to any option."
           list="design-options"

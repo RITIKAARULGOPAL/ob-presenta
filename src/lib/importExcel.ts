@@ -18,8 +18,16 @@ const LABEL_HEADERS = ['area', 'room', 'name', 'label'];
 const REQUIRED_HEADERS = ['required', 'req'];
 const ACHIEVED_HEADERS = ['achieved', 'actual', 'count', 'value'];
 
-function findColumn(header: string[], candidates: string[]): number {
-  return header.findIndex((h) => candidates.some((c) => h.toLowerCase().includes(c)));
+function findColumn(header: string[], candidates: string[], exclude: number[] = []): number {
+  const lc = header.map((h) => h.toLowerCase());
+  // 1. Exact whole-header match
+  const exact = lc.findIndex((h, i) => !exclude.includes(i) && candidates.includes(h));
+  if (exact >= 0) return exact;
+  // 2. Whole-word match (e.g. "Zone Name" contains word "zone" but not "area")
+  const word = lc.findIndex((h, i) => !exclude.includes(i) && candidates.some((c) => new RegExp(`\\b${c}\\b`).test(h)));
+  if (word >= 0) return word;
+  // 3. Substring (legacy fallback)
+  return lc.findIndex((h, i) => !exclude.includes(i) && candidates.some((c) => h.includes(c)));
 }
 
 /** Reads the first sheet of a workbook and extracts seating rows. Header-
@@ -38,9 +46,9 @@ export async function parseSeatingWorkbook(file: File): Promise<SeatingImportRow
 
   const headerRow = rows[0].map((c) => String(c ?? '').trim());
   let zoneCol = findColumn(headerRow, ZONE_HEADERS);
-  let labelCol = findColumn(headerRow, LABEL_HEADERS);
-  let requiredCol = findColumn(headerRow, REQUIRED_HEADERS);
-  let achievedCol = findColumn(headerRow, ACHIEVED_HEADERS);
+  let labelCol = findColumn(headerRow, LABEL_HEADERS, [zoneCol]);
+  let requiredCol = findColumn(headerRow, REQUIRED_HEADERS, [zoneCol, labelCol]);
+  let achievedCol = findColumn(headerRow, ACHIEVED_HEADERS, [zoneCol, labelCol, requiredCol]);
   const hasHeader = zoneCol >= 0 || labelCol >= 0 || requiredCol >= 0 || achievedCol >= 0;
 
   let dataRows = rows;

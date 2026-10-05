@@ -232,7 +232,7 @@ function dropLinksTo(slide: Slide, deletedId: string): Slide {
   const linked = slide.fields.linkedSlideIds?.filter((id) => id !== deletedId);
   const views = slide.fields.views?.map((v) =>
     v.hotspots?.some((h) => h.targetSlideId === deletedId)
-      ? { ...v, hotspots: v.hotspots.filter((h) => h.targetSlideId !== deletedId) }
+      ? { ...v, hotspots: v.hotspots.map((h) => h.targetSlideId === deletedId ? { ...h, targetSlideId: undefined } : h) }
       : v,
   );
 
@@ -407,6 +407,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       currentSlideId: stillSelected ? currentSlideId : (previous.slides[0]?.id ?? null),
       undoStack: undoStack.slice(0, -1),
       redoStack: [...redoStack, project].slice(-MAX_HISTORY),
+      selectedSlideIds: [],
+      selectionAnchor: null,
     });
     persist(previous);
   },
@@ -421,6 +423,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       currentSlideId: stillSelected ? currentSlideId : (nextProject.slides[0]?.id ?? null),
       undoStack: [...undoStack, project].slice(-MAX_HISTORY),
       redoStack: redoStack.slice(0, -1),
+      selectedSlideIds: [],
+      selectionAnchor: null,
     });
     persist(nextProject);
   },
@@ -587,6 +591,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   changeLayout: (layout) => {
     const { project, currentSlideId } = get();
     if (!project || !currentSlideId) return;
+    const current = project.slides.find((s) => s.id === currentSlideId);
+    if (current?.layout === layout && current?.style === 'standard') return;
     const slides = project.slides.map((s) =>
       s.id === currentSlideId ? { ...s, layout, style: 'standard' as const, fields: defaultFieldsForLayout(layout) } : s
     );
@@ -596,6 +602,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   changeStyle: (style) => {
     const { project, currentSlideId } = get();
     if (!project || !currentSlideId) return;
+    const current = project.slides.find((s) => s.id === currentSlideId);
+    if (current?.style === style) return;
     const slides = project.slides.map((s) =>
       s.id === currentSlideId
         ? {

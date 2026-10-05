@@ -111,9 +111,13 @@ export default function HomePage() {
   }
 
   async function handleDelete(id: string) {
-    setProjects((prev) => prev.filter((p) => p.id !== id));
     setConfirmDeleteId(null);
-    await deleteProject(id);
+    try {
+      await deleteProject(id);
+      setProjects((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      console.error('Could not delete project:', err);
+    }
   }
 
   return (

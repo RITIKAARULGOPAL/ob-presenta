@@ -48,6 +48,10 @@ export interface LinkedViewToolbarSnapshot {
   /** Set while the stage on show is the Site analysis stage, or one that can
    *  become it (S2). */
   site: SiteToolsSnapshot | null;
+  /** Current split-animation style for Layout views; null for other kinds
+   *  (Render, Axo) that don't have a zone burst/fade concept. */
+  splitAnimation: 'fade' | 'burst' | null;
+  onSetSplitAnimation: ((v: 'fade' | 'burst') => void) | null;
 }
 
 /** What's picked to place on a Site analysis plan (S2), plus the region

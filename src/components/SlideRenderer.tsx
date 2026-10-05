@@ -1840,9 +1840,11 @@ function LinkedViewsExplorer({ slide, editable, silent, interactive = editable, 
         active.kind === 'layout' && activeStage && (activeStage.siteAnalysis || canSetUpSiteAnalysis(active, activeStage))
           ? { slideId: slide.id, viewId: active.id, stageId: activeStage.id, ready: !!activeStage.siteAnalysis, onPlace: placeSite }
           : null,
+      splitAnimation: active.kind === 'layout' ? (active.splitAnimation ?? 'fade') : null,
+      onSetSplitAnimation: active.kind === 'layout' ? (v: 'fade' | 'burst') => setView(active.id, { splitAnimation: v }) : null,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editable, stageUrl, active.kind, active.id, active.stages, activeStage?.id, active.zoomPanEnabled, displayNorthDeg, northLocked, calibration, calibrationLocked, pickMode, regionTool]);
+  }, [editable, stageUrl, active.kind, active.id, active.stages, activeStage?.id, active.zoomPanEnabled, displayNorthDeg, northLocked, calibration, calibrationLocked, pickMode, regionTool, active.splitAnimation]);
 
   // Unmount only, and only for the editable instance (see above) — clears
   // the registration so a different slide's Properties panel never shows a
@@ -2728,35 +2730,10 @@ function LinkedViewsExplorer({ slide, editable, silent, interactive = editable, 
             activeStageId={activeStage?.id}
             editable={editable}
             onSelect={selectStage}
-            onAddStages={addStagesToView}
             onRenameStage={renameStageOfView}
             onMoveStage={moveStageOfView}
             onRequestDeleteStage={requestDeleteStage}
-            onOpenPicker={cancelDrawing}
           />
-        </div>
-      )}
-      {editable && active.kind === 'layout' && (
-        <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2">
-          <span className="text-[11px] font-medium text-[var(--ink-3)]">Split style:</span>
-          {([
-            ['fade', 'Fade'],
-            ['burst', 'Burst'],
-          ] as const).map(([style, label]) => (
-            <button
-              key={style}
-              onClick={() => setView(active.id, { splitAnimation: style })}
-              title="How a hotspot with no same-id match on the other stage animates when it names (or is named by) a parent zone via 'Parent zone' in the hotspot popup"
-              className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold transition ${
-                (active.splitAnimation ?? 'fade') === style
-                  ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
-                  : 'border-[var(--line)] text-[var(--ink-3)] hover:border-[var(--ink-3)]'
-              }`}
-            >
-              <SplitStylePreviewIcon variant={style} />
-              {label}
-            </button>
-          ))}
         </div>
       )}
       {activeOverlay === 'zoning' && !overlayHidden && zoneCategories.length > 0 && (

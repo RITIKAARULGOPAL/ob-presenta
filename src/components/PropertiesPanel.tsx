@@ -9,6 +9,7 @@ import { IconImage, IconLink, IconDroplet, IconType, IconLayers, IconCompass, Ic
 import type { Brand, SectionIconKey } from '@/types/slide';
 import { LINKED_VIEW_DRAW_TOOLS } from './SlideRenderer';
 import { StageList } from './StageEditing';
+import { SplitStylePreviewIcon } from './SplitStylePreviewIcon';
 import { SitePanel } from './SitePanel';
 
 type SectionKey = 'designOption' | 'sectionIcon' | 'background' | 'logo' | 'linkedSlides' | 'accent' | 'typography';
@@ -186,6 +187,26 @@ export function PropertiesPanel() {
           {/* The same stage actions as the timeline on the slide (S1, F8),
               at a size that's comfortable to use. */}
           <StageList stages={linkedViewToolbar.stages} />
+          {linkedViewToolbar.splitAnimation !== null && (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-ui-ink-3">Split style</span>
+              {(['fade', 'burst'] as const).map((style) => (
+                <button
+                  key={style}
+                  onClick={() => linkedViewToolbar.onSetSplitAnimation!(style)}
+                  title="How a hotspot animates when it names (or is named by) a parent zone via 'Parent zone' in the hotspot popup"
+                  className={`flex items-center gap-1.5 rounded-ui-sm border px-2 py-1 text-[11px] font-semibold transition ${
+                    linkedViewToolbar.splitAnimation === style
+                      ? 'border-ui-accent-line bg-ui-accent-soft text-ui-accent'
+                      : 'border-ui-line text-ui-ink-3 hover:border-ui-line-strong'
+                  }`}
+                >
+                  <SplitStylePreviewIcon variant={style} />
+                  {style === 'fade' ? 'Fade' : 'Burst'}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="mt-4 border-t border-ui-line-soft pt-3" />
           {!linkedViewToolbar.hasImage ? (
             <p className="text-[11px] leading-snug text-ui-ink-3">

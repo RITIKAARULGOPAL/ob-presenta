@@ -56,7 +56,7 @@ shorten this. Adjust the weeks for holidays and review time.
 |---|---|---|---|---|
 | W1 | Sep 28–Oct 2 | Stop losing work + quick fixes | B1–B7, B9–B20, B22, V1, V2, U6, U17, U19, L1, L2, sectionIcon | ~26h |
 | W1 (you) | Sep 28–Oct 2 | Only you can do these | Run migrations 0003–0005, send the image for B8, clean the Ecom stray seating link, decide U1/B12/B22, Presenter reload check in a real browser | ~1h |
-| W2 | Oct 5–9 | Presenter ready for meetings + safe saves | B21, U1–U5, F4, X6, ~~two Linked Views checks~~ (done 09-28), export-time check, CHANGELOG catch-up | ~29h |
+| W2 | Oct 5–9 | Presenter ready for meetings + safe saves | B21, U1–U5, F4, X6, ~~two Linked Views checks~~ (done 09-28), export-time check, ~~CHANGELOG catch-up~~ (done 10-05) | ~29h |
 | W3 | Oct 12–16 | Editor UX pass | U8–U10, U12–U16, U18, U20, U21 | ~29h |
 | W4–5 | Oct 19–30 | Crisp PDF + PPTX exports, optional stages | X3, X4, ~~S1~~, ~~F8~~ (done 09-28) | 4–7d |
 | W6–8 | Nov 2–18 | Site analysis stage | S2 (plan waiting for sign-off) | 2.5–3w |
@@ -116,6 +116,8 @@ shorten this. Adjust the weeks for holidays and review time.
 - [x] ~~Design Option tagging across slide types (multiple design options per project)~~ (2026-09-22)
 - [x] ~~Properties panel: collapsible `Disclosure` sections~~ (2026-09-24)
 - [x] ~~Linked Views canvas toolbar moved into the Properties panel~~ (2026-09-25)
+- [x] ~~"+ Stage" and Split style (Fade/Burst) moved off the slide into the
+      Properties panel~~ (2026-10-05, `77da3b2`)
 - [x] ~~Per-slide Background (color/image/darken)~~ (2026-09-17)
 - [ ] `Slide.sectionIcon` picker — decide keep-or-remove now that the
       Presenter sidebar dropped its own icon rendering (A) · **30m · W1**
@@ -345,6 +347,10 @@ projector.
       poster frame is taken from the video on upload. Needs F6 (Storage),
       and big walkthroughs need a paid Supabase plan, because the free
       plan's file-size limit is too small (C) · **4–6d · W12–13**
+      **Started 2026-10-05:** hero and walkthrough videos now upload from a
+      file picker or drag-drop to a Supabase Storage `media` bucket
+      (migration 0006, 50 MB cap); the paste-URL boxes are gone. Still to do:
+      progress/resume, poster frames, lazy loading, PDF/PPTX handling.
 
 ## Concept library / imports
 
@@ -408,7 +414,7 @@ trace). The full report is in
 given in chat. Severity runs from P0 (blocking) to P3 (polish).
 
 ### Bugs (confirmed)
-- [ ] **B1 P0** Rail thumbnails squash to 4–9px on decks longer than about 7 slides.
+- [x] ~~**B1 P0**~~ (2026-10-05, `d7da69d`) Rail thumbnails squash to 4–9px on decks longer than about 7 slides.
       Each tile is a flex item with `overflow-hidden` and no `shrink-0`
       (`SlideRail.tsx:141`) (B) · **15m · W1**
 - [ ] **B2 P1** Delete/Backspace deletes the whole slide whenever focus isn't
@@ -416,7 +422,7 @@ given in chat. Severity runs from P0 (blocking) to P3 (polish).
       remove the last point) and right after clicking an image. Backspace in the
       new-region popup's inputs removes a shape point instead of a letter
       (`edit/page.tsx:126-131`, `SlideRenderer.tsx:1282-1305`) (C) · **2h · W1**
-- [ ] **B3 P1** Changing Layout or Style replaces the fields with defaults,
+- [x] ~~**B3 P1**~~ (2026-10-05, `d7da69d`) Changing Layout or Style replaces the fields with defaults,
       even when re-picking the current one. Style also forces the layout
       (`editorStore.ts:496-518`) (C) · **½d · W1**
 - [ ] **B4 P1** Presenter always re-fetches the deck and calls `loadProject`.
@@ -424,18 +430,23 @@ given in chat. Severity runs from P0 (blocking) to P3 (polish).
       the editor keeps that copy, so the next edit overwrites the save that was
       in flight. `mode` also stays `presenter` (`present/page.tsx:52-65`,
       `edit/page.tsx:73-76`, `editorStore.ts:242-250`) (C) · **½d · W1**
-- [ ] **B5 P1** Image and logo adjust drags stop after the first pointermove.
+      **Partly fixed 2026-10-05 (uncommitted):** Present from the editor now
+      reuses the in-memory deck (no re-fetch, undo kept, accent/logo/fonts
+      show even while migrations 0003–0005 are missing). A direct link or a
+      reload in Presenter still fetches. `mode` staying `presenter` not
+      re-checked, though the editor was editable again after Esc.
+- [x] ~~**B5 P1**~~ (2026-10-05, `d7da69d`) Image and logo adjust drags stop after the first pointermove.
       The inline `onChange` changes `onPointerMove`'s identity, and the cleanup
       effect then removes the window listeners. This is the same bug that was
       fixed in `FreeformElementWrapper` on 09-21 (`ImageAdjustOverlay.tsx:43-96`,
       `LogoAdjustOverlay.tsx:45-78`, `onChange` at `SlideRenderer.tsx:378`) (B)
       · **1h · W1**
-- [ ] **B6 P1** The hero video and background image are `-z-10` inside a
+- [x] ~~**B6 P1**~~ (2026-10-05, `d7da69d`) The hero video and background image are `-z-10` inside a
       wrapper that isn't isolated, so the wrapper's own background paints over
       them and the hero title becomes white on white. A background image is also
       hidden whenever a colour is set (`SlideRenderer.tsx:537-545, 4029-4035`;
       fix: `isolate`) (C) · **30m · W1**
-- [ ] **B7 P1** At 100% the editor canvas is off-centre and clipped (at
+- [x] ~~**B7 P1**~~ (2026-10-05, `d7da69d`) At 100% the editor canvas is off-centre and clipped (at
       1440×900: 192px empty on the left, the right 21% cut off). The cause is a
       1280px layout box with `margin:auto` and a scale from the centre. When
       zoomed in, the top-left can't be scrolled to (`ScaledStage.tsx:98-110`) (B)
@@ -443,13 +454,13 @@ given in chat. Severity runs from P0 (blocking) to P3 (polish).
 - [ ] **B8 P1** The Ecom Express deck uses `/demo-assets/layout.jpg`, which
       doesn't exist (404). Needs the right image from the user (C)
       · **15m · W1 (after you send the image)**
-- [ ] **B9 P2** Line breaks are dropped on save because `EditableText` saves
+- [x] ~~**B9 P2**~~ (2026-10-05, `d7da69d`) Line breaks are dropped on save because `EditableText` saves
       `textContent` (`EditableText.tsx:66`) (B) · **1h · W1**
 - [ ] **B10 P2** Linked Views viewer state (zoom, measure mode, a half-drawn
       shape, an open popup) carries over to the next Linked Views slide. There's
       no `key={slide.id}` (`present/page.tsx:143`, `edit/page.tsx:423`) (B)
       · **30m · W1**
-- [ ] **B11 P2** Deleting a slide deletes every hotspot elsewhere that
+- [x] ~~**B11 P2**~~ (2026-10-05, `d7da69d`) Deleting a slide deletes every hotspot elsewhere that
       targets it, with its gallery, space detail and seating links, instead of
       just unlinking it (`editorStore.ts:144-164`) (C) · **1h · W1**
 - [ ] **B12 P2** The Add slide menu offers the E-Com Express client's
@@ -458,7 +469,7 @@ given in chat. Severity runs from P0 (blocking) to P3 (polish).
 - [ ] **B13 P2** The client logo's size, rotation and opacity are never
       saved: there's no field in the save/load row and no column
       (`data.ts:180-194`) (C) · **1h · W1 + a migration you run**
-- [ ] **B14 P3** The Design Option input trims on every keystroke, so
+- [x] ~~**B14 P3**~~ (2026-10-05, `d7da69d`) The Design Option input trims on every keystroke, so
       "Option 1" becomes "Option1" (`PropertiesPanel.tsx:297`) (B) · **15m · W1**
 - [ ] **B15 P3** In Presenter, Space and the arrow keys always change slide.
       A walkthrough video can't be paused, and the arrows act behind the
@@ -469,12 +480,12 @@ given in chat. Severity runs from P0 (blocking) to P3 (polish).
       store's `updateLinkedView`, which patches the view as it is in the deck,
       and the panel's snapshot re-registers when the stages change. Verified:
       rename, then North drag and Unlock from the panel, and the name stays.
-- [ ] **B17 P3** Undo and redo leave stale multi-selection ids, showing a
+- [x] ~~**B17 P3**~~ (2026-10-05, `d7da69d`) Undo and redo leave stale multi-selection ids, showing a
       phantom "N selected" toolbar (`editorStore.ts:307-335`) (C) · **30m · W1**
-- [ ] **B18 P3** Excel import matches headers by substring, so "Zone Name"
+- [x] ~~**B18 P3**~~ (2026-10-05, `d7da69d`) Excel import matches headers by substring, so "Zone Name"
       hits the area column; with no zone column, every row becomes its own zone
       (`importExcel.ts:21-58`) (B) · **1h · W1**
-- [ ] **B19 P3** Deleting a project on Home removes the row even when the
+- [x] ~~**B19 P3**~~ (2026-10-05, `d7da69d`) Deleting a project on Home removes the row even when the
       delete fails, because errors are swallowed (`page.tsx:114-116`,
       `data.ts:204-207`) (B) · **30m · W1**
 - [ ] **B20 P3** At phone width, Presenter's controls pill can overlap the
@@ -542,21 +553,25 @@ given in chat. Severity runs from P0 (blocking) to P3 (polish).
 - [ ] **U16** The migration banner can't be dismissed and tells users to run
       SQL, and the controls it warns about stay enabled. Error messages show raw
       database errors and "see console" (B) · **2h · W3**
-- [ ] **U17** The Layout menu only shows its ✓ when the style is Standard
+- [x] ~~**U17**~~ (2026-10-05, `d7da69d`) The Layout menu only shows its ✓ when the style is Standard
       (`edit/page.tsx:357`) (B) · **15m · W1**
 - [ ] **U18** Rail thumbnails lay slides out at 652px wide, not 1280, so text
       wraps differently from the real slide (B) · **2h · W3**
-- [ ] **U19** The copy "BOQ note (placeholder — real table coming later)" is
+- [x] ~~**U19**~~ (2026-10-05, `d7da69d`) The copy "BOQ note (placeholder — real table coming later)" is
       visible to users (C) · **15m · W1**
 - [ ] **U20** The only way back to Home is the "P" badge (B) · **30m · W3**
 - [ ] **U21** Menus use `role=menu` but have no arrow-key navigation, and
       their triggers lack `aria-haspopup` (B) · **2h · W3**
 - [ ] **U22** Exporting 163 slides has no cancel and no time estimate (B)
       · **½d · W15**
+- [x] ~~Export hung forever on a slide with an empty image slot~~
+      (2026-10-05, `ec016af`)
 
 ### Home UX
 - [ ] **U23** Duplicate names (5× "Ecom Express", 4× "xx") can't be told
       apart, and there are no thumbnails or client logos (B) · **2h · W14**
+      **Partly done 2026-10-05 (`fe4d5be`):** cards now show a first-slide
+      thumbnail; duplicate names and client logos on cards are still open.
 - [ ] **U24** At 1024×700 the first project row starts at y=510 (B) · **1h · W14**
 - [ ] **U25** "Presentation date" is read-only. Search says "name or client"
       but there's no client field. The heading says "New presentation" and the
@@ -565,11 +580,11 @@ given in chat. Severity runs from P0 (blocking) to P3 (polish).
       sits 16px from "Open →" (B) · **30m · W14**
 
 ### Visual system & accessibility
-- [ ] **V1** `--app-ink-3` (`#8a93a3`) measures 2.7–3.1:1 on panel headers,
+- [x] ~~**V1**~~ (2026-10-05, `d7da69d`) `--app-ink-3` (`#8a93a3`) measures 2.7–3.1:1 on panel headers,
       "Slide 1 of 7", the footer hints and "Powered by Officebanao" (2.8:1). It
       was 4.8:1 after the 09-21 pass. Use about `#636b7a`
       (`globals.css:59, 102`) (B) · **30m · W1**
-- [ ] **V2** Most chrome text renders in the `body` Arial default
+- [x] ~~**V2**~~ (2026-10-05, `d7da69d`) Most chrome text renders in the `body` Arial default
       (`globals.css:307`); the Helvetica stack only reaches a few elements (B)
       · **30m · W1**
 - [ ] **V3** 10–11px chrome text: the hint strip, the "VIEWS" badges and the
@@ -594,9 +609,12 @@ given in chat. Severity runs from P0 (blocking) to P3 (polish).
       on close. A stopgap until E2 covers most of it (C) · **1d · W2**
 - [ ] **F5** Home: rename and duplicate a project, an editable date, a
       client field, thumbnails (B) · **1–2d · W14**
+      **Thumbnails done 2026-10-05 (`fe4d5be`);** the rest is open.
 - [ ] **F6** Store images in Supabase Storage instead of as base64 in the
       row (decks run up to about 5.2 MB) (C)
       · **1–2w · W8–9 (needs dashboard access)**
+      **2026-10-05:** a Storage `media` bucket now exists for videos only
+      (migration 0006, uncommitted); images still go in the row.
 - [ ] **F7** Editable PPTX export (currently one PNG per slide). Export
       also holds every slide as a 2× PNG in memory. This is the full fix
       for sharp PowerPoint text, and X4 is the interim one. PowerPoint needs

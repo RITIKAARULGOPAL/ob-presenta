@@ -32,7 +32,7 @@ or re-explain anything.
 
 ---
 
-## 2026-10-05 (cont'd) — Stage controls into the panel; 3002 worktree merged
+## 2026-10-05 (cont'd) — Stage controls into the panel; 3002 merged; video upload
 
 **Done:**
 - `77da3b2`: "+ Stage" removed from `PlanTimeline` (the panel's `StageList`
@@ -48,14 +48,53 @@ or re-explain anything.
   a deck from Home loads the right project (thumbnail code borrows the store),
   Split style toggles from the panel and is gone from the slide.
 
+- Pushed `claude/f1-presenting` to origin (first push of this branch).
+- **Video upload (uncommitted):** hero video (title slide) and walkthrough
+  video now take a file picker or drag-drop instead of a pasted URL. New
+  [videoUpload.ts](src/lib/videoUpload.ts) uploads to a Supabase Storage
+  `media` bucket and the slide keeps the public URL;
+  [0006_media_bucket.sql](supabase/migrations/0006_media_bucket.sql) creates
+  the bucket (50 MB/file, mp4/webm/mov) with open read/insert policies.
+  `HeroVideo` is now the title slide's wrapper, so the drop zone and the
+  video fill the whole slide — before, the video only covered the title
+  text block. Verified: tsc clean, no new lint; drops on both slots reach
+  the upload and show "run migration 0006" since the bucket doesn't exist
+  yet; a stand-in box confirmed the video now fills the slide.
+- Ticked the 15 W1 bug-sweep fixes in `FEATURES.md` (they'd only been
+  logged here), plus the stage-controls move, the export-hang fix, and
+  partial-progress notes on X9, U23, F5 and F6.
+- **Accent colour etc. missing in Presenter (uncommitted):** cause is the
+  missing migrations 0003–0005. Saves drop logo/accent/font/typography, the
+  editor keeps them in memory, and Presenter re-fetched the stripped row.
+  `present/page.tsx` now reuses the store's deck when its id matches (same
+  guard as `edit/page.tsx`). Verified: accent change shows in Presenter and
+  survives Esc back to the editor; a reload in Presenter still falls back
+  to black until the migrations run. The real fix is running 0003–0005.
+- Caught `CHANGELOG.md` up from 09-08 to today: all 63 commits since
+  `482c4e5`, grouped by date, plus an "Uncommitted" block for the video
+  work. Its architecture/context sections at the bottom are still 09-08.
+
 **Watch out for:**
+- **Vercel preview build of this branch fails**, while `main` builds fine
+  there. Not reproducible locally: `next build` passes (also with the
+  Supabase env blanked); lockfile is identical to main; every import
+  matches a committed file case-exactly; no large files. Needs the error
+  from the Vercel build log (Vercel connector isn't authorized, no CLI).
+- **Drive D: filled to 0 GB** mid-session (local build failed with "not
+  enough space"); the user is clearing it. Watch for odd write failures.
 - "Ecom Express" has a `file:///` image in its first slide, so its thumbnail
   capture fails and the card shows a plain fill. Data, not code.
 - The 3002 worktree still exists, with only its port-3002 `launch.json`
   change and a pending file left. Remove it when no longer needed.
+- Removing a video leaves the file in the bucket on purpose (Undo and
+  duplicated slides can still point at it); no cleanup exists yet.
 
 **Left off / next up:**
-- Delete scratch deck `proj_8i77grpxmumdc4qk`. Not pushed — don't push until asked.
+- User runs migrations 0003–0006 in the Supabase SQL Editor. Then test a
+  real video upload + playback, check accent survives a Presenter reload,
+  and commit.
+- Get the Vercel build error and fix it.
+- Delete scratch deck `proj_8i77grpxmumdc4qk`.
 
 ---
 

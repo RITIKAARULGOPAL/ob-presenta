@@ -12,8 +12,8 @@ import type { Project, Slide } from '@/types/slide';
 // are frozen-frame formats, so each slide is captured in its settled (post-
 // animation) state; entrance animations don't carry over by design.
 
-const SLIDE_W = 1280;
-const SLIDE_H = 720;
+export const SLIDE_W = 1280;
+export const SLIDE_H = 720;
 
 export type ExportProgress = (current: number, total: number) => void;
 
@@ -29,14 +29,21 @@ function sanitizeFilename(name: string): string {
  *  decoding after that commit. Rasterizing early yields a frame with its photo
  *  missing — or, since html-to-image serializes whatever it finds, one that
  *  still shows the slide before it. */
-async function settleStage(stage: HTMLElement): Promise<void> {
+export async function settleStage(stage: HTMLElement): Promise<void> {
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
   await Promise.all(
     Array.from(stage.querySelectorAll('img')).map(
       (img) =>
         new Promise<void>((res) => {
-          if (img.complete && img.naturalWidth > 0) return res();
+          // `complete` alone is the right check — per spec it's already true
+          // for a still-pending real load (false) vs. no src/empty src/a
+          // finished request (true) in every case, including a genuinely
+          // empty MediaBox slot. The old `&& naturalWidth > 0` excluded that
+          // last, zero-width-but-complete case, so an empty slot's <img>
+          // (no fetch ever dispatched, so load/error never fires) hung this
+          // wait forever — found live via a Linked Views slide's plan image.
+          if (img.complete) return res();
           img.addEventListener('load', () => res(), { once: true });
           img.addEventListener('error', () => res(), { once: true });
         })

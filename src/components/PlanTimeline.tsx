@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { StageActions, StagePicker } from './StageEditing';
+import { existingStageLabels, StageActions, StagePicker } from './StageEditing';
 
 export interface PlanTimelineStage {
   id: string;
   label: string;
+  /** The plan's Site analysis stage (S2), whatever it's called. */
+  isSite?: boolean;
 }
 
 interface PlanTimelineProps {
@@ -101,7 +103,7 @@ export default function PlanTimeline({
     <StagePicker
       surface="slide"
       suggest={variant === 'timeline'}
-      existingLabels={stages.map((s) => s.label)}
+      existingLabels={existingStageLabels(stages)}
       onAdd={(labels) => {
         onAddStages(labels);
         setPickerOpen(false);

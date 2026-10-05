@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EditableText } from './EditableText';
-import { useEditorStore, type DrawTool } from '@/lib/editorStore';
+import { EMPTY_SITE_UI, useEditorStore, type DrawTool, type SitePlacement } from '@/lib/editorStore';
 import { shadeWithBlack, tintWithWhite } from '@/lib/color';
 import { resolveTypography, headlineStyle } from '@/lib/fonts';
 import { dataUrlBytes, fileToDataUrl, fileToSlideImage } from '@/lib/imageFile';
@@ -38,11 +38,26 @@ import { LogoAdjustOverlay } from './LogoAdjustOverlay';
 import PlanTimeline from './PlanTimeline';
 import { StageDeleteDialog } from './StageDeleteDialog';
 import { SplitStylePreviewIcon } from './SplitStylePreviewIcon';
-import { addStages, deleteStage, moveStage, regionsOnlyOn, removeRegions, renameStage, type StageRegionFate } from '@/lib/linkedViewStages';
+import { SiteLayer } from './SiteLayer';
+import { SiteChecklist } from './SiteChecklist';
+import { SiteEntryCard } from './SiteEntryCard';
+import {
+  addStages,
+  defaultRegionStageIds,
+  deleteStage,
+  moveStage,
+  regionShowsOn,
+  regionsOnlyOn,
+  removeRegions,
+  renameStage,
+  type StageRegionFate,
+} from '@/lib/linkedViewStages';
+import { addSiteEntry, canSetUpSiteAnalysis, entryAnchor, entryFromPlacement, removeSiteEntry, updateSiteEntry } from '@/lib/siteAnalysis';
+import { PLAN_LAYERS, siteCategory } from '@/lib/siteChecklist';
 import { morphShapes } from '@/lib/shapeMorph';
 import { clamp, imageStyle, maxPan, MAX_ZOOM, MIN_ZOOM } from '@/lib/imageTransform';
 import { makeId } from '@/lib/id';
-import type { Brand, FreeformElement, HotspotGalleryImage, ImageTransform, LinkedView, PlanCalibration, PlanGeometry, Slide, ViewHotspot } from '@/types/slide';
+import type { Brand, FreeformElement, HotspotGalleryImage, ImageTransform, LinkedView, PlanAnnotation, PlanCalibration, PlanGeometry, Slide, ViewHotspot } from '@/types/slide';
 import type { Point } from '@/lib/hotspotShape';
 
 type PdfDocument = import('pdfjs-dist').PDFDocumentProxy;
@@ -61,6 +76,16 @@ interface SlideRendererProps {
    *  track a second time over the audience screen, or play the next slide's
    *  track early. Also export, which renders every slide off-screen. */
   silent?: boolean;
+  /** Takes clicks: a Linked Views plan's regions, site entries and layer
+   *  legend respond. Defaults to `editable`. Presenter's own slide passes it;
+   *  every copy (rail thumbnails, Presenter's dot previews, the presenter
+   *  view's panes, the concept library, export) leaves it off, so a click on
+   *  a thumbnail selects the slide rather than acting inside it. */
+  interactive?: boolean;
+  /** Rendering for export. A Linked Views plan then opens on its first stage
+   *  after Site analysis, so the picture shows the design rather than the
+   *  site survey (S2); the site plan is used only when it's the only stage. */
+  forExport?: boolean;
 }
 
 const ARROW = '→';
@@ -996,11 +1021,17 @@ function isClickTool(tool: DrawTool | null): boolean {
   return tool === 'polygon' || tool === 'spline';
 }
 
+/** A key press meant for a text field, not for the plan (B2: Backspace in
+ *  the region popup's label used to delete a point of the shape). */
+function isTypingTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+}
+
 /** A region drawn as a polygon on a source image. Editable mode: click to place
  * vertices, Finish once there are 3+, then pick the target view (+ optional video
  * timestamp); click a finished region to delete it. Non-editable (Presenter): click
  * a region to jump to its target, seeking the target video if a timestamp was set. */
-function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
+function LinkedViewsExplorer({ slide, editable, silent, interactive = editable, forExport = false }: SlideRendererProps) {
   const updateField = useEditorStore((s) => s.updateField);
   const views = slide.fields.views ?? [];
   const [activeId, setActiveId] = useState<string | undefined>(views[0]?.id);
@@ -1008,7 +1039,15 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
   const selectSlide = useEditorStore((s) => s.selectSlide);
   const setLinkedViewToolbar = useEditorStore((s) => s.setLinkedViewToolbar);
   const updateLinkedView = useEditorStore((s) => s.updateLinkedView);
-  const [tool, setTool] = useState<DrawTool | null>(null);
+  const siteUiState = useEditorStore((s) => s.siteUi);
+  const setSiteUi = useEditorStore((s) => s.setSiteUi);
+  const resetSiteUi = useEditorStore((s) => s.resetSiteUi);
+  /** The region tool picked in the Properties panel. Drawing reads `tool`,
+   *  derived further down, since a site area being placed (S2) borrows the
+   *  region shapes without picking a region tool. */
+  const [regionTool, setRegionTool] = useState<DrawTool | null>(null);
+  /** A site line being placed: the points clicked so far. */
+  const [linePoints, setLinePoints] = useState<Point[] | null>(null);
   const [drawingPoints, setDrawingPoints] = useState<Point[] | null>(null);
   /** Where the cursor is, for the rubber-band edge and the close-snap hint. */
   const [cursor, setCursor] = useState<Point | null>(null);
@@ -1063,8 +1102,12 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
    *  space-detail overlay is clicked, opening the full Lightbox on top of it. */
   const [spaceDetailGalleryIndex, setSpaceDetailGalleryIndex] = useState<number | null>(null);
   /** Which named stage is active — undefined means "no stages defined" or
-   *  "first one," both of which fall back to the view's own url/transform. */
-  const [activeStageId, setActiveStageId] = useState<string | undefined>(undefined);
+   *  "first one," both of which fall back to the view's own url/transform.
+   *  An export starts on the first stage after Site analysis instead, so the
+   *  picture shows the design (S2, decision 7). */
+  const [activeStageId, setActiveStageId] = useState<string | undefined>(() =>
+    forExport ? views[0]?.stages?.find((s) => !s.siteAnalysis)?.id : undefined,
+  );
   /** The stage whose delete dialog is open (see StageDeleteDialog). */
   const [stagePendingDelete, setStagePendingDelete] = useState<string | null>(null);
   /** A snapshot of the stage just switched *away* from, kept only for the
@@ -1080,6 +1123,9 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
     isPdfPlan: boolean | undefined;
     overlay: 'zoning' | 'circulation' | null;
     hotspots: { id: string; points: Point[]; shape: ViewHotspot['shape']; parentHotspotId: string | undefined }[];
+    /** The site layers on show when leaving the Site analysis stage, which
+     *  fade out on the same clock. */
+    site: PlanAnnotation[] | null;
   } | null>(null);
   const [transitionProgress, setTransitionProgress] = useState(1);
   const transitionRafRef = useRef<number | null>(null);
@@ -1202,6 +1248,20 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
     recompute();
     return () => observer.disconnect();
   }, []);
+  /** The natural width of whatever's beside the plan (seating table, side
+   *  list, site checklist, or nothing), which the aside animates its own
+   *  width to. The transition then drives fitSize frame by frame, so the
+   *  plan resizes smoothly when that content changes, as it does when a
+   *  stage change swaps the site checklist in or out (S2). */
+  const asideInnerRef = useRef<HTMLDivElement>(null);
+  const [asideWidth, setAsideWidth] = useState<number | null>(null);
+  useEffect(() => {
+    const el = asideInnerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => setAsideWidth(entry.contentRect.width));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
   /** Manual override for the hotspot popup's computed position — a pixel
    *  offset added on top of whatever `popupPosition()` would otherwise
    *  place it at, so dragging works regardless of which side of the shape
@@ -1276,6 +1336,122 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
   const planGeometry = activeStage?.url ? activeStage.geometry : active?.geometry;
   const snapIndex = useMemo(() => buildSnapIndex(planGeometry, FRAME_ASPECT), [planGeometry]);
 
+  // The Site analysis stage on show (S2) and its tools' state. Only the one
+  // interactive copy of this slide (the editor's canvas, or Presenter's own
+  // slide) owns the store's `siteUi`; rail thumbnails and dot previews draw
+  // every layer and never select anything.
+  const siteStage = active?.kind === 'layout' && activeStage?.siteAnalysis ? activeStage : undefined;
+  const siteScope = interactive && active && siteStage ? `${slide.id}/${active.id}/${siteStage.id}` : null;
+  const site = siteScope && siteUiState.scope === siteScope ? siteUiState : EMPTY_SITE_UI;
+  const sitePlacing = editable ? site.placing : null;
+  const siteSelected = editable ? site.selected : null;
+  /** What drawing uses: a site area being placed borrows the region shapes. */
+  const tool: DrawTool | null = sitePlacing?.kind === 'area' ? (sitePlacing.shape ?? 'polygon') : regionTool;
+
+  // A different stage (or none) on show starts the site tools fresh.
+  useEffect(() => {
+    if (!interactive) return;
+    resetSiteUi(siteScope);
+    return () => {
+      if (useEditorStore.getState().siteUi.scope === siteScope) resetSiteUi(null);
+    };
+  }, [interactive, siteScope, resetSiteUi]);
+
+  // Kept current after each render for the key handlers below, which are
+  // registered once rather than on every render.
+  const drawingPointsRef = useRef<Point[] | null>(null);
+  const linePointsRef = useRef<Point[] | null>(null);
+  const pickingTargetRef = useRef(false);
+  useEffect(() => {
+    drawingPointsRef.current = drawingPoints;
+    linePointsRef.current = linePoints;
+    pickingTargetRef.current = pickingTarget;
+  });
+  /** The drawing tools' Enter finishes a shape through finishShape, which
+   *  sits below the early return with the rest of the drawing code. The
+   *  pointer handlers that build the shape keep this pointed at the latest
+   *  one, so Enter never runs an older render's copy. */
+  const finishShapeRef = useRef<((points: Point[]) => void) | null>(null);
+
+  /** Adds what's being placed to the site stage, and selects it so its
+   *  fields show in the Properties panel. Reads the placement fresh, since
+   *  the key handlers call this from a registration made earlier. */
+  function placeSiteEntry(points: Point[], shape?: PlanAnnotation['shape']) {
+    const placing = useEditorStore.getState().siteUi.placing;
+    if (!siteStage || !active || !placing) return;
+    const entry = entryFromPlacement(placing, points, shape);
+    const stageId = siteStage.id;
+    updateLinkedView(slide.id, active.id, (v) => addSiteEntry(v, stageId, entry));
+    setSiteUi({ selected: { kind: 'entry', id: entry.id } });
+  }
+
+  function finishSiteLine() {
+    const pts = linePointsRef.current;
+    if (!pts || pts.length < 2) return;
+    placeSiteEntry(pts);
+    setLinePoints(null);
+    setCursor(null);
+  }
+
+  function stopPlacingSite() {
+    setLinePoints(null);
+    setCursor(null);
+    setSiteUi({ placing: null });
+  }
+
+  function removeSelectedSiteEntry() {
+    const sel = useEditorStore.getState().siteUi.selected;
+    if (!siteStage || !active || sel?.kind !== 'entry') return;
+    const stageId = siteStage.id;
+    updateLinkedView(slide.id, active.id, (v) => removeSiteEntry(v, stageId, sel.id));
+    setSiteUi({ selected: null });
+  }
+
+  /** The site tools' keys in the editor. Esc stops placing, or puts down the
+   *  selection; Enter and Backspace finish and undo a line; Delete or
+   *  Backspace removes the selected entry. An area being drawn uses the
+   *  region tools' own keys instead. Only these keys are claimed, so Undo and
+   *  the rest still work, and never from a text field, a menu, a dialog or
+   *  the slide rail, which own their keys (Delete in the rail removes a
+   *  slide). */
+  function onSiteKey(e: KeyboardEvent) {
+    if (e.defaultPrevented || isTypingTarget(e.target)) return;
+    if (e.target instanceof Element && e.target.closest('[role="menu"],[role="dialog"],[role="alertdialog"],[data-slide-rail]')) return;
+    const ui = useEditorStore.getState().siteUi;
+    if (ui.placing?.kind === 'area') return;
+    const claim = () => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    };
+    const line = ui.placing?.kind === 'line' ? linePointsRef.current : null;
+    if (e.key === 'Escape') {
+      claim();
+      if (ui.placing) stopPlacingSite();
+      else setSiteUi({ selected: null });
+    } else if (e.key === 'Enter' && line) {
+      claim();
+      finishSiteLine();
+    } else if (e.key === 'Backspace' && line?.length) {
+      claim();
+      setLinePoints(line.length > 1 ? line.slice(0, -1) : null);
+    } else if ((e.key === 'Delete' || e.key === 'Backspace') && ui.selected?.kind === 'entry') {
+      claim();
+      removeSelectedSiteEntry();
+    }
+  }
+  const siteKeyRef = useRef(onSiteKey);
+  useEffect(() => {
+    siteKeyRef.current = onSiteKey;
+  });
+  const siteKeysLive = editable && interactive && (!!sitePlacing || !!siteSelected);
+  useEffect(() => {
+    if (!siteKeysLive) return;
+    // Capture phase: ahead of the editor's own shortcuts.
+    const listener = (e: KeyboardEvent) => siteKeyRef.current(e);
+    window.addEventListener('keydown', listener, true);
+    return () => window.removeEventListener('keydown', listener, true);
+  }, [siteKeysLive]);
+
   function setView(id: string, patch: Partial<LinkedView>) {
     // Read the freshest views from the store rather than this render's
     // closure. MediaBox commits a url and then a transform back-to-back in
@@ -1292,20 +1468,28 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
   // Declared before the early return below so the hook order never changes.
   useEffect(() => {
     if (tool === null) return;
+    const clickTool = isClickTool(tool);
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         e.preventDefault();
         setDrawingPoints(null);
         setPickingTarget(false);
-        setTool(null);
+        setRegionTool(null);
         setCursor(null);
         setDragging(false);
-      } else if (e.key === 'Enter') {
+        // Also puts down a site area being placed (S2).
+        if (useEditorStore.getState().siteUi.placing) setSiteUi({ placing: null });
+        return;
+      }
+      // Enter and Backspace typed into the region popup belong to its
+      // fields (B2), and once the popup is open the shape is finished.
+      if (isTypingTarget(e.target) || pickingTargetRef.current) return;
+      if (e.key === 'Enter') {
         e.preventDefault();
-        setDrawingPoints((pts) => {
-          if (pts && pts.length >= 3) setPickingTarget(true);
-          return pts;
-        });
+        // Through finishShape, like the Finish button: it's what fills a new
+        // region's popup, and what commits a site area or a redrawn shape.
+        const pts = drawingPointsRef.current;
+        if (clickTool && pts && pts.length >= 3) finishShapeRef.current?.(pts);
       } else if (e.key === 'Backspace') {
         e.preventDefault();
         setDrawingPoints((pts) => (pts && pts.length > 1 ? pts.slice(0, -1) : null));
@@ -1313,7 +1497,7 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [tool]);
+  }, [tool, setSiteUi]);
 
   // Separate from the drawing-tool effect above: editing an existing
   // hotspot's label/list/style needs no tool selected at all, so it needs its
@@ -1446,12 +1630,27 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
   function cancelDrawing() {
     setDrawingPoints(null);
     setPickingTarget(false);
-    setTool(null);
+    setRegionTool(null);
     setCursor(null);
     setDragging(false);
     setOrtho(false);
     setEditingHotspotId(null);
     setRedrawShapeFor(null);
+    setLinePoints(null);
+    // Read fresh: this also runs from handlers the panel registered earlier.
+    if (useEditorStore.getState().siteUi.placing) setSiteUi({ placing: null });
+  }
+
+  /** Picks something to place on the Site analysis plan (S2), or with null
+   *  puts it down. One tool at a time: it ends any region drawing, Calibrate
+   *  and Dimensions first. */
+  function placeSite(placing: SitePlacement | null) {
+    cancelDrawing();
+    setPickMode(null);
+    setPickPoints([]);
+    setSnapHit(null);
+    setDimensionsOn(false);
+    setSiteUi({ placing });
   }
 
   // Stage edits (S1, F8), shared by the timeline on the slide and the
@@ -1597,7 +1796,7 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
       hasImage: !!stageUrl,
       stages: {
         suggest: active.kind === 'layout',
-        list: (active.stages ?? []).map((s) => ({ id: s.id, label: s.label })),
+        list: (active.stages ?? []).map((s) => ({ id: s.id, label: s.label, isSite: !!s.siteAnalysis })),
         activeStageId: activeStage?.id,
         onSelect: showStage,
         onAdd: addStagesToView,
@@ -1618,20 +1817,32 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
       pickMode,
       onCalibrate: () => {
         if (calibrationLocked) return;
+        setLinePoints(null);
+        setSiteUi({ placing: null });
         setPickMode('calibrate');
         setPickPoints([]);
         setPendingCalDistance('');
       },
       onUnlockCalibration: unlockCalibration,
-      tool,
+      // The region tool itself, not `tool`: a site area borrowing a shape
+      // shouldn't light up the region buttons.
+      tool: regionTool,
       onSetTool: (t) => {
         setDrawingPoints(null);
         setPickingTarget(false);
-        setTool((prev) => (prev === t ? null : t));
+        setLinePoints(null);
+        setSiteUi({ placing: null });
+        setRegionTool((prev) => (prev === t ? null : t));
       },
+      // Only ids and a setter: the panel reads the site content and the
+      // tools' state from the store, fresh.
+      site:
+        active.kind === 'layout' && activeStage && (activeStage.siteAnalysis || canSetUpSiteAnalysis(active, activeStage))
+          ? { slideId: slide.id, viewId: active.id, stageId: activeStage.id, ready: !!activeStage.siteAnalysis, onPlace: placeSite }
+          : null,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editable, stageUrl, active.kind, active.id, active.stages, activeStage?.id, active.zoomPanEnabled, displayNorthDeg, northLocked, calibration, calibrationLocked, pickMode, tool]);
+  }, [editable, stageUrl, active.kind, active.id, active.stages, activeStage?.id, active.zoomPanEnabled, displayNorthDeg, northLocked, calibration, calibrationLocked, pickMode, regionTool]);
 
   // Unmount only, and only for the editable instance (see above) — clears
   // the registration so a different slide's Properties panel never shows a
@@ -1646,15 +1857,27 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
   const otherViews = views.filter((v) => v.id !== active.id);
   const allHotspots = active.hotspots ?? [];
   const pendingDeleteStage = stagePendingDelete ? active.stages?.find((s) => s.id === stagePendingDelete) : undefined;
-  // Pre-ticked in the delete dialog as where the stage's own regions go.
+  // Pre-ticked in the delete dialog as where the stage's own regions go: the
+  // nearest stage that isn't Site analysis, which design regions stay off.
   const deleteNeighbour = (() => {
     const list = active.stages ?? [];
     const at = pendingDeleteStage ? list.indexOf(pendingDeleteStage) : -1;
-    return at === -1 ? undefined : (list[at - 1] ?? list[at + 1]);
+    if (at === -1) return undefined;
+    return list.slice(0, at).reverse().find((s) => !s.siteAnalysis) ?? list.slice(at + 1).find((s) => !s.siteAnalysis);
   })();
   // Unset stageIds = active on every stage — matters both for hotspots drawn
-  // before stages existed and for a view that never defines any.
-  const hotspots = activeStage ? allHotspots.filter((h) => !h.stageIds || h.stageIds.includes(activeStage.id)) : allHotspots;
+  // before stages existed and for a view that never defines any. The Site
+  // analysis stage is the exception (S2, decision 2): see regionShowsOn.
+  const hotspots = activeStage ? allHotspots.filter((h) => regionShowsOn(h, activeStage, active)) : allHotspots;
+  /** What a region's "Active on" boxes show ticked while it has no stage
+   *  list of its own. */
+  const regionDefaultStageIds = defaultRegionStageIds(active);
+  const siteEntries = siteStage?.siteAnalysis?.entries ?? [];
+  const visibleSiteEntries = siteEntries.filter((e) => !site.hidden.includes(e.category));
+  /** Re-cropping the plan under placed entries would leave them behind, so
+   *  the crop is off once there are some, as it is for PDF plans. */
+  const siteCropLocked = siteEntries.length > 0;
+  const canPlaceSite = editable && interactive && !!siteStage;
 
   /** Where a pointer at these client coordinates should actually place a point.
    *
@@ -1779,8 +2002,32 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
     setViewportPanY((y) => clamp(y, -limit, limit));
   }, [viewportZoom]);
 
+  /** Where a pointer lands for a site marker or line point. Shift keeps a
+   *  line's next segment to 45° steps, like the polygon tool. */
+  function sitePointAt(e: React.PointerEvent<HTMLDivElement>): Point {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const raw = clamp01({ x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height });
+    const from = linePoints?.[linePoints.length - 1];
+    return e.shiftKey && from && sitePlacing?.kind === 'line' ? snapAngle(from, raw, rect.width / rect.height) : raw;
+  }
+
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    finishShapeRef.current = finishShape;
+    // A marker or a line point for the Site analysis stage (S2). Areas go
+    // through the region shapes below, like any other drawn outline.
+    if (canPlaceSite && sitePlacing && sitePlacing.kind !== 'area' && !pickMode) {
+      const point = sitePointAt(e);
+      if (sitePlacing.kind === 'marker') {
+        placeSiteEntry([point]);
+        return;
+      }
+      setLinePoints((prev) => (!prev ? [point] : isTooClose(prev, point) ? prev : [...prev, point]));
+      return;
+    }
     if (!drawable()) {
+      // A press on the plan itself puts down a selected site entry, and in
+      // Presenter closes its card. Entries stop their own presses first.
+      if (site.selected) setSiteUi({ selected: null });
       if (zoomPanActive && viewportZoom > 1) {
         try {
           e.currentTarget.setPointerCapture(e.pointerId);
@@ -1821,6 +2068,12 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
   }
 
   function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    finishShapeRef.current = finishShape;
+    if (canPlaceSite && sitePlacing?.kind === 'line') {
+      // The rubber band from the last point.
+      setCursor(sitePointAt(e));
+      return;
+    }
     if (!drawable()) {
       const pan = panRef.current;
       if (!pan) return;
@@ -1909,6 +2162,14 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
       resetShape();
       return;
     }
+    // A site area (S2): no popup, it goes straight onto the site stage and
+    // its fields show in the Properties panel. The shape stays picked for
+    // the next one.
+    if (sitePlacing?.kind === 'area') {
+      if (hasEnoughPoints(points, tool ? shapeForTool(tool) : 'polygon')) placeSiteEntry(points, tool ? shapeForTool(tool) : 'polygon');
+      resetShape();
+      return;
+    }
     setDrawingPoints(points);
     startPickingTarget(points);
   }
@@ -1954,6 +2215,7 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
       isPdfPlan,
       overlay: activeOverlay,
       hotspots: hotspots.filter((h) => hasEnoughPoints(pointsFor(h), h.shape)).map((h) => ({ id: h.id, points: pointsFor(h), shape: h.shape, parentHotspotId: h.parentHotspotId })),
+      site: siteStage ? visibleSiteEntries : null,
     });
     setTransitionProgress(0);
     setActiveStageId(toStageId);
@@ -1990,7 +2252,9 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
     setPendingClickAction(h?.clickAction ?? '');
     setPendingKeyPlanUrl(h?.keyPlanImage?.url ?? '');
     setPendingKeyPlanArrowDeg(h?.keyPlanImage?.arrowDeg != null ? String(h.keyPlanImage.arrowDeg) : '');
-    setPendingStageIds(h?.stageIds ?? []);
+    // A new region drawn on the Site analysis stage starts out on that stage
+    // alone: left at every stage, it wouldn't show there (decision 2).
+    setPendingStageIds(h ? (h.stageIds ?? []) : siteStage ? [siteStage.id] : []);
     setPendingConceptTitle(h?.spaceDetail?.concept?.title ?? '');
     setPendingConceptBody(h?.spaceDetail?.concept?.body ?? '');
     setPendingConceptImage(h?.spaceDetail?.concept?.imageUrl ?? '');
@@ -2144,7 +2408,8 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
     setDragging(false);
     setOrtho(false);
     setEditingHotspotId(null);
-    setTool(h.shape === 'ellipse' ? 'ellipse' : h.shape === 'spline' ? 'spline' : 'polygon');
+    setSiteUi({ placing: null });
+    setRegionTool(h.shape === 'ellipse' ? 'ellipse' : h.shape === 'spline' ? 'spline' : 'polygon');
     setRedrawShapeFor({ hotspotId: h.id, stageId: activeStage.id });
   }
 
@@ -2172,6 +2437,9 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
   }
 
   function jumpTo(hotspot: ViewHotspot) {
+    // A site entry's card closes first, so it can't sit on top of (or under)
+    // the gallery or space detail this opens, and so Esc closes those.
+    if (site.selected) setSiteUi({ selected: null });
     const detail = hotspot.spaceDetail;
     const hasRichDetail = !!(detail?.concept || detail?.walkthroughUrl || detail?.boq || detail?.note);
     // Always wins, regardless of clickAction — per ViewHotspot.clickAction's
@@ -2546,13 +2814,18 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
       <div
         ref={stageBoxRef}
         className={`relative min-w-0 select-none overflow-hidden ${fitSize ? '' : 'aspect-video h-full'} ${
-          drawing ? 'cursor-crosshair' : zoomPanActive && viewportZoom > 1 ? 'cursor-grab active:cursor-grabbing' : ''
+          drawing || sitePlacing ? 'cursor-crosshair' : zoomPanActive && viewportZoom > 1 ? 'cursor-grab active:cursor-grabbing' : ''
         }`}
         style={fitSize ? { width: fitSize.width, height: fitSize.height } : undefined}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={() => setCursor(null)}
+        // A site line ends on a double-click (its second press was too close
+        // to the first to add a point).
+        onDoubleClick={() => {
+          if (canPlaceSite && sitePlacing?.kind === 'line') finishSiteLine();
+        }}
       >
       <div
         className="h-full w-full transition-transform duration-100 ease-out"
@@ -2597,8 +2870,11 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
           transform={stageTransform}
           onChangeTransform={(t) => setStage({ transform: t })}
           // A PDF plan's geometry and calibration are both fixed to the plan as
-          // rendered, so re-cropping it would silently desync both.
-          allowAdjust={tool === null && !isPdfPlan}
+          // rendered, so re-cropping it would silently desync both; the same
+          // goes for site entries placed on it. Off too while placing or with
+          // a site entry selected, when a click on the plan means something
+          // else (placing, or putting the selection down).
+          allowAdjust={tool === null && !isPdfPlan && !sitePlacing && !siteSelected && !(siteStage && siteCropLocked)}
           className="h-full w-full"
           style={transitionFrom && transitionFrom.url !== stageUrl ? { opacity: transitionProgress } : undefined}
           mediaRef={active.kind === 'walkthrough' ? videoRef : undefined}
@@ -2693,8 +2969,12 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
               stroke={paint ?? h.strokeColor ?? DEFAULT_STROKE}
               strokeWidth={isHot ? baseStrokeWidth * 1.6 : baseStrokeWidth}
               strokeOpacity={fadeOpacity * (zoning ? overlayFadeIn : 1)}
-              className={ghost || drawing ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer transition-[fill-opacity,stroke-width]'}
-              onMouseEnter={() => !ghost && !drawing && setHoveredHotspotId(h.id)}
+              className={
+                ghost || drawing || sitePlacing || !interactive
+                  ? 'pointer-events-none'
+                  : 'pointer-events-auto cursor-pointer transition-[fill-opacity,stroke-width]'
+              }
+              onMouseEnter={() => !ghost && !drawing && interactive && setHoveredHotspotId(h.id)}
               onMouseLeave={() => setHoveredHotspotId((cur) => (cur === h.id ? null : cur))}
               onClick={(e) => {
                 if (ghost) return;
@@ -2799,7 +3079,67 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
                 ))}
             </>
           )}
+
+          {/* A site line being placed (S2): its points so far, and a rubber
+              band to the cursor. */}
+          {sitePlacing?.kind === 'line' && linePoints && linePoints.length > 0 && (
+            <g pointerEvents="none">
+              <polyline
+                points={linePoints.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
+                fill="none"
+                stroke={siteCategory(sitePlacing.category).color}
+                strokeWidth={2.5}
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+              />
+              {cursor && (
+                <line
+                  x1={linePoints[linePoints.length - 1].x * 100}
+                  y1={linePoints[linePoints.length - 1].y * 100}
+                  x2={cursor.x * 100}
+                  y2={cursor.y * 100}
+                  stroke={siteCategory(sitePlacing.category).color}
+                  strokeWidth={1.25}
+                  strokeDasharray="3,3"
+                  vectorEffect="non-scaling-stroke"
+                />
+              )}
+              {linePoints.map((p, i) => (
+                <circle
+                  key={i}
+                  cx={p.x * 100}
+                  cy={p.y * 100}
+                  r={0.9}
+                  fill="white"
+                  stroke={siteCategory(sitePlacing.category).color}
+                  strokeWidth={1.5}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+            </g>
+          )}
         </svg>
+
+        {/* The Site analysis stage's markers, lines and areas (S2): the
+            outgoing stage's fading out during a stage change, and this
+            stage's own (fading in, if it just arrived). */}
+        {transitionFrom?.site && transitionFrom.site.length > 0 && (
+          <SiteLayer entries={transitionFrom.site} opacity={1 - transitionProgress} interactive={false} editable={false} counterScale={1 / viewportZoom} />
+        )}
+        {siteStage && (
+          <SiteLayer
+            entries={visibleSiteEntries}
+            opacity={transitionFrom ? transitionProgress : 1}
+            selectedId={site.selected?.kind === 'entry' ? site.selected.id : null}
+            interactive={interactive}
+            passive={drawing || !!sitePlacing || !!pickMode}
+            editable={editable}
+            counterScale={1 / viewportZoom}
+            frameRef={stageBoxRef}
+            onSelect={(entry) => setSiteUi({ selected: { kind: 'entry', id: entry.id } })}
+            onMoveMarker={(entry, point) => updateLinkedView(slide.id, active.id, (v) => updateSiteEntry(v, siteStage.id, entry.id, { points: [point] }))}
+          />
+        )}
 
         {/* Every overlay label is HTML rather than SVG <text>: the hotspot
             SVG above is stretched with preserveAspectRatio="none", which
@@ -2876,6 +3216,70 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
         )}
       </div>
 
+        {/* The site layers' legend (S2), inside the frame across from North
+            and Dimensions, so the plan's size doesn't change between stages.
+            Each layer shows or hides on a click; it makes way for the
+            drawing hint while something's being placed. */}
+        {siteStage && !drawing && !sitePlacing && !pickMode && (() => {
+          const inUse = PLAN_LAYERS.map((layer) => ({ layer, count: siteEntries.filter((e) => e.category === layer.key).length })).filter((l) => l.count);
+          if (!inUse.length) return null;
+          return (
+            <div
+              className="absolute left-2 top-2 z-10 flex max-w-[62%] flex-wrap gap-1"
+              style={transitionFrom ? { opacity: transitionProgress } : undefined}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              {inUse.map(({ layer, count }) => {
+                const off = site.hidden.includes(layer.key);
+                return (
+                  <button
+                    key={layer.key}
+                    type="button"
+                    tabIndex={interactive ? 0 : -1}
+                    aria-pressed={!off}
+                    title={off ? `Show ${layer.label}` : `Hide ${layer.label}`}
+                    onClick={(e) => {
+                      setSiteUi({ hidden: off ? site.hidden.filter((k) => k !== layer.key) : [...site.hidden, layer.key] });
+                      // Presenter's own keys (Space, the arrows) mustn't press it again.
+                      if (!editable) e.currentTarget.blur();
+                    }}
+                    className={`flex items-center gap-1.5 rounded-full bg-black/60 px-2 py-1 text-[10px] font-semibold text-white shadow transition hover:bg-black/75 ${
+                      off ? 'opacity-55' : ''
+                    } ${interactive ? '' : 'pointer-events-none'}`}
+                  >
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: off ? 'transparent' : layer.color, boxShadow: `inset 0 0 0 1.5px ${layer.color}` }} />
+                    <span className={off ? 'line-through decoration-white/60' : ''}>{layer.short}</span>
+                    <span className="tabular-nums text-white/65">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        {/* A site entry's card, in Presenter (S2). Outside the zoomed layer,
+            so it stays readable and inside the frame at any zoom. */}
+        {!editable &&
+          interactive &&
+          (() => {
+            const entry = site.selected?.kind === 'entry' ? visibleSiteEntries.find((e) => e.id === site.selected?.id) : undefined;
+            if (!entry || !stageSize) return null;
+            const { width: W, height: H } = stageSize;
+            const a = entryAnchor(entry);
+            // Where the entry lands once the viewer's zoom and pan apply (the
+            // zoomed layer scales about its centre, after its translate).
+            const ax = W / 2 + viewportZoom * (a.x * W + (viewportPanX / 100) * W - W / 2);
+            const ay = H / 2 + viewportZoom * (a.y * H + (viewportPanY / 100) * H - H / 2);
+            const CARD_W = 224;
+            const HALF_H = 64;
+            const GAP = 22;
+            const MARGIN = 8;
+            const cx = ax + GAP + CARD_W + MARGIN <= W ? ax + GAP + CARD_W / 2 : ax - GAP - CARD_W / 2;
+            const left = Math.min(Math.max(cx, MARGIN + CARD_W / 2), W - MARGIN - CARD_W / 2);
+            const top = Math.min(Math.max(ay, MARGIN + HALF_H), H - MARGIN - HALF_H);
+            return <SiteEntryCard key={entry.id} entry={entry} style={{ left, top }} onClose={() => setSiteUi({ selected: null })} />;
+          })()}
+
         {/* One shared row, not each control independently `absolute`-offset
             against the next — that pattern only worked as long as exactly
             two things (mute, "Tap for sound") ever shared this corner, and
@@ -2911,12 +3315,12 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => {
                 if (!calibration) return;
-                setDimensionsOn((cur) => {
-                  const next = !cur;
-                  setPickMode(next ? 'measure' : null);
-                  setPickPoints([]);
-                  return next;
-                });
+                const next = !dimensionsOn;
+                setDimensionsOn(next);
+                setPickMode(next ? 'measure' : null);
+                setPickPoints([]);
+                // Measuring takes the plan's clicks, so it ends site placing.
+                if (next && sitePlacing) stopPlacingSite();
               }}
               disabled={!calibration}
               title={calibration ? 'Toggle calibrated dimensions and click-to-measure' : 'Calibrate this plan first'}
@@ -2989,6 +3393,12 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
 
         {drawing && !pickingTarget && (
           <div onPointerDown={(e) => e.stopPropagation()} className="absolute left-2 top-2 z-20 flex items-center gap-2 rounded-md bg-black/75 px-2.5 py-1.5 text-[11px] font-medium text-white">
+            {sitePlacing?.kind === 'area' && (
+              <span className="flex max-w-[14rem] items-center gap-1.5 font-semibold">
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: siteCategory(sitePlacing.category).color }} />
+                <span className="truncate">{sitePlacing.label}</span>
+              </span>
+            )}
             {isClickTool(tool) && drawingPoints ? (
               <>
                 <span>
@@ -3023,6 +3433,40 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
             )}
             <button onClick={cancelDrawing} className="underline decoration-white/50 hover:decoration-white">
               Cancel
+            </button>
+          </div>
+        )}
+
+        {/* The same bar while a site marker or line is being placed (S2). */}
+        {canPlaceSite && sitePlacing && sitePlacing.kind !== 'area' && !pickMode && (
+          <div onPointerDown={(e) => e.stopPropagation()} className="absolute left-2 top-2 z-20 flex items-center gap-2 rounded-md bg-black/75 px-2.5 py-1.5 text-[11px] font-medium text-white">
+            <span className="flex max-w-[14rem] items-center gap-1.5 font-semibold">
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: siteCategory(sitePlacing.category).color }} />
+              <span className="truncate">{sitePlacing.label}</span>
+            </span>
+            {sitePlacing.kind === 'marker' ? (
+              <span className="text-white/70">Click to place · Esc stops</span>
+            ) : linePoints?.length ? (
+              <>
+                <span>
+                  {linePoints.length} point{linePoints.length === 1 ? '' : 's'}
+                </span>
+                <button
+                  onClick={() => setLinePoints((pts) => (pts && pts.length > 1 ? pts.slice(0, -1) : null))}
+                  className="underline decoration-white/50 hover:decoration-white"
+                >
+                  Undo
+                </button>
+                <button onClick={finishSiteLine} disabled={linePoints.length < 2} className="rounded bg-[var(--accent)] px-2 py-0.5 font-semibold disabled:opacity-40">
+                  {linePoints.length < 2 ? 'Finish (1 more)' : 'Finish'}
+                </button>
+                <span className="text-white/50">⇧ 45°</span>
+              </>
+            ) : (
+              <span className="text-white/70">Click the first point</span>
+            )}
+            <button onClick={stopPlacingSite} className="underline decoration-white/50 hover:decoration-white">
+              Done
             </button>
           </div>
         )}
@@ -3253,10 +3697,12 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
                     <label key={s.id} className="flex items-center gap-1 text-[11px] text-[var(--ink-2)]">
                       <input
                         type="checkbox"
-                        checked={pendingStageIds.length === 0 || pendingStageIds.includes(s.id)}
+                        // No stage list means every stage but Site
+                        // analysis (decision 2), so tick what that covers.
+                        checked={(pendingStageIds.length ? pendingStageIds : regionDefaultStageIds).includes(s.id)}
                         onChange={(e) =>
                           setPendingStageIds((prev) => {
-                            const base = prev.length === 0 ? active.stages!.map((st) => st.id) : prev;
+                            const base = prev.length === 0 ? regionDefaultStageIds : prev;
                             return e.target.checked ? [...base, s.id] : base.filter((id) => id !== s.id);
                           })
                         }
@@ -3585,8 +4031,24 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
           `recompute()` subtracts from the row's width to get the plan's
           available space, so it has to exist unconditionally, not live
           inside whichever conditional branch happens to be active. */}
-      <div ref={asideRef} className="shrink-0">
-      {active.seatingZones?.length || (editable && !showHotspotList) ? (
+      {/* Its width follows what's inside (asideWidth, measured below) with a
+          transition, and fitSize follows the width, so when a stage change
+          brings the site checklist in or takes it away the plan resizes
+          smoothly instead of jumping (S2). */}
+      <div
+        ref={asideRef}
+        className="shrink-0 overflow-hidden transition-[width] duration-300 ease-out"
+        style={asideWidth != null ? { width: asideWidth } : undefined}
+      >
+      <div ref={asideInnerRef} className="h-full w-max">
+      {siteStage ? (
+        <SiteChecklist
+          facts={siteStage.siteAnalysis!.facts}
+          editable={editable}
+          selectedId={site.selected?.kind === 'fact' ? site.selected.id : null}
+          onSelect={interactive ? (id) => setSiteUi({ selected: { kind: 'fact', id } }) : undefined}
+        />
+      ) : active.seatingZones?.length || (editable && !showHotspotList) ? (
         <SeatingTable
           view={active}
           hotspots={hotspots}
@@ -3611,6 +4073,7 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
       )}
       </div>
       </div>
+      </div>
       {editable && pendingDeleteStage && (
         <StageDeleteDialog
           key={pendingDeleteStage.id}
@@ -3618,7 +4081,14 @@ function LinkedViewsExplorer({ slide, editable, silent }: SlideRendererProps) {
           ownImage={!!pendingDeleteStage.url}
           imageKept={!!pendingDeleteStage.url && !active.url && (active.stages?.length ?? 0) === 1}
           onlyRegions={regionsOnlyOn(active, pendingDeleteStage.id).length}
-          otherStages={(active.stages ?? []).filter((s) => s.id !== pendingDeleteStage.id).map((s) => ({ id: s.id, label: s.label }))}
+          site={
+            pendingDeleteStage.siteAnalysis
+              ? { entries: pendingDeleteStage.siteAnalysis.entries.length, rows: pendingDeleteStage.siteAnalysis.facts.length }
+              : undefined
+          }
+          // Design regions stay off the Site analysis stage, so they aren't
+          // carried there; with only it left they stay on the plan.
+          otherStages={(active.stages ?? []).filter((s) => s.id !== pendingDeleteStage.id && !s.siteAnalysis).map((s) => ({ id: s.id, label: s.label }))}
           defaultCarryTo={deleteNeighbour ? [deleteNeighbour.id] : []}
           onCancel={() => setStagePendingDelete(null)}
           onConfirm={confirmDeleteStage}
@@ -3982,7 +4452,7 @@ function TwoContent({ slide, editable }: SlideRendererProps) {
   );
 }
 
-export function SlideRenderer({ slide, editable, animate = false, silent = false }: SlideRendererProps) {
+export function SlideRenderer({ slide, editable, animate = false, silent = false, interactive, forExport = false }: SlideRendererProps) {
   const updateField = useEditorStore((s) => s.updateField);
   const accentColor = useEditorStore((s) => s.project?.accentColor) ?? DEFAULT_ACCENT;
   const projectFontFamily = useEditorStore((s) => s.project?.fontFamily);
@@ -4157,7 +4627,19 @@ export function SlideRenderer({ slide, editable, animate = false, silent = false
           {slide.layout === 'two-content' && <TwoContent slide={slide} editable={editable} />}
           {slide.layout === 'merge-diagram' && <MergeDiagram slide={slide} editable={editable} />}
           {slide.layout === 'stat-hero' && <StatHero slide={slide} editable={editable} />}
-          {slide.layout === 'linked-views' && <LinkedViewsExplorer slide={slide} editable={editable} silent={silent} />}
+          {/* Keyed by slide: moving between two plan slides must start the
+              second one fresh, not carry over a picked tool, a stage or
+              hidden layers from the first. */}
+          {slide.layout === 'linked-views' && (
+            <LinkedViewsExplorer
+              key={slide.id}
+              slide={slide}
+              editable={editable}
+              silent={silent}
+              interactive={interactive ?? editable}
+              forExport={forExport}
+            />
+          )}
           {slide.layout === 'orbit' && <OrbitDiagram slide={slide} editable={editable} />}
           {slide.layout === 'site-locus' && <SiteLocusDiagram slide={slide} editable={editable} />}
           {slide.layout === 'material-compare' && <MaterialCompare slide={slide} editable={editable} />}

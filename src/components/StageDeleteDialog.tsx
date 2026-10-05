@@ -18,6 +18,7 @@ export function StageDeleteDialog({
   ownImage,
   imageKept,
   onlyRegions,
+  site,
   otherStages,
   defaultCarryTo,
   onCancel,
@@ -30,6 +31,10 @@ export function StageDeleteDialog({
    *  plan had no image of its own). */
   imageKept: boolean;
   onlyRegions: number;
+  /** Set when it's the Site analysis stage: its content goes with it (S2). */
+  site?: { entries: number; rows: number };
+  /** Where regions can be carried. Leaves out the Site analysis stage, which
+   *  design regions stay off. */
   otherStages: { id: string; label: string }[];
   defaultCarryTo: string[];
   onCancel: () => void;
@@ -116,7 +121,13 @@ export function StageDeleteDialog({
               </label>
             </fieldset>
           )}
-          {!ownImage && onlyRegions === 0 && <p>No regions are only on this stage, so nothing else goes with it.</p>}
+          {site && (
+            <p>
+              Its site analysis goes too: {site.entries} {site.entries === 1 ? 'entry' : 'entries'} on the plan and {site.rows} checklist{' '}
+              {site.rows === 1 ? 'row' : 'rows'}.
+            </p>
+          )}
+          {!ownImage && !site && onlyRegions === 0 && <p>No regions are only on this stage, so nothing else goes with it.</p>}
           {!canConfirm && <p className="text-micro text-ui-danger">Tick a stage to carry them to, or choose to delete them.</p>}
           <p className="text-micro text-ui-ink-3">Undo brings it all back.</p>
         </div>

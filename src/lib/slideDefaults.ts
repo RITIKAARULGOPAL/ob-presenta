@@ -198,7 +198,16 @@ export function cloneSlide(slide: Slide): Slide {
     clonedViews = views.map((v) => ({
       ...v,
       id: viewIdMap.get(v.id)!,
-      stages: v.stages?.map((s) => ({ ...s, id: stageIdMap.get(s.id)! })),
+      stages: v.stages?.map((s) => ({
+        ...s,
+        id: stageIdMap.get(s.id)!,
+        // Site analysis entries and rows (S2) refer to nothing else by id, so
+        // they only need ids of their own.
+        siteAnalysis: s.siteAnalysis && {
+          entries: s.siteAnalysis.entries.map((e) => ({ ...e, id: makeId('site') })),
+          facts: s.siteAnalysis.facts.map((f) => ({ ...f, id: makeId('fact') })),
+        },
+      })),
       hotspots: v.hotspots?.map((h) => ({
         ...h,
         id: hotspotIdMap.get(h.id)!,

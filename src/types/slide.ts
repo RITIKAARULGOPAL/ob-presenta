@@ -268,6 +268,75 @@ export interface SpaceDetail {
   note?: string;
 }
 
+/** Where a site-analysis entry or checklist row stands after the site visit
+ *  (S2). Unset means nobody has checked it yet. */
+export type SiteStatus = 'verified' | 'to-verify' | 'not-available' | 'not-applicable';
+
+/** The site checklist's categories (S2), in checklist order. Every one but
+ *  'regulatory' is also a layer on the plan; Regulatory & Landlord is facts
+ *  only. Names and colours live in siteChecklist.ts. */
+export type SiteCategoryKey = 'site' | 'access' | 'hvac' | 'electrical' | 'plumbing' | 'fire' | 'natural' | 'regulatory';
+
+/** How a line entry is drawn: a route with arrowheads, a dashed service run
+ *  or beam, a thick wall, or a structural grid line with its label. */
+export type PlanLineStyle = 'route' | 'dashed' | 'wall' | 'grid';
+
+/** A marker, line or area placed on a plan: the Site analysis stage's
+ *  entries (S2). Nothing in it is site-specific, so the Design consideration
+ *  stage's pinned notes can reuse it later. */
+export interface PlanAnnotation {
+  id: string;
+  kind: 'marker' | 'line' | 'area';
+  /** The checklist item it was placed from (see siteChecklist.ts). Unset for
+   *  an entry with a name of its own. */
+  itemKey?: string;
+  /** Its layer. */
+  category: SiteCategoryKey;
+  /** Copied from the checklist when placed, so the deck reads the same even
+   *  if the checklist's wording changes later. Editable. */
+  label: string;
+  /** The short code a marker shows, e.g. "PL". Copied like `label`. */
+  code?: string;
+  /** 0–1 against the plan frame, like a hotspot's: one point for a marker,
+   *  two or more for a line, three or more for an area (two corners for an
+   *  ellipse). */
+  points: { x: number; y: number }[];
+  /** Areas only: how the points become an outline, as ViewHotspot.shape. */
+  shape?: 'polygon' | 'spline' | 'ellipse';
+  /** Lines only. */
+  lineStyle?: PlanLineStyle;
+  /** Markers with a view direction (External views): degrees clockwise from
+   *  up on the plan. */
+  directionDeg?: number;
+  value?: string;
+  note?: string;
+  status?: SiteStatus;
+}
+
+/** A row of the Site checklist beside the plan (S2): a fact about the site
+ *  that doesn't sit at one spot on the plan, like its power capacity. */
+export interface SiteFact {
+  id: string;
+  /** The checklist item it came from. Unset for a row added by hand. */
+  itemKey?: string;
+  category: SiteCategoryKey;
+  label: string;
+  value?: string;
+  note?: string;
+  status?: SiteStatus;
+}
+
+/** A Site analysis stage's own content (S2). Having it is what makes a stage
+ *  the site analysis stage, whatever it's called, and a plan has at most one.
+ *  It lives on the stage, so deleting the stage takes it along and Undo
+ *  brings it back. */
+export interface SiteAnalysis {
+  entries: PlanAnnotation[];
+  /** Pre-filled from the checklist when the stage is set up. Rows can be
+   *  removed, removed ones added back, and rows of your own added. */
+  facts: SiteFact[];
+}
+
 /** A named mode a linked view can be switched between while editing/viewing
  *  — e.g. "Zoning" vs "Layout" — gating which hotspots are interactive and
  *  optionally swapping the shown image. Absent/empty on a view = the single
@@ -305,6 +374,9 @@ export interface LinkedViewStage {
   /** Set automatically the moment `calibration` is committed via "Set
    *  scale." Same unlock behaviour as `northLocked`. */
   calibrationLocked?: boolean;
+  /** Makes this the plan's Site analysis stage (S2): its markers, lines and
+   *  areas, and the checklist shown beside the plan. */
+  siteAnalysis?: SiteAnalysis;
 }
 
 export interface LinkedView {

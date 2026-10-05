@@ -3,7 +3,8 @@ import type * as React from 'react';
 import { cloneSlide, createSlide, createStyledSlide, defaultFieldsForLayout, defaultFieldsForStyle } from './slideDefaults';
 import { optionalColumnsMissing, saveProject } from './data';
 import { makeId } from './id';
-import type { Brand, FontPairing, ImageTransform, LinkedView, Project, SectionIconKey, Slide, SlideBackground, SlideFields, SlideLayout, SlideStyleKind, TypographySettings } from '@/types/slide';
+import type { PlacementSpec } from './siteAnalysis';
+import type { Brand, FontPairing, ImageTransform, LinkedView, Project, SectionIconKey, SiteCategoryKey, Slide, SlideBackground, SlideFields, SlideLayout, SlideStyleKind, TypographySettings } from '@/types/slide';
 
 type Mode = 'editor' | 'presenter';
 
@@ -44,7 +45,51 @@ export interface LinkedViewToolbarSnapshot {
   onUnlockCalibration: () => void;
   tool: DrawTool | null;
   onSetTool: (t: DrawTool | null) => void;
+  /** Set while the stage on show is the Site analysis stage, or one that can
+   *  become it (S2). */
+  site: SiteToolsSnapshot | null;
 }
+
+/** What's picked to place on a Site analysis plan (S2), plus the region
+ *  shape an area is drawn with. */
+export interface SitePlacement extends PlacementSpec {
+  shape?: DrawTool;
+}
+
+/** Which Site analysis stage is on show, for the Properties panel's Site
+ *  Analysis section. Only ids: the panel reads the entries and rows from the
+ *  deck itself, and the tools' state from `siteUi`, so nothing in here can
+ *  go stale the way a registered copy of the stages once did (B16). */
+export interface SiteToolsSnapshot {
+  slideId: string;
+  viewId: string;
+  stageId: string;
+  /** False for a stage named Site analysis that was added before S2 and
+   *  isn't set up yet; the panel offers to set it up. */
+  ready: boolean;
+  /** Picks something to place, or with null puts it down. Picking also turns
+   *  off the region tools, Calibrate and Dimensions: one tool at a time. */
+  onPlace: (p: SitePlacement | null) => void;
+}
+
+/** The Site analysis stage's tool state (S2), shared by the plan on the
+ *  canvas and the Properties panel. Transient, like the slide selection:
+ *  never saved and never on the Undo history. Set by the one interactive
+ *  LinkedViewsExplorer (the editor's canvas, or Presenter's slide), which
+ *  resets it whenever a different stage comes on show. */
+export interface SiteUiState {
+  /** `slideId/viewId/stageId` of the Site analysis stage on show, or null.
+   *  The fields below mean something only while it matches. */
+  scope: string | null;
+  placing: SitePlacement | null;
+  /** The entry or checklist row whose details the Properties panel shows in
+   *  the editor, or whose card is open in Presenter. */
+  selected: { kind: 'entry' | 'fact'; id: string } | null;
+  /** Layers hidden on the plan for now. */
+  hidden: SiteCategoryKey[];
+}
+
+export const EMPTY_SITE_UI: SiteUiState = { scope: null, placing: null, selected: null, hidden: [] };
 
 /** The active Linked View's stages as the Properties panel lists them, with
  *  the same handlers the stage timeline on the slide calls. */
@@ -53,7 +98,9 @@ export interface LinkedViewStagesSnapshot {
    *  kinds use stages for things like day and night, so they only get a
    *  custom name. */
   suggest: boolean;
-  list: { id: string; label: string }[];
+  /** `isSite` marks the Site analysis stage, so the picker doesn't offer a
+   *  second one after it's been renamed. */
+  list: { id: string; label: string; isSite?: boolean }[];
   activeStageId: string | undefined;
   onSelect: (stageId: string) => void;
   onAdd: (labels: string[]) => void;
@@ -88,6 +135,8 @@ interface EditorState {
    *  slide's tools apply (wrong layout, or a walkthrough view). Transient,
    *  like the selection state above: never persisted, never undo-tracked. */
   linkedViewToolbar: LinkedViewToolbarSnapshot | null;
+  /** See `SiteUiState` above. */
+  siteUi: SiteUiState;
 
   loadProject: (project: Project) => void;
   setMode: (mode: Mode) => void;
@@ -99,6 +148,9 @@ interface EditorState {
   clearSlideSelection: () => void;
   selectAllSlides: () => void;
   setLinkedViewToolbar: (v: LinkedViewToolbarSnapshot | null) => void;
+  setSiteUi: (patch: Partial<Omit<SiteUiState, 'scope'>>) => void;
+  /** Starts the site tools fresh for the stage now on show (null for none). */
+  resetSiteUi: (scope: string | null) => void;
   goNext: () => void;
   goPrev: () => void;
   undo: () => void;
@@ -261,6 +313,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedSlideIds: [],
   selectionAnchor: null,
   linkedViewToolbar: null,
+  siteUi: EMPTY_SITE_UI,
 
   loadProject: (project) =>
     // Deliberately doesn't touch `linkedViewToolbar` — that's the currently-
@@ -287,6 +340,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setMode: (mode) => set({ mode }),
 
   setLinkedViewToolbar: (v) => set({ linkedViewToolbar: v }),
+
+  setSiteUi: (patch) => set((s) => ({ siteUi: { ...s.siteUi, ...patch } })),
+  resetSiteUi: (scope) => set({ siteUi: { ...EMPTY_SITE_UI, scope } }),
 
   selectSlide: (id, modifier = 'none') => {
     const { project, selectedSlideIds, selectionAnchor } = get();

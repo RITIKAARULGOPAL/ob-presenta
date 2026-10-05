@@ -1,5 +1,6 @@
 import { makeId } from './id';
-import type { LinkedView, ViewHotspot } from '@/types/slide';
+import { createSiteAnalysis } from './siteAnalysis';
+import type { LinkedView, LinkedViewStage, ViewHotspot } from '@/types/slide';
 
 // Adding, renaming, reordering and deleting a Linked View's stages (S1, F8),
 // as pure functions over one view. Both the stage timeline on the slide and
@@ -27,11 +28,19 @@ export function suggestedRank(label: string): number {
   return SUGGESTED_PLAN_STAGES.findIndex((s) => norm(s) === norm(label));
 }
 
+/** Where a stage sits in the usual order. The site analysis stage counts as
+ *  Site analysis whatever it's been renamed to. */
+function stageRank(stage: LinkedViewStage): number {
+  return stage.siteAnalysis ? 0 : suggestedRank(stage.label);
+}
+
 /** Adds stages in the order given. A suggested stage slots in before the
  *  first existing stage that comes after it in the usual order, so ticking
  *  "Walls" on a Zoning/Furniture plan lands between the two; a custom name
  *  goes at the end. A suggested stage the view already has is skipped.
- *  Returns the view unchanged (same object) when nothing was added. */
+ *  Site analysis comes set up with its checklist (S2), and a plan gets only
+ *  one, even if the first was renamed. Returns the view unchanged (same
+ *  object) when nothing was added. */
 export function addStages(view: LinkedView, labels: string[]): { view: LinkedView; added: string[] } {
   const stages = [...(view.stages ?? [])];
   const added: string[] = [];
@@ -40,13 +49,31 @@ export function addStages(view: LinkedView, labels: string[]): { view: LinkedVie
     if (!label) continue;
     const rank = suggestedRank(label);
     if (rank >= 0 && stages.some((s) => norm(s.label) === norm(label))) continue;
-    const stage = { id: makeId('stage'), label };
-    const at = rank >= 0 ? stages.findIndex((s) => suggestedRank(s.label) > rank) : -1;
+    const isSite = rank === 0;
+    if (isSite && stages.some((s) => s.siteAnalysis)) continue;
+    const stage: LinkedViewStage = { id: makeId('stage'), label, ...(isSite && view.kind === 'layout' ? { siteAnalysis: createSiteAnalysis() } : {}) };
+    const at = rank >= 0 ? stages.findIndex((s) => stageRank(s) > rank) : -1;
     if (at === -1) stages.push(stage);
     else stages.splice(at, 0, stage);
     added.push(stage.id);
   }
   return added.length ? { view: { ...view, stages }, added } : { view, added };
+}
+
+/** Whether a region shows on a stage. A region with no stage list shows on
+ *  every stage except the Site analysis stage, which shows the floor as it
+ *  is before any design (S2, decision 2), unless that's the only stage and
+ *  there's nowhere else for the region to show. */
+export function regionShowsOn(h: ViewHotspot, stage: LinkedViewStage, view: LinkedView): boolean {
+  if (h.stageIds) return h.stageIds.includes(stage.id);
+  return !stage.siteAnalysis || (view.stages?.length ?? 0) <= 1;
+}
+
+/** The stages a region with no stage list shows on: what its "Active on"
+ *  boxes show ticked. */
+export function defaultRegionStageIds(view: LinkedView): string[] {
+  const stages = view.stages ?? [];
+  return stages.filter((s) => !s.siteAnalysis || stages.length <= 1).map((s) => s.id);
 }
 
 export function renameStage(view: LinkedView, stageId: string, label: string): LinkedView {
@@ -69,13 +96,21 @@ export function moveStage(view: LinkedView, stageId: string, delta: -1 | 1): Lin
 
 /** Regions that show on this stage and no other, counting only stages that
  *  still exist. These are what deleting the stage would take with it unless
- *  they're carried somewhere. A region with no stage list shows on every
- *  stage, so it never counts. */
+ *  they're carried somewhere. A region with no stage list usually shows on
+ *  several stages, so it rarely counts. It does when this is the last stage
+ *  besides Site analysis, which it stays off (see regionShowsOn); on a view
+ *  with one stage it never does, since deleting that stage leaves it on the
+ *  plan. */
 export function regionsOnlyOn(view: LinkedView, stageId: string): ViewHotspot[] {
-  const existing = new Set((view.stages ?? []).map((s) => s.id));
+  const stages = view.stages ?? [];
+  const existing = new Set(stages.map((s) => s.id));
   return (view.hotspots ?? []).filter((h) => {
-    const live = h.stageIds?.filter((id) => existing.has(id));
-    return live?.length === 1 && live[0] === stageId;
+    if (stages.length <= 1 || h.stageIds) {
+      const live = h.stageIds?.filter((id) => existing.has(id));
+      return live?.length === 1 && live[0] === stageId;
+    }
+    const on = stages.filter((s) => regionShowsOn(h, s, view));
+    return on.length === 1 && on[0].id === stageId;
   });
 }
 

@@ -89,7 +89,7 @@ async function captureSlides(project: Project, onProgress?: ExportProgress): Pro
 
     for (let i = 0; i < exportable.length; i++) {
       const slide = exportable[i];
-      root.render(createElement(SlideRenderer, { slide, editable: false, silent: true }));
+      root.render(createElement(SlideRenderer, { slide, editable: false, silent: true, forExport: true }));
       await settleStage(stage);
 
       const dataUrl = await htmlToImage.toPng(stage, {

@@ -257,7 +257,7 @@ export default function PresenterPage({ params }: { params: Promise<{ id: string
               that matters more than showing the entire frame at all times,
               unlike the editor's own ScaledStage usage. */}
           <ScaledStage fit="cover">
-            <SlideRenderer slide={currentSlide} editable={false} animate />
+            <SlideRenderer slide={currentSlide} editable={false} animate interactive />
           </ScaledStage>
         </div>
       )}

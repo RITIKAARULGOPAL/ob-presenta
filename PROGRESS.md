@@ -32,6 +32,91 @@ or re-explain anything.
 
 ---
 
+## 2026-10-05 — S2: Site analysis stage
+
+**Context:** sign-off on all 7 decisions given 2026-09-29; built on top of
+the S1/F8/B16 commit on `claude/f1-presenting`.
+
+**Done:**
+- **Data model** (`slide.ts`): `SiteAnalysis`, `PlanAnnotation` (marker/line/area),
+  `SiteFact`, `SiteStatus`, `SiteCategoryKey`, `PlanLineStyle`. Added to
+  `LinkedViewStage.siteAnalysis?`.
+- **96-item checklist** (`siteChecklist.ts`): 8 categories (site, access,
+  hvac, electrical, plumbing, fire, natural, regulatory), colour-coded layers,
+  helpers `createSiteFacts()`, `codeFromLabel()`.
+- **Pure functions** (`siteAnalysis.ts`): `siteStageOf`, `canSetUpSiteAnalysis`,
+  `setUpSiteAnalysis`, `removeSiteAnalysis`, `addSiteEntry`, `updateSiteEntry`,
+  `removeSiteEntry`, `addSiteFact`, `updateSiteFact`, `removeSiteFact`,
+  `entryAnchor`, `factRecorded`. All return view unchanged when nothing
+  changes (no spurious undo steps).
+- **Stage logic** (`linkedViewStages.ts`): `regionShowsOn` / `defaultRegionStageIds`
+  (regions off by default on Site analysis unless it's the only stage);
+  `addStages` inits `siteAnalysis`; `stageRank` helper.
+- **Clone** (`slideDefaults.ts`): site entries and facts get fresh ids.
+- **Store** (`editorStore.ts`): `SiteUiState`, `SiteToolsSnapshot`,
+  `setSiteUi`, `resetSiteUi`; `isSite` on stage list items.
+- **SiteLayer** (`SiteLayer.tsx`): HTML markers (round, drag), SVG lines/areas
+  (1600×900 viewBox), counter-scaled for zoom, selection halo, status dots,
+  direction arrow. Legend inside the frame.
+- **SiteChecklist** (`SiteChecklist.tsx`): grouped by category, collapses,
+  Presenter filters to recorded rows only.
+- **SiteEntryCard** (`SiteEntryCard.tsx`): Presenter entry detail card.
+- **SitePanel** (`SitePanel.tsx`): full Properties panel section — entry
+  editor, fact editor, layer list, item picker with search, checklist rows,
+  remove-site-analysis with confirm.
+- **SlideRenderer** (`SlideRenderer.tsx`): `interactive` prop, `forExport`
+  prop, `key={slide.id}` on LinkedViewsExplorer, `regionShowsOn` filter,
+  capture-phase site key handler, aside width animation, two SiteLayer
+  instances for transition, site hint bar, SiteChecklist replaces
+  SeatingTable when siteStage exists.
+- **B2 fix** (`edit/page.tsx`): Delete/Backspace only removes a slide when
+  focus is inside `[data-slide-rail]`.
+- **Export** (`exportDeck.ts`): `forExport: true`; active stage starts at
+  first non-site stage.
+- **Presenter** (`present/page.tsx`): `interactive` prop on main slide.
+- `SlideRail.tsx`: `data-slide-rail` attribute.
+- `StageDeleteDialog.tsx`: `site?` prop shows content count.
+- `PlanTimeline.tsx`: `isSite?` on stage items.
+- `StageEditing.tsx`: `existingStageLabels()` export, Esc in rename fixed.
+
+**Verified live** (~90%): markers, lines, areas placed and selected; drag
+repositioning; line multi-point with Enter/click-close; area polygon and
+ellipse; delete via Esc/key/panel; status and note edits; layer
+show/hide; checklist facts add/edit/remove/status/note; Presenter
+checklist filtered to recorded rows; note expand/collapse; entry card in
+Presenter; stage transitions (site entries fade out); aside animation;
+region visibility (off on site stage, on all others); export `forExport`
+path; 86 unique ids across duplicate slides; `tsc` clean; eslint no new
+issues.
+
+**Not verified (believed correct by construction):**
+- `slide_s2old`: "Set up site analysis" button on a stage named "Site
+  analysis" with no `siteAnalysis` content (browser nav blocked at end of
+  session due to permission setting).
+- Export opening on Zoning (first non-site stage) — the `forExport` init
+  path was read and is correct by construction.
+
+**Watch out for:**
+- The B2 fix gates Delete/Backspace on `[data-slide-rail]` focus — the site
+  entry Delete is capture-phase so it fires first, but `[data-slide-rail]`
+  must be on the outer div of SlideRail (it is, checked).
+- `regionTool` vs `tool`: `tool` is derived — it's `sitePlacing.shape` when
+  placing a site area, otherwise `regionTool`. Site areas borrow existing
+  region shapes without lighting up the region tool buttons.
+- ResizeObserver for aside width animation stalls in hidden browser panes;
+  works normally in real use.
+- Windows was near OOM during this session (~0.4 GB free); the dev server
+  crashed twice. Verify on a machine with ≥2 GB free.
+
+**Left off / next up:**
+- Delete the scratch deck "S2 scratch - delete me"
+  (`proj_8i77grpxmumdc4qk`) from Home when done.
+- Do not push the branch until the user asks.
+- Committed 2026-10-05 on `claude/f1-presenting`, on top of the S1/F8
+  commit. Not pushed.
+
+---
+
 ## 2026-09-28 (cont'd) — Linked Views: optional stages (S1), delete and reorder stages (F8), B16, two transition checks
 
 **Context:** asked to start on FEATURES.md's three Linked Views sections.
@@ -89,9 +174,12 @@ the Properties panel.
   whole-row save overwrites the seeded data.
 
 **Left off / next up:**
-- **S2 (Site analysis)** is next: 1.5–2.5 weeks, and
-  `docs/site-analysis-checklist.md` still lacks its category 1. It needs a
-  build plan signed off before building.
+- **S2 (Site analysis)** is next. Category 1 arrived later on 09-28, and
+  `docs/site-analysis-checklist.md` now holds the full checklist, the
+  design and a build plan of 13–14 days with seven decisions waiting for
+  the user's sign-off. A plan review against the code on 09-29 added
+  decision 7 (what an export shows), the B2 fix as groundwork, and about
+  3 days. Don't build before sign-off.
 - Not started, by the timeline: the kind-change crossfade and bowtie morph
   (Later), and the BOQ table (W27+).
 - Committed 2026-09-28 on `claude/f1-presenting` as its own commit, after

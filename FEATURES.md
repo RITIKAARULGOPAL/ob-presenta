@@ -59,7 +59,7 @@ shorten this. Adjust the weeks for holidays and review time.
 | W2 | Oct 5–9 | Presenter ready for meetings + safe saves | B21, U1–U5, F4, X6, ~~two Linked Views checks~~ (done 09-28), export-time check, CHANGELOG catch-up | ~29h |
 | W3 | Oct 12–16 | Editor UX pass | U8–U10, U12–U16, U18, U20, U21 | ~29h |
 | W4–5 | Oct 19–30 | Crisp PDF + PPTX exports, optional stages | X3, X4, ~~S1~~, ~~F8~~ (done 09-28) | 4–7d |
-| W6–7 | Nov 2–13 | Site analysis stage | S2 | 1.5–2.5w |
+| W6–8 | Nov 2–18 | Site analysis stage | S2 (plan waiting for sign-off) | 2.5–3w |
 | W8–9 | Nov 16–27 | Images to Supabase Storage | F6 (needs dashboard access) | 1–2w |
 | W10–11 | Nov 30–Dec 11 | Full-resolution photos, sharp floor plans, lighter editor previews | X1, X2, X7 | 4–7d |
 | W12–13 | Dec 14–25 | Animated GIFs + uploaded videos | X8, X9 | 6–9d |
@@ -199,16 +199,13 @@ shorten this. Adjust the weeks for holidays and review time.
       Site analysis and Design consideration are ordinary stages for now,
       with their own image and regions, until S2 decides more. See
       PROGRESS.md 2026-09-28 (cont'd).
-- [ ] **S2** Site analysis stage (requested 2026-09-28): the site
-      due-diligence plan, with about 90 checklist items in 6 categories
-      (Access & Circulation; MEP; Fire & Life Safety; Natural &
-      Environmental; Regulatory & Landlord). Each item appears as a marker
-      (an icon placed on the plan), a line (a route, pipe or wall), an area
-      (a shaded region), or a fact (a row in a checklist table beside the
-      plan). Each entry carries a note, a value and a status (Verified, To
-      verify, Not available). Categories work as layers that can be shown or
-      hidden. The full list and proposed design are in
-      `docs/site-analysis-checklist.md` (C) · **1.5–2.5w · W6–7**
+- [x] ~~**S2** Site analysis stage~~ (built 2026-10-05): the site
+      due-diligence plan, with 96 checklist items in 8 categories. Markers,
+      lines and areas on the plan; facts in the checklist beside it. Layers
+      per category, statuses, notes, values. Place/edit/delete from the
+      Properties panel; Presenter shows recorded facts only. Export starts
+      on the first non-site stage. Full design in
+      `docs/site-analysis-checklist.md`.
 
 ## Linked Views — background, key-plan, seating
 

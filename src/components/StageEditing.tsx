@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { SUGGESTED_PLAN_STAGES } from '@/lib/linkedViewStages';
 import type { LinkedViewStagesSnapshot } from '@/lib/editorStore';
 import { IconButton } from './ui/Button';
@@ -39,6 +39,14 @@ const SURFACE: Record<Surface, { box: string; heading: string; chip: string; chi
 };
 
 const norm = (label: string) => label.trim().toLowerCase();
+
+/** The labels the picker treats as already on the plan. The Site analysis
+ *  stage counts as "Site analysis" whatever it's been renamed to, since a
+ *  plan gets only one (S2). */
+export function existingStageLabels(stages: { label: string; isSite?: boolean }[]): string[] {
+  const labels = stages.map((s) => s.label);
+  return stages.some((s) => s.isSite) ? [...labels, SUGGESTED_PLAN_STAGES[0]] : labels;
+}
 
 /** Pick stages to add: the six suggested plan stages to tick (Layout views
  *  only), and a stage with any name. One Add for all of them, so building a
@@ -183,7 +191,7 @@ export function StageList({ stages }: { stages: LinkedViewStagesSnapshot }) {
         <StagePicker
           surface="panel"
           suggest={stages.suggest}
-          existingLabels={stages.list.map((s) => s.label)}
+          existingLabels={existingStageLabels(stages.list)}
           onAdd={(labels) => {
             stages.onAdd(labels);
             setAdding(false);
@@ -230,8 +238,15 @@ function StageRow({
     setSeen(label);
     setDraft(label);
   }
+  // Esc blurs the box to put the name back, and that blur would otherwise
+  // commit the text this render still holds.
+  const cancelled = useRef(false);
 
   function commit() {
+    if (cancelled.current) {
+      cancelled.current = false;
+      return;
+    }
     if (draft.trim() && draft.trim() !== label) onRename(draft);
     else setDraft(label);
   }
@@ -255,6 +270,7 @@ function StageRow({
         onKeyDown={(e) => {
           if (e.key === 'Enter') e.currentTarget.blur();
           if (e.key === 'Escape') {
+            cancelled.current = true;
             setDraft(label);
             e.currentTarget.blur();
           }

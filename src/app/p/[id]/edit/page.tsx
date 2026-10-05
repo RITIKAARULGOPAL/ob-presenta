@@ -150,15 +150,20 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
       }
 
       const active = document.activeElement;
+      // A <select> counts too: arrows there pick an option, not a slide.
       const isEditingText =
-        active instanceof HTMLElement && (active.isContentEditable || active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
+        active instanceof HTMLElement &&
+        (active.isContentEditable || active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT');
       if (isEditingText) return;
 
       const currentSlideId = currentSlide?.id;
       const mod = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
 
-      if (e.key === 'Delete' || e.key === 'Backspace') {
+      // Only while the slide rail has focus, as in Google Slides (B2). On the
+      // canvas these keys belong to what's being edited there: a point being
+      // drawn, a selected site entry, a picture just clicked.
+      if ((e.key === 'Delete' || e.key === 'Backspace') && active instanceof HTMLElement && active.closest('[data-slide-rail]')) {
         e.preventDefault();
         if (selectedSlideIds.length > 1) removeSlides(selectedSlideIds);
         else if (currentSlideId) removeSlide(currentSlideId);
@@ -477,7 +482,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               onClick={() => toggleSkip(currentSlide.id)}
             />
             {project.slides.length > 1 && (
-              <IconButton variant="danger" label="Delete slide" title="Delete slide (Delete)" icon={<IconTrash className="h-[15px] w-[15px]" />} onClick={() => removeSlide(currentSlide.id)} />
+              <IconButton variant="danger" label="Delete slide" title="Delete slide (or Delete in the slide rail)" icon={<IconTrash className="h-[15px] w-[15px]" />} onClick={() => removeSlide(currentSlide.id)} />
             )}
           </>
         )}

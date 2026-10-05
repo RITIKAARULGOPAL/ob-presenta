@@ -9,6 +9,7 @@ import { IconImage, IconLink, IconDroplet, IconType, IconLayers, IconCompass, Ic
 import type { Brand, SectionIconKey } from '@/types/slide';
 import { LINKED_VIEW_DRAW_TOOLS } from './SlideRenderer';
 import { StageList } from './StageEditing';
+import { SitePanel } from './SitePanel';
 
 type SectionKey = 'designOption' | 'sectionIcon' | 'background' | 'logo' | 'linkedSlides' | 'accent' | 'typography';
 
@@ -119,6 +120,7 @@ export function PropertiesPanel() {
   // e.g. Background, so "present at all = relevant right now" is the more
   // useful default. Not slide-keyed since it isn't part of `SectionKey`.
   const [toolbarOpen, setToolbarOpen] = useState(true);
+  const [siteOpen, setSiteOpen] = useState(true);
 
   const linkedIds = slide?.fields.linkedSlideIds ?? [];
   // Plans, renders and design slides are what a concept wants to point at —
@@ -288,6 +290,15 @@ export function PropertiesPanel() {
             ))}
           </div>
           )}
+        </Disclosure>
+      )}
+
+      {/* The Site analysis stage's own tools (S2), right under the plan's:
+          shown while that stage is on the slide, or while a stage named Site
+          analysis is waiting to be set up. */}
+      {linkedViewToolbar?.site && (
+        <Disclosure icon={<IconLayers className="h-3.5 w-3.5" />} label="Site Analysis" open={siteOpen} onToggle={() => setSiteOpen((o) => !o)}>
+          <SitePanel site={linkedViewToolbar.site} />
         </Disclosure>
       )}
 

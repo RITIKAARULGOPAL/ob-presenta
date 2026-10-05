@@ -95,8 +95,11 @@ or re-explain anything.
   Presenter load; a recorded 96 KB webm dropped on the title slide
   uploaded to the `media` bucket, fills the slide and loads in Presenter.
 - Deployed: `main` fast-forwarded to `f269806` by the user, live at
-  https://ob-presenta.vercel.app. Preview builds of branches still fail on
-  Vercel (every Preview on record has) — likely Preview env vars.
+  https://ob-presenta.vercel.app.
+- Vercel Preview builds had failed since 09-22 with "supabaseUrl is
+  required": both Supabase env vars were Production-only. The user ticked
+  Preview on both (2026-10-05). `GEMINI_API_KEY` isn't set on Vercel at all,
+  so `/api/import-slide` can't work there until it's added.
 - Get the Vercel build error and fix it.
 - Delete scratch deck `proj_8i77grpxmumdc4qk`.
 
